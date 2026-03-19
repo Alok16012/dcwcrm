@@ -51,10 +51,10 @@ export function Sidebar({ role }: SidebarProps) {
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Distance Courses Wala" className="w-8 h-8 rounded-lg bg-white" />
-            <div className="flex flex-col">
+            <img src="/brand-logo.png" alt="Distance Courses Wala" className="w-10 h-10" />
+            <div className="flex flex-col justify-center">
               <span className="font-bold text-xs leading-tight">Distance Courses</span>
-              <span className="text-[10px] text-blue-400 font-medium leading-tight">Wala.com</span>
+              <span className="text-[10px] text-blue-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Wala</span>
             </div>
           </div>
         )}

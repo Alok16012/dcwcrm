@@ -197,7 +197,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
       <LeadTransferModal
         open={showTransfer}
         onClose={() => setShowTransfer(false)}
-        leadId={lead.id}
+        leadIds={[lead.id]}
         currentAssignee={lead.assigned_to}
         onSuccess={async () => {
           setShowTransfer(false)

@@ -4,6 +4,7 @@ export const studentSchema = z.object({
     full_name: z.string().min(2, 'Name required'),
     phone: z.string().min(10, 'Valid phone required'),
     email: z.string().email().optional().or(z.literal('')),
+    guardian_name: z.string().optional().or(z.literal('')),
     city: z.string().optional(),
     enrollment_number: z.string().min(1, 'Enrollment number required'),
     enrollment_date: z.string().optional(),

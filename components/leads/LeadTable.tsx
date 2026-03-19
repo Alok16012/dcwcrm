@@ -71,15 +71,16 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
   const { filters, setFilters, clearFilters } = useLeadStore()
   const [search, setSearch] = useState(filters.search ?? '')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [transferLead, setTransferLead] = useState<Lead | null>(null)
+  const [transferLeadIds, setTransferLeadIds] = useState<string[]>([])
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [statusLead, setStatusLead] = useState<Lead | null>(null)
+  const [showBulkDelete, setShowBulkDelete] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [showFilters, setShowFilters] = useState(false)
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
   const [mounted, setMounted] = useState(false)
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
   useEffect(() => {
@@ -156,6 +157,18 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
 
   async function confirmStatusChange() {
     // This is now handled by ConvertLeadModal
+  }
+
+  async function handleBulkDelete() {
+    startTransition(async () => {
+      const { error } = await supabase.from('leads').delete().in('id', Array.from(selected))
+      if (error) { toast.error('Failed to delete leads'); return }
+
+      toast.success(`Deleted ${selected.size} lead(s) successfully`)
+      setSelected(new Set())
+      setShowBulkDelete(false)
+      onRefresh()
+    })
   }
 
   if (!mounted) return <div className="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[400px] animate-pulse" />
@@ -348,7 +361,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)}>View Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditLead(lead)}>Update Details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTransferLead(lead)}>Transfer Lead</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][])
                           .filter(([k]) => k !== lead.status)
@@ -382,7 +395,11 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
 
           <div className="flex items-center gap-3 text-sm text-gray-500">
             {selected.size > 0 && (
-              <span className="text-blue-600 font-medium mr-2">{selected.size} selected</span>
+              <div className="flex items-center gap-2 mr-2">
+                <span className="text-blue-600 font-medium">{selected.size} selected</span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setTransferLeadIds(Array.from(selected))}>Transfer</Button>
+                <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setShowBulkDelete(true)}>Delete</Button>
+              </div>
             )}
             <span>
               {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, sorted.length)} of {sorted.length}
@@ -411,13 +428,13 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
       )}
 
       {/* Modals */}
-      {transferLead && (
+      {transferLeadIds.length > 0 && (
         <LeadTransferModal
           open={true}
-          onClose={() => setTransferLead(null)}
-          leadId={transferLead.id}
-          currentAssignee={transferLead.assigned_to}
-          onSuccess={() => { setTransferLead(null); onRefresh() }}
+          onClose={() => setTransferLeadIds([])}
+          leadIds={transferLeadIds}
+          currentAssignee={transferLeadIds.length === 1 ? paginated.find(l => l.id === transferLeadIds[0])?.assigned_to : undefined}
+          onSuccess={() => { setTransferLeadIds([]); setSelected(new Set()); onRefresh() }}
         />
       )}
       {/* Convert modal with fee details */}
@@ -429,6 +446,16 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
           onSuccess={() => { setStatusLead(null); onRefresh() }}
         />
       )}
+
+      {/* Confirm Bulk Delete Dialog */}
+      <ConfirmDialog
+        open={showBulkDelete}
+        onCancel={() => setShowBulkDelete(false)}
+        title="Delete Selected Leads"
+        description={`Are you sure you want to delete ${selected.size} lead(s)? This action cannot be undone.`}
+        onConfirm={handleBulkDelete}
+        destructive
+      />
 
       {/* Edit Lead Dialog */}
       <Dialog open={!!editLead} onOpenChange={(open) => !open && setEditLead(null)}>

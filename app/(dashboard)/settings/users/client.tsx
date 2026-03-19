@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +32,7 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
   const [users, setUsers] = useState(initialUsers)
   const [open, setOpen] = useState(false)
   const [confirmUser, setConfirmUser] = useState<Profile | null>(null)
+  const [deleteUser, setDeleteUser] = useState<Profile | null>(null)
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
@@ -74,27 +75,63 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
     setConfirmUser(null)
   }
 
+  async function handleDeleteUser(user: Profile) {
+    startTransition(async () => {
+      try {
+        const res = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        })
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error)
+
+        setUsers((prev) => prev.filter((u) => u.id !== user.id))
+        toast.success('User deleted successfully')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete user')
+      }
+      setDeleteUser(null)
+    })
+  }
+
   const columns: ColumnDef<Profile>[] = [
     { accessorKey: 'full_name', header: 'Name' },
     { accessorKey: 'email', header: 'Email' },
-    { accessorKey: 'role', header: 'Role', cell: ({ row }) => (
-      <Badge variant="outline" className="capitalize">{row.original.role}</Badge>
-    )},
+    {
+      accessorKey: 'role', header: 'Role', cell: ({ row }) => (
+        <Badge variant="outline" className="capitalize">{row.original.role}</Badge>
+      )
+    },
     { accessorKey: 'phone', header: 'Phone', cell: ({ row }) => row.original.phone ?? '-' },
-    { accessorKey: 'is_active', header: 'Status', cell: ({ row }) => (
-      <Badge className={row.original.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-        {row.original.is_active ? 'Active' : 'Inactive'}
-      </Badge>
-    )},
-    { id: 'actions', header: 'Actions', cell: ({ row }) => (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setConfirmUser(row.original)}
-      >
-        {row.original.is_active ? <UserX className="w-4 h-4 text-red-500" /> : <UserCheck className="w-4 h-4 text-green-500" />}
-      </Button>
-    )},
+    {
+      accessorKey: 'is_active', header: 'Status', cell: ({ row }) => (
+        <Badge className={row.original.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+          {row.original.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      )
+    },
+    {
+      id: 'actions', header: 'Actions', cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmUser(row.original)}
+          >
+            {row.original.is_active ? <UserX className="w-4 h-4 text-red-500" /> : <UserCheck className="w-4 h-4 text-green-500" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            onClick={() => setDeleteUser(row.original)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      )
+    },
   ]
 
   return (
@@ -143,6 +180,17 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
           destructive={confirmUser.is_active}
           onConfirm={() => toggleUserStatus(confirmUser)}
           onCancel={() => setConfirmUser(null)}
+        />
+      )}
+      {deleteUser && (
+        <ConfirmDialog
+          open={true}
+          title="Delete User"
+          description={`Are you sure you want to completely delete ${deleteUser.full_name}? This will permanently remove their account and all their access. This action cannot be undone.`}
+          confirmLabel="Delete"
+          destructive={true}
+          onConfirm={() => handleDeleteUser(deleteUser)}
+          onCancel={() => setDeleteUser(null)}
         />
       )}
     </div>

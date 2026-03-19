@@ -41,8 +41,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar role={userProfile.role} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar user={userProfile} />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <div className="flex-1 p-6">
+            {children}
+          </div>
+          <footer className="w-full py-4 text-center text-sm text-gray-500 border-t border-gray-200 mt-auto">
+            Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">Blinks AI</a>
+          </footer>
         </main>
       </div>
     </div>

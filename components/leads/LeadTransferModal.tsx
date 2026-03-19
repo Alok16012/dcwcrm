@@ -12,12 +12,12 @@ import type { Profile } from '@/types/app.types'
 interface LeadTransferModalProps {
   open: boolean
   onClose: () => void
-  leadId: string
+  leadIds: string[]
   currentAssignee?: string | null
   onSuccess: () => void
 }
 
-export function LeadTransferModal({ open, onClose, leadId, currentAssignee, onSuccess }: LeadTransferModalProps) {
+export function LeadTransferModal({ open, onClose, leadIds, currentAssignee, onSuccess }: LeadTransferModalProps) {
   const [telecallers, setTelecallers] = useState<Profile[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [reason, setReason] = useState('')
@@ -32,28 +32,33 @@ export function LeadTransferModal({ open, onClose, leadId, currentAssignee, onSu
 
   async function handleTransfer() {
     if (!selectedId) { toast.error('Select a telecaller'); return }
+    if (!leadIds || leadIds.length === 0) { toast.error('No leads selected'); return }
+
     startTransition(async () => {
       try {
         const { error } = await supabase.from('leads').update({
           assigned_to: selectedId,
           assigned_at: new Date().toISOString(),
-        } as never).eq('id', leadId)
+        } as never).in('id', leadIds)
         if (error) throw error
 
         const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('lead_activities').insert({
-          lead_id: leadId,
+
+        const activities = leadIds.map(id => ({
+          lead_id: id,
           activity_type: 'transferred',
           new_value: telecallers.find((t) => t.id === selectedId)?.full_name,
           note: reason || null,
           performed_by: user?.id
-        } as never)
+        }))
 
-        toast.success('Lead transferred successfully')
+        await supabase.from('lead_activities').insert(activities as never)
+
+        toast.success(`Successfully transferred ${leadIds.length} lead${leadIds.length > 1 ? 's' : ''}`)
         onSuccess()
         onClose()
       } catch {
-        toast.error('Failed to transfer lead')
+        toast.error('Failed to transfer lead(s)')
       }
     })
   }

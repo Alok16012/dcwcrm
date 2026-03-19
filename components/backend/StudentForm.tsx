@@ -15,7 +15,7 @@ import {
 } from '@/types/app.types'
 
 interface StudentFormProps {
-    student: Student
+    student?: Partial<Student>
     onSuccess: () => void
     onCancel: () => void
 }
@@ -68,19 +68,20 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<StudentFormData>({
         resolver: zodResolver(studentSchema),
         defaultValues: {
-            full_name: student.full_name,
-            phone: student.phone,
-            email: student.email ?? '',
-            city: student.city ?? '',
-            enrollment_number: student.enrollment_number,
-            enrollment_date: student.enrollment_date ?? '',
-            course_id: student.course_id ?? '',
-            sub_course_id: student.sub_course_id ?? '',
-            assigned_counsellor: student.assigned_counsellor ?? '',
-            status: student.status as any,
-            incentive_amount: student.incentive_amount ?? 0,
-            total_fee: student.total_fee ?? 0,
-            amount_paid: student.amount_paid ?? 0,
+            full_name: student?.full_name ?? '',
+            guardian_name: student?.guardian_name ?? '',
+            phone: student?.phone ?? '',
+            email: student?.email ?? '',
+            city: student?.city ?? '',
+            enrollment_number: student?.enrollment_number ?? '',
+            enrollment_date: student?.enrollment_date ?? '',
+            course_id: student?.course_id ?? '',
+            sub_course_id: student?.sub_course_id ?? '',
+            assigned_counsellor: student?.assigned_counsellor ?? '',
+            status: (student?.status as any) || 'active',
+            incentive_amount: student?.incentive_amount ?? 0,
+            total_fee: student?.total_fee ?? 0,
+            amount_paid: student?.amount_paid ?? 0,
         },
     })
 
@@ -94,26 +95,31 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             ])
 
             const cds = (c ?? []) as any[]
-            if (student.course && !cds.find(x => x.id === student.course?.id)) {
+            if (student?.course && !cds.find(x => x.id === student.course?.id)) {
                 cds.push(student.course)
             }
+            const pds = (p ?? []) as any[]
+            if (student?.counsellor && !pds.find(x => x.id === student.counsellor?.id)) {
+                pds.push(student.counsellor)
+            }
             setCourses([...cds])
-            setCounsellors(p ?? [])
+            setCounsellors([...pds])
 
             reset({
-                full_name: student.full_name,
-                phone: student.phone,
-                email: student.email ?? '',
-                city: student.city ?? '',
-                enrollment_number: student.enrollment_number,
-                enrollment_date: student.enrollment_date ?? '',
-                course_id: student.course_id ?? (student as any).course?.id ?? '',
-                sub_course_id: student.sub_course_id ?? (student as any).sub_course?.id ?? '',
-                assigned_counsellor: student.assigned_counsellor ?? '',
-                status: student.status as any,
-                incentive_amount: student.incentive_amount ?? 0,
-                total_fee: student.total_fee ?? 0,
-                amount_paid: student.amount_paid ?? 0,
+                full_name: student?.full_name ?? '',
+                guardian_name: student?.guardian_name ?? '',
+                phone: student?.phone ?? '',
+                email: student?.email ?? '',
+                city: student?.city ?? '',
+                enrollment_number: student?.enrollment_number ?? '',
+                enrollment_date: student?.enrollment_date ?? '',
+                course_id: student?.course_id ?? (student as any)?.course?.id ?? '',
+                sub_course_id: student?.sub_course_id ?? (student as any)?.sub_course?.id ?? '',
+                assigned_counsellor: student?.assigned_counsellor ?? '',
+                status: (student?.status as any) || 'active',
+                incentive_amount: student?.incentive_amount ?? 0,
+                total_fee: student?.total_fee ?? 0,
+                amount_paid: student?.amount_paid ?? 0,
             } as any)
         }
         load()
@@ -124,12 +130,12 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         supabase.from('sub_courses').select('*').eq('course_id', selectedCourseId)
             .then(({ data }) => {
                 const sds = (data ?? []) as any[]
-                if (student.sub_course && student.sub_course.course_id === selectedCourseId) {
+                if (student?.sub_course && student.sub_course.course_id === selectedCourseId) {
                     if (!sds.find(x => x.id === student.sub_course?.id)) sds.push(student.sub_course)
                 }
                 setSubCourses([...sds])
-                if (selectedCourseId === (student.course_id || student.course?.id)) {
-                    setValue('sub_course_id', (student.sub_course_id || (student as any).sub_course?.id || '') as any)
+                if (selectedCourseId === (student?.course_id || student?.course?.id)) {
+                    setValue('sub_course_id', (student?.sub_course_id || (student as any)?.sub_course?.id || '') as any)
                 }
             })
     }, [selectedCourseId, student, setValue])
@@ -137,16 +143,24 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     async function onSubmit(data: StudentFormData) {
         setLoading(true)
         try {
-            const { error } = await supabase.from('students').update({
-                ...data,
-                updated_at: new Date().toISOString(),
-            } as never).eq('id', student.id)
+            if (student?.id) {
+                const { error } = await supabase.from('students').update({
+                    ...data,
+                    updated_at: new Date().toISOString(),
+                } as never).eq('id', student.id)
+                if (error) throw error
+                toast.success('Student profile updated')
+            } else {
+                const { error } = await supabase.from('students').insert({
+                    ...data,
+                } as never)
+                if (error) throw error
+                toast.success('Student successfully added')
+            }
 
-            if (error) throw error
-            toast.success('Student profile updated')
             onSuccess()
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update student')
+            toast.error(err instanceof Error ? err.message : 'Failed to save student')
         } finally {
             setLoading(false)
         }
@@ -161,6 +175,13 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                             <Input {...register('full_name')} className="pl-9 bg-white border-blue-200" />
+                        </div>
+                    </FieldWrapper>
+
+                    <FieldWrapper label="Guardian / Father Name" error={errors.guardian_name?.message}>
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                            <Input {...register('guardian_name')} className="pl-9 bg-white border-blue-200" />
                         </div>
                     </FieldWrapper>
 
@@ -225,12 +246,16 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     <FieldWrapper label="Counsellor">
                         <div className="relative">
                             <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-                            <Select value={watch('assigned_counsellor') || ''} onValueChange={(v) => setValue('assigned_counsellor', v || '')}>
+                            <Select value={(watch('assigned_counsellor') as string) || 'none'} onValueChange={(v) => setValue('assigned_counsellor', (v === 'none' ? '' : v) as any)}>
                                 <SelectTrigger className="pl-9 bg-white border-purple-200">
-                                    <SelectValue placeholder="Select counsellor" />
+                                    <SelectValue placeholder="Select counsellor">
+                                        {(watch('assigned_counsellor') && watch('assigned_counsellor') !== 'none')
+                                            ? counsellors.find(c => c.id === (watch('assigned_counsellor') || ''))?.full_name || (student as any)?.counsellor?.full_name || watch('assigned_counsellor')
+                                            : "Select counsellor"}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Unassigned</SelectItem>
+                                    <SelectItem value="none">Unassigned</SelectItem>
                                     {counsellors.map((c) => (
                                         <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
                                     ))}
@@ -303,7 +328,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]">
-                    {loading ? 'Saving...' : 'Update Student'}
+                    {loading ? 'Saving...' : student?.id ? 'Update Student' : 'Add Student'}
                 </Button>
             </div>
         </form>

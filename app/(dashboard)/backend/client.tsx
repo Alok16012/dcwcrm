@@ -42,6 +42,7 @@ export function BackendListClient() {
   const [statusFilter, setStatusFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
   const [editStudent, setEditStudent] = useState<Student | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
   const supabase = createClient()
 
   const fetchStudents = useCallback(async () => {
@@ -159,6 +160,9 @@ export function BackendListClient() {
             <SelectItem value="unpaid">Unpaid</SelectItem>
           </SelectContent>
         </Select>
+        <Button onClick={() => setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+          + Add Student
+        </Button>
       </div>
 
       <DataTable
@@ -183,6 +187,21 @@ export function BackendListClient() {
               onCancel={() => setEditStudent(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Student</DialogTitle>
+          </DialogHeader>
+          <StudentForm
+            onSuccess={() => {
+              setShowAdd(false)
+              fetchStudents()
+            }}
+            onCancel={() => setShowAdd(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

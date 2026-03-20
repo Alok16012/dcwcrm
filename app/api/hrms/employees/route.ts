@@ -106,17 +106,92 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const supabase = await createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user ?? null
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const adminClient = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    // Check role using adminClient to avoid recursion
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single() as { data: { role: string } | null }
+
+    if (!profile || !['admin', 'backend'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Employee ID required' }, { status: 400 })
+    }
+
+    const { data: employee, error: fetchError } = await adminClient
+      .from('employees')
+      .select('*, profiles(full_name, email, phone, role)')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      console.error('Fetch employee error:', fetchError)
+      return NextResponse.json({ error: fetchError.message }, { status: 404 })
+    }
+
+    if (!employee) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    }
+
+    const profileData = Array.isArray((employee as any).profiles) ? (employee as any).profiles[0] : (employee as any).profiles
+
+    const final = {
+      ...(employee as any),
+      full_name: profileData?.full_name || '—',
+      role: profileData?.role || '—',
+      email: profileData?.email || '',
+      phone: profileData?.phone || '',
+    }
+    delete final.profiles
+
+    return NextResponse.json({ employee: final })
+  } catch (error) {
+    console.error('GET employee error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createServerClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const adminClient = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    // Check role using adminClient to avoid recursion
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -137,27 +212,23 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    // Get the employee to find their profile_id
-    console.log('Fetching employee to find profile_id for id:', id)
-    const { data: employee, error: fetchError } = await supabase
+    // Get the employee to find their profile_id (use adminClient to bypass RLS)
+    const { data: employee, error: fetchError } = await adminClient
       .from('employees')
       .select('profile_id')
       .eq('id', id)
       .single()
 
     if (fetchError) {
-      console.error('Fetch employee error:', fetchError)
       throw new Error(`Failed to fetch employee: ${fetchError.message}`)
     }
     if (!employee) {
-      console.error('Employee not found for id:', id)
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
     }
 
     const profileId = (employee as any).profile_id
-    console.log('Found profileId:', profileId)
 
-    // Update Profile
+    // Update Profile (use adminClient to bypass RLS)
     const profileUpdate: any = {}
     if (updateData.full_name) profileUpdate.full_name = updateData.full_name
     if (updateData.email) profileUpdate.email = updateData.email
@@ -165,17 +236,15 @@ export async function PATCH(req: NextRequest) {
     if (updateData.role) profileUpdate.role = updateData.role
 
     if (Object.keys(profileUpdate).length > 0) {
-      console.log('Updating profile with:', profileUpdate)
-      const { error: pError } = await (supabase.from('profiles') as any)
+      const { error: pError } = await (adminClient.from('profiles') as any)
         .update(profileUpdate)
         .eq('id', profileId)
       if (pError) {
-        console.error('Profile update error:', pError)
         throw pError
       }
     }
 
-    // Update Employee
+    // Update Employee (use adminClient to bypass RLS)
     const empUpdate: any = {}
     if (updateData.department) empUpdate.department = updateData.department
     if (updateData.designation) empUpdate.designation = updateData.designation
@@ -190,29 +259,27 @@ export async function PATCH(req: NextRequest) {
     if (updateData.salary_cycle_start_day !== undefined) empUpdate.salary_cycle_start_day = updateData.salary_cycle_start_day
 
     if (Object.keys(empUpdate).length > 0) {
-      console.log('Updating employee with:', empUpdate)
-      const { error: eError } = await (supabase.from('employees') as any)
+      const { error: eError } = await (adminClient.from('employees') as any)
         .update(empUpdate)
         .eq('id', id)
       if (eError) {
-        console.error('Employee update error:', eError)
         throw eError
       }
     }
 
-    // Fetch updated employee
-    console.log('Fetching updated employee data for id:', id)
-    const { data: updated, error: uError } = await supabase
+    // Fetch updated employee (use adminClient to bypass RLS)
+    const { data: updated, error: uError } = await adminClient
       .from('employees')
       .select('*, profiles(full_name, role)')
       .eq('id', id)
       .single()
 
     if (uError) {
-      console.error('Fetch updated employee error:', uError)
       throw uError
     }
-    if (!updated) throw new Error('Failed to fetch updated employee after update')
+    if (!updated) {
+      throw new Error('Failed to fetch updated employee after update')
+    }
 
     // Handle profile data (it might be an object or an array depending on PostgREST version/config)
     const profileData = updated ? (Array.isArray((updated as any).profiles) ? (updated as any).profiles[0] : (updated as any).profiles) : null
@@ -225,13 +292,12 @@ export async function PATCH(req: NextRequest) {
     delete final.profiles
 
     return NextResponse.json({ employee: final })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update employee overall error:', error)
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Internal server error',
-        details: error instanceof Error ? error.stack : undefined,
-        raw: JSON.stringify(error)
+        error: error?.message || 'Internal server error',
+        stack: error?.stack
       },
       { status: 500 }
     )

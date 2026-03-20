@@ -100,48 +100,37 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
 
     startTransition(async () => {
       try {
-        // Fetch full detail for editing (especially salary/bank fields not in table)
-        const res = await fetch(`/api/hrms/employees?id=${id}`) // Wait, I need a way to get one employee
-        // Actually, the API doesn't have a GET by ID yet. 
-        // I'll fetch it from supabase client directly if possible, or just use what I have if it's enough.
-        // Wait! The table might not have all fields.
-
-        // I'll just use the supabase client to fetch the full record.
-        const { createClient } = await import('@/lib/supabase/client')
-        const supabase = createClient()
-        const { data: fullEmp, error } = await supabase
-          .from('employees')
-          .select('*, profiles(full_name, email, phone, role)')
-          .eq('id', id)
-          .single()
-
-        if (error || !fullEmp) throw new Error('Failed to fetch employee details')
-
-        const profileData = Array.isArray((fullEmp as any).profiles) ? (fullEmp as any).profiles[0] : (fullEmp as any).profiles
+        // Fetch full detail via API (avoids RLS recursion issues on client)
+        const res = await fetch(`/api/hrms/employees?id=${id}`)
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Failed to fetch employee details')
+        }
+        const { employee: fullEmp } = await res.json()
 
         const formData: EmployeeFormData = {
-          full_name: profileData?.full_name || '',
-          email: profileData?.email || '',
-          phone: profileData?.phone || '',
-          role: profileData?.role || 'lead',
-          department: (fullEmp as any).department || '',
-          designation: (fullEmp as any).designation || '',
-          joining_date: (fullEmp as any).joining_date || '',
-          basic_salary: (fullEmp as any).basic_salary || 0,
-          hra: (fullEmp as any).hra || 0,
-          allowances: (fullEmp as any).allowances || 0,
-          pf_deduction: (fullEmp as any).pf_deduction || 0,
-          tds_deduction: (fullEmp as any).tds_deduction || 0,
-          bank_account_masked: (fullEmp as any).bank_account || '',
-          bank_ifsc: (fullEmp as any).bank_ifsc || '',
-          salary_cycle_start_day: (fullEmp as any).salary_cycle_start_day || 1,
+          full_name: fullEmp.full_name || '',
+          email: fullEmp.email || '',
+          phone: fullEmp.phone || '',
+          role: fullEmp.role || 'lead',
+          department: fullEmp.department || '',
+          designation: fullEmp.designation || '',
+          joining_date: fullEmp.joining_date || '',
+          basic_salary: fullEmp.basic_salary || 0,
+          hra: fullEmp.hra || 0,
+          allowances: fullEmp.allowances || 0,
+          pf_deduction: fullEmp.pf_deduction || 0,
+          tds_deduction: fullEmp.tds_deduction || 0,
+          bank_account_masked: fullEmp.bank_account || '',
+          bank_ifsc: fullEmp.bank_ifsc || '',
+          salary_cycle_start_day: fullEmp.salary_cycle_start_day || 1,
         }
 
         setEditingEmployee(emp)
         reset({ ...formData, role: formData.role as 'admin' | 'lead' | 'backend' })
         setShowForm(true)
-      } catch (e) {
-        toast.error('Failed to load employee details')
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : 'Failed to load employee details')
       }
     })
   }

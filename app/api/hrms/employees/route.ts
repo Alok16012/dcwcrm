@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       full_name, email, phone, role,
       department, designation, joining_date,
       basic_salary, hra, allowances, pf_deduction, tds_deduction,
-      bank_account_masked, bank_ifsc,
+      bank_account_masked, bank_ifsc, salary_cycle_start_day,
     } = parsed.data
 
     // Use service role client for creating auth users
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       tds_deduction,
       bank_account: bank_account_masked ?? null,
       bank_ifsc: bank_ifsc ?? null,
+      salary_cycle_start_day: salary_cycle_start_day ?? 1,
       is_active: true,
     } as never).select('*').single()
 
@@ -175,6 +176,7 @@ export async function PATCH(req: NextRequest) {
     if (updateData.tds_deduction !== undefined) empUpdate.tds_deduction = updateData.tds_deduction
     if (updateData.bank_account_masked !== undefined) empUpdate.bank_account = updateData.bank_account_masked
     if (updateData.bank_ifsc !== undefined) empUpdate.bank_ifsc = updateData.bank_ifsc
+    if (updateData.salary_cycle_start_day !== undefined) empUpdate.salary_cycle_start_day = updateData.salary_cycle_start_day
 
     if (Object.keys(empUpdate).length > 0) {
       const { error: eError } = await (supabase.from('employees') as any)

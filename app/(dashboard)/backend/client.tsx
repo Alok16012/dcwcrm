@@ -139,6 +139,37 @@ export function BackendListClient() {
   }, [fetchStudents])
 
   const columns: ColumnDef<Student>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
+          checked={table.getIsAllPageRowsSelected()}
+          ref={(el) => {
+            if (el) el.indeterminate = table.getIsSomePageRowsSelected()
+          }}
+          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
+          checked={row.getIsSelected()}
+          onChange={(e) => row.toggleSelected(e.target.checked)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      id: 'serial',
+      header: 'S.No',
+      cell: ({ row }) => <span className="text-gray-500 tabular-nums">{row.index + 1}</span>,
+    },
     { accessorKey: 'full_name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.full_name}</span> },
     { accessorKey: 'phone', header: 'Phone' },
     { id: 'mode', header: 'Mode', cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.mode ?? '-'}</Badge> },

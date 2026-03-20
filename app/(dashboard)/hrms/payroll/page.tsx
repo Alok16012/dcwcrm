@@ -19,7 +19,7 @@ export default async function PayrollPage({
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || profile.role !== 'admin') redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const now = new Date()
   const month = Number(searchParams.month ?? getMonth(now) + 1)
@@ -27,7 +27,7 @@ export default async function PayrollPage({
 
   const { data: payRaw, error } = await supabase
     .from('payroll')
-    .select('id, employee_id, month, year, basic, hra, allowances, incentive, gross, pf, tds, other_deductions, net, status, payment_date')
+    .select('id, employee_id, month, year, basic, hra, allowances, incentive, gross, pf, tds, other_deductions, leave_deduction, net, status, payment_date')
     .eq('month', month)
     .eq('year', year)
     .order('employee_id')
@@ -36,7 +36,7 @@ export default async function PayrollPage({
     return <div className="p-4 text-red-500">Failed to load payroll: {error.message}</div>
   }
 
-  type RawPayroll = { id: string; employee_id: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; net: number; status: string; payment_date: string | null }
+  type RawPayroll = { id: string; employee_id: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; leave_deduction: number; net: number; status: string; payment_date: string | null }
   const payrollData = payRaw as RawPayroll[] | null
 
   // Fetch employee names
@@ -65,6 +65,7 @@ export default async function PayrollPage({
     pf: p.pf,
     tds: p.tds,
     other_deductions: p.other_deductions,
+    leave_deduction: p.leave_deduction,
     net: p.net,
     status: p.status as 'draft' | 'processed' | 'paid',
     payment_date: p.payment_date,

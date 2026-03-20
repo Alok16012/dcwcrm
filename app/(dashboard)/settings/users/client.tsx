@@ -22,7 +22,7 @@ const createUserSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(8, 'Min 8 characters'),
-  role: z.enum(['admin', 'telecaller', 'backend', 'finance']),
+  role: z.enum(['admin', 'lead', 'backend']),
   phone: z.string().optional(),
 })
 
@@ -157,9 +157,8 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
                     <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="telecaller">Telecaller</SelectItem>
+                      <SelectItem value="lead">Lead</SelectItem>
                       <SelectItem value="backend">Backend</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.role && <p className="text-xs text-red-500">{errors.role.message}</p>}

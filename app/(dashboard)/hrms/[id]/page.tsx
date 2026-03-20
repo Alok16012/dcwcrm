@@ -25,7 +25,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!currentProfile || currentProfile.role !== 'admin') redirect('/')
+  if (!currentProfile || !['admin', 'backend'].includes(currentProfile.role)) redirect('/')
 
   const now = new Date()
   const currentMonth = getMonth(now) + 1
@@ -69,7 +69,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
     attendance: attendanceMap,
   }]
 
-  type PayrollRow = { id: string; employee_id: string; employee_name: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; net: number; status: 'draft' | 'processed' | 'paid'; payment_date: string | null }
+  type PayrollRow = { id: string; employee_id: string; employee_name: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; leave_deduction: number; net: number; status: 'draft' | 'processed' | 'paid'; payment_date: string | null }
   const payrollRows = (payrollData ?? []).map((p) => ({
     ...(p as Record<string, unknown>),
     employee_name: profile?.full_name ?? '—',

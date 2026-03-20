@@ -21,7 +21,7 @@ export function LeadFilters() {
   useEffect(() => {
     Promise.all([
       supabase.from('courses').select('*').eq('is_active', true).order('name'),
-      supabase.from('profiles').select('*').eq('role', 'telecaller').eq('is_active', true),
+      supabase.from('profiles').select('*').eq('role', 'lead').eq('is_active', true),
     ]).then(([{ data: c }, { data: t }]) => {
       setCourses(c ?? [])
       setTelecallers(t ?? [])
@@ -78,11 +78,10 @@ export function LeadFilters() {
             <button
               key={k}
               onClick={() => toggleStatus(k)}
-              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                filters.status?.includes(k)
+              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filters.status?.includes(k)
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}
+                }`}
             >
               {v}
             </button>
@@ -98,11 +97,10 @@ export function LeadFilters() {
             <button
               key={k}
               onClick={() => toggleSource(k)}
-              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                filters.source?.includes(k)
+              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filters.source?.includes(k)
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}
+                }`}
             >
               {v}
             </button>

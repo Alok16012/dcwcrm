@@ -16,7 +16,6 @@ export default async function DashboardPage() {
 
   // Non-admin users get redirected to their module (excluding telecallers who now have access)
   if (profile?.role === 'backend') redirect('/backend')
-  if (profile?.role === 'finance') redirect('/finance')
 
   const now = new Date()
   const todayStart = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss")
@@ -26,7 +25,7 @@ export default async function DashboardPage() {
   const todayDate = format(now, 'yyyy-MM-dd')
 
   const applyScope = (q: any, table: string) => {
-    if (profile?.role === 'telecaller') {
+    if (profile?.role === 'lead') {
       if (table === 'leads') return q.eq('assigned_to', user!.id)
       if (table === 'students') return q.eq('assigned_counsellor', user!.id)
       if (table === 'payments') return q.eq('recorded_by', user!.id)

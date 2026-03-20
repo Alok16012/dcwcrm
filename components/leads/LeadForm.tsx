@@ -128,7 +128,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
     async function load() {
       const [{ data: c }, { data: t }, { data: ff }, { data: d }, { data: s }] = await Promise.all([
         supabase.from('courses').select('*').order('name'),
-        supabase.from('profiles').select('*').eq('role', 'telecaller').eq('is_active', true).order('full_name'),
+        supabase.from('profiles').select('*').eq('role', 'lead').eq('is_active', true).order('full_name'),
         supabase.from('lead_form_fields').select('*').eq('is_active', true).order('display_order'),
         supabase.from('departments').select('*').order('name'),
         supabase.from('sessions').select('*').order('created_at', { ascending: false }),

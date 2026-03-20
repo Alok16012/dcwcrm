@@ -24,6 +24,7 @@ interface PayrollRow {
   pf: number
   tds: number
   other_deductions: number
+  leave_deduction: number
   net: number
   status: 'draft' | 'processed' | 'paid'
   payment_date: string | null
@@ -128,6 +129,7 @@ export default function PayrollTable({ data: initialData, isAdmin, employeeId, e
             <View style={styles.divider} />
             <View style={styles.row}><Text style={styles.label}>PF Deduction</Text><Text style={styles.value}>- {fmt(row.pf)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>TDS</Text><Text style={styles.value}>- {fmt(row.tds)}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>Leave Deduction</Text><Text style={styles.value}>- {fmt(row.leave_deduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Other Deductions</Text><Text style={styles.value}>- {fmt(row.other_deductions)}</Text></View>
             <View style={styles.divider} />
             <View style={styles.row}><Text style={{ ...styles.label, fontSize: 13, fontWeight: 'bold' }}>Net Pay</Text><Text style={{ ...styles.value, fontSize: 13 }}>{fmt(row.net)}</Text></View>
@@ -211,6 +213,7 @@ export default function PayrollTable({ data: initialData, isAdmin, employeeId, e
               <th className="px-3 py-2 text-right font-semibold">Gross</th>
               <th className="px-3 py-2 text-right">PF</th>
               <th className="px-3 py-2 text-right">TDS</th>
+              <th className="px-3 py-2 text-right">Leave Ded.</th>
               <th className="px-3 py-2 text-right font-semibold">Net</th>
               <th className="px-3 py-2 text-center">Status</th>
               <th className="px-3 py-2 text-center">Slip</th>
@@ -240,6 +243,7 @@ export default function PayrollTable({ data: initialData, isAdmin, employeeId, e
                 <td className="px-3 py-2 text-right font-semibold text-xs">{fmt(row.gross)}</td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.pf)}</td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.tds)}</td>
+                <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.leave_deduction)}</td>
                 <td className="px-3 py-2 text-right font-bold text-green-700">{fmt(row.net)}</td>
                 <td className="px-3 py-2 text-center">
                   <Badge

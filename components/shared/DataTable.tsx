@@ -1,4 +1,3 @@
-'use client'
 import {
   flexRender,
   getCoreRowModel,
@@ -14,20 +13,30 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useState } from 'react'
 
 interface DataTableProps<T> {
   data: T[]
   columns: ColumnDef<T>[]
   isLoading?: boolean
   onRowClick?: (row: T) => void
+  onSelectionChange?: (rows: T[]) => void
 }
 
-export function DataTable<T>({ data, columns, isLoading, onRowClick }: DataTableProps<T>) {
+export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelectionChange }: DataTableProps<T>) {
+  const [rowSelection, setRowSelection] = useState({})
+
   const table = useReactTable({
     data,
     columns,
+    state: {
+      rowSelection,
+    },
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
+    enableRowSelection: true,
   })
+
 
   if (isLoading) {
     return (

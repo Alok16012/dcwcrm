@@ -26,12 +26,12 @@ export function LeadTransferModal({ open, onClose, leadIds, currentAssignee, onS
 
   useEffect(() => {
     if (!open) return
-    supabase.from('profiles').select('*').eq('role', 'telecaller').eq('is_active', true)
+    supabase.from('profiles').select('*').eq('role', 'lead').eq('is_active', true)
       .then(({ data }) => setTelecallers((data ?? []) as any[]))
   }, [open, currentAssignee])
 
   async function handleTransfer() {
-    if (!selectedId) { toast.error('Select a telecaller'); return }
+    if (!selectedId) { toast.error('Select a lead agent'); return }
     if (!leadIds || leadIds.length === 0) { toast.error('No leads selected'); return }
 
     startTransition(async () => {
@@ -71,7 +71,7 @@ export function LeadTransferModal({ open, onClose, leadIds, currentAssignee, onS
           <div>
             <Label>Transfer to</Label>
             <Select value={selectedId} onValueChange={(v) => setSelectedId(v || '')}>
-              <SelectTrigger><SelectValue placeholder="Select telecaller" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger>
               <SelectContent>
                 {telecallers.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
               </SelectContent>

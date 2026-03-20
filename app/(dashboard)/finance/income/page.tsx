@@ -14,7 +14,7 @@ export default async function IncomeePage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || !['admin', 'finance'].includes(profile.role)) redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const { data: paymentsRaw, error } = await supabase
     .from('payments')

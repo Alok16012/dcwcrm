@@ -34,7 +34,7 @@ interface EmployeeTableProps {
   data: EmployeeRow[]
 }
 
-const ROLES: UserRole[] = ['admin', 'telecaller', 'backend', 'finance']
+const ROLES: UserRole[] = ['admin', 'lead', 'backend']
 
 export default function EmployeeTable({ data: initialData }: EmployeeTableProps) {
   const [data, setData] = useState(initialData)
@@ -47,7 +47,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { role: 'telecaller', hra: 0, allowances: 0, pf_deduction: 0, tds_deduction: 0 },
+    defaultValues: { role: 'lead', hra: 0, allowances: 0, pf_deduction: 0, tds_deduction: 0, salary_cycle_start_day: 1 },
   })
 
   const filtered = data.filter((e) => {
@@ -132,10 +132,11 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
           tds_deduction: (fullEmp as any).tds_deduction || 0,
           bank_account_masked: (fullEmp as any).bank_account || '',
           bank_ifsc: (fullEmp as any).bank_ifsc || '',
+          salary_cycle_start_day: (fullEmp as any).salary_cycle_start_day || 1,
         }
 
         setEditingEmployee(emp)
-        reset(formData)
+        reset({ ...formData, role: formData.role as 'admin' | 'lead' | 'backend' })
         setShowForm(true)
       } catch (e) {
         toast.error('Failed to load employee details')
@@ -214,7 +215,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => { setEditingEmployee(null); reset({ role: 'telecaller', hra: 0, allowances: 0, pf_deduction: 0, tds_deduction: 0 }); setShowForm(true) }}>
+        <Button onClick={() => { setEditingEmployee(null); reset({ role: 'lead', hra: 0, allowances: 0, pf_deduction: 0, tds_deduction: 0, salary_cycle_start_day: 1 }); setShowForm(true) }}>
           <Plus className="mr-2 h-4 w-4" /> Add Employee
         </Button>
       </div>
@@ -249,7 +250,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
               </div>
               <div className="space-y-1">
                 <Label>Role</Label>
-                <Select onValueChange={(v) => setValue('role', v as UserRole)} defaultValue="telecaller">
+                <Select onValueChange={(v) => setValue('role', v as UserRole)} defaultValue="lead">
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
@@ -301,6 +302,11 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
               <div className="space-y-1">
                 <Label>Bank IFSC</Label>
                 <Input {...register('bank_ifsc')} placeholder="SBIN0001234" />
+              </div>
+              <div className="space-y-1">
+                <Label>Salary Cycle Start Day (1-31)</Label>
+                <Input type="number" min="1" max="31" {...register('salary_cycle_start_day', { valueAsNumber: true })} />
+                {errors.salary_cycle_start_day && <p className="text-xs text-red-500">{errors.salary_cycle_start_day.message}</p>}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">

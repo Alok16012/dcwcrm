@@ -16,7 +16,7 @@ export default async function FinancePage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || !['admin', 'finance'].includes(profile.role)) redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')

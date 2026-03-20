@@ -14,7 +14,7 @@ export default async function HrmsPage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || profile.role !== 'admin') redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const { data: empRaw, error } = await supabase
     .from('employees')
@@ -37,7 +37,7 @@ export default async function HrmsPage() {
     profile_id: e.profile_id,
     employee_code: e.employee_code,
     full_name: profMap[e.profile_id]?.full_name ?? '—',
-    role: (profMap[e.profile_id]?.role ?? 'telecaller') as import('@/types/app.types').UserRole,
+    role: (profMap[e.profile_id]?.role ?? 'lead') as import('@/types/app.types').UserRole,
     department: e.department ?? '—',
     designation: e.designation ?? '—',
     joining_date: e.joining_date ?? '—',

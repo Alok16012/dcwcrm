@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'telecaller' | 'backend' | 'finance'
+export type UserRole = 'admin' | 'lead' | 'backend'
 
 export type LeadStatus =
   | 'new' | 'contacted' | 'interested' | 'counselled'
@@ -225,9 +225,30 @@ export interface Employee {
   bank_account?: string
   bank_ifsc?: string
   bank_name?: string
+  salary_cycle_start_day?: number
   is_active: boolean
   created_at: string
   profile?: Profile
+}
+
+export interface Payroll {
+  id: string
+  employee_id: string
+  month: number
+  year: number
+  basic: number
+  hra: number
+  allowances: number
+  incentive: number
+  gross: number
+  pf: number
+  tds: number
+  other_deductions: number
+  leave_deduction: number
+  net: number
+  status: 'draft' | 'processed' | 'paid'
+  payment_date?: string
+  created_at: string
 }
 
 export interface Expense {

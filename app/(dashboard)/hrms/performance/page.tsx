@@ -46,7 +46,7 @@ export default async function PerformancePage({
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || profile.role !== 'admin') redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const now = new Date()
   const month = Number(searchParams.month ?? getMonth(now) + 1)
@@ -59,14 +59,14 @@ export default async function PerformancePage({
     supabase.from('leads').select('id, assigned_to, status').gte('created_at', monthStart).lte('created_at', monthEnd),
     supabase.from('payments').select('lead_id, amount').gte('payment_date', monthStart).lte('payment_date', monthEnd),
   ])
-  const telecallers = tcRes.data as { id: string; full_name: string }[] | null
+  const agents = tcRes.data as { id: string; full_name: string }[] | null
   const leads = leadsRes.data as { id: string; assigned_to: string | null; status: string }[] | null
   const payments = paymentsRes.data as { lead_id: string | null; amount: number }[] | null
 
   // Build lead_id → assigned_to map
   const leadOwnerMap = Object.fromEntries((leads ?? []).filter((l) => l.assigned_to).map((l) => [l.id, l.assigned_to!]))
 
-  const rows: PerformanceRow[] = (telecallers ?? []).map((tc) => {
+  const rows: PerformanceRow[] = (agents ?? []).map((tc) => {
     const myLeads = (leads ?? []).filter((l) => l.assigned_to === tc.id)
     const contacted = myLeads.filter((l) =>
       ['contacted', 'interested', 'counselled', 'application_sent', 'converted'].includes(l.status)

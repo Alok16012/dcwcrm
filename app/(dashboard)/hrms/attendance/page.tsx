@@ -20,7 +20,7 @@ export default async function AttendancePage({
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || profile.role !== 'admin') redirect('/')
+  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
   const now = new Date()
   const month = Number(searchParams.month ?? getMonth(now) + 1)

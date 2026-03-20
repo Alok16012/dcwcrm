@@ -63,6 +63,19 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
       if (error) throw error
 
       const { data: { user } } = await supabase.auth.getUser()
+
+      // Record the payment in the payments table so it shows in Income
+      if (paid > 0) {
+        await supabase.from('payments').insert({
+          lead_id: lead.id,
+          amount: paid,
+          payment_mode: 'cash', // Default for conversion
+          payment_date: new Date().toISOString().split('T')[0],
+          notes: 'Initial payment during conversion',
+          recorded_by: user?.id,
+        } as never)
+      }
+
       await supabase.from('lead_activities').insert({
         lead_id: lead.id,
         activity_type: 'converted',

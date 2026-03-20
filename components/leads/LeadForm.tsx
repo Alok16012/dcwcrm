@@ -257,6 +257,19 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
 
         const { data: { user } } = await supabase.auth.getUser()
 
+        // Record the payment difference if any
+        const diff = (data.amount_paid ?? 0) - (lead.amount_paid ?? 0)
+        if (diff > 0) {
+          await supabase.from('payments').insert({
+            lead_id: lead.id,
+            amount: diff,
+            payment_mode: 'cash',
+            payment_date: new Date().toISOString().split('T')[0],
+            notes: 'Payment adjustment via lead form',
+            recorded_by: user?.id,
+          } as never)
+        }
+
         if (changes.length > 0) {
           await supabase.from('lead_activities').insert({
             lead_id: lead.id,
@@ -279,6 +292,18 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         const { data: { user } } = await supabase.auth.getUser()
         const { data: newLead, error } = await supabase.from('leads').insert({ ...payload, created_by: user?.id } as never).select().single()
         if (error) throw error
+
+        // Record the initial payment for new lead
+        if ((data.amount_paid ?? 0) > 0 && newLead) {
+          await supabase.from('payments').insert({
+            lead_id: (newLead as any).id,
+            amount: data.amount_paid,
+            payment_mode: 'cash',
+            payment_date: new Date().toISOString().split('T')[0],
+            notes: 'Initial payment during lead creation',
+            recorded_by: user?.id,
+          } as never)
+        }
 
         // Log creation activity
         if (newLead) {

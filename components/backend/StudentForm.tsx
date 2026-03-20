@@ -179,18 +179,47 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 enrollment_date: data.enrollment_date || null,
             }
 
+            const { data: { user } } = await supabase.auth.getUser()
+
             if (student?.id) {
                 const { error } = await supabase.from('students').update({
                     ...payload,
                     updated_at: new Date().toISOString(),
                 } as never).eq('id', student.id)
                 if (error) throw error
+
+                // If amount_paid was increased, record the difference as a payment
+                const diff = (data.amount_paid ?? 0) - (student.amount_paid ?? 0)
+                if (diff > 0) {
+                    await supabase.from('payments').insert({
+                        student_id: student.id,
+                        lead_id: student.lead_id ?? null,
+                        amount: diff,
+                        payment_mode: 'cash',
+                        payment_date: new Date().toISOString().split('T')[0],
+                        notes: 'Payment adjustment via student form',
+                        recorded_by: user?.id,
+                    } as never)
+                }
                 toast.success('Student profile updated')
             } else {
-                const { error } = await supabase.from('students').insert({
+                const { data: newStudent, error } = await supabase.from('students').insert({
                     ...payload,
-                } as never)
+                } as never).select().single()
                 if (error) throw error
+
+                // Record the initial payment for new student
+                if ((data.amount_paid ?? 0) > 0 && newStudent) {
+                    await supabase.from('payments').insert({
+                        student_id: (newStudent as any).id,
+                        lead_id: (newStudent as any).lead_id ?? null,
+                        amount: data.amount_paid,
+                        payment_mode: 'cash',
+                        payment_date: new Date().toISOString().split('T')[0],
+                        notes: 'Initial payment during enrollment',
+                        recorded_by: user?.id,
+                    } as never)
+                }
                 toast.success('Student successfully added')
             }
 

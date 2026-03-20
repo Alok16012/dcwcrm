@@ -43,9 +43,14 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error('Delete user error:', error)
+        const err = error as any
+        console.error('Delete user error full:', err)
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Internal server error' },
+            {
+                error: err.message || 'Internal server error',
+                details: err.details || err.hint || null,
+                code: err.code || null
+            },
             { status: 500 }
         )
     }

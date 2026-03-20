@@ -58,12 +58,14 @@ export function BackendListClient() {
           *,
           course:courses(id, name, is_active, created_at),
           sub_course:sub_courses(id, name, is_active, created_at, course_id),
+          department:departments(id, name),
+          sub_section:department_sub_sections(id, name),
           counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at)
         `)
         .order('created_at', { ascending: false })
 
       if (search) {
-        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,enrollment_number.ilike.%${search}%`)
+        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
       }
       if (statusFilter) query = query.eq('status', statusFilter)
       if (paymentFilter === 'paid') query = query.gt('amount_paid', 0).gte('amount_paid', 'total_fee')
@@ -101,9 +103,10 @@ export function BackendListClient() {
   }, [fetchStudents])
 
   const columns: ColumnDef<Student>[] = [
-    { accessorKey: 'enrollment_number', header: 'Enrollment #', cell: ({ row }) => <span className="font-mono text-xs">{row.original.enrollment_number}</span> },
     { accessorKey: 'full_name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.full_name}</span> },
     { accessorKey: 'phone', header: 'Phone' },
+    { id: 'mode', header: 'Mode', cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.mode ?? '-'}</Badge> },
+    { id: 'department', header: 'Dept', cell: ({ row }) => row.original.department?.name ?? '-' },
     { id: 'course', header: 'Course', cell: ({ row }) => row.original.course?.name ?? '-' },
     { id: 'counsellor', header: 'Counsellor', cell: ({ row }) => row.original.counsellor?.full_name ?? '-' },
     { accessorKey: 'total_fee', header: 'Total Fee', cell: ({ row }) => row.original.total_fee ? formatCurrency(row.original.total_fee) : '-' },
@@ -161,7 +164,7 @@ export function BackendListClient() {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search name, phone, enrollment#..."
+            placeholder="Search name, phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9"

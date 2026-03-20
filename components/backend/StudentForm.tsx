@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Calendar, IndianRupee, FileText } from 'lucide-react'
+import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Calendar, IndianRupee, FileText, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { studentSchema, type StudentFormData } from '@/lib/validations/student.schema'
 import {
     type Student, type Course, type SubCourse, type Profile,
+    type Department, type DepartmentSubSection,
 } from '@/types/app.types'
 
 interface StudentFormProps {
@@ -61,6 +62,8 @@ function FieldWrapper({ label, required, error, children }: { label: string; req
 export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) {
     const [courses, setCourses] = useState<Course[]>([])
     const [subCourses, setSubCourses] = useState<SubCourse[]>([])
+    const [departments, setDepartments] = useState<Department[]>([])
+    const [subSections, setSubSections] = useState<DepartmentSubSection[]>([])
     const [counsellors, setCounsellors] = useState<Profile[]>([])
     const [loading, setLoading] = useState(false)
     const supabase = createClient()
@@ -73,12 +76,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             phone: student?.phone ?? '',
             email: student?.email ?? '',
             city: student?.city ?? '',
-            enrollment_number: student?.enrollment_number ?? '',
             enrollment_date: student?.enrollment_date ?? '',
             course_id: student?.course_id ?? '',
             sub_course_id: student?.sub_course_id ?? '',
+            department_id: student?.department_id ?? '',
+            sub_section_id: student?.sub_section_id ?? '',
             assigned_counsellor: student?.assigned_counsellor ?? '',
             status: (student?.status as any) || 'active',
+            mode: student?.mode ?? '',
             incentive_amount: student?.incentive_amount ?? 0,
             total_fee: student?.total_fee ?? 0,
             amount_paid: student?.amount_paid ?? 0,
@@ -86,12 +91,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     })
 
     const selectedCourseId = watch('course_id')
+    const selectedDeptId = watch('department_id')
 
     useEffect(() => {
         async function load() {
-            const [{ data: c }, { data: p }] = await Promise.all([
+            const [{ data: c }, { data: p }, { data: d }] = await Promise.all([
                 supabase.from('courses').select('*').order('name'),
                 supabase.from('profiles').select('*').order('full_name'),
+                supabase.from('departments').select('*').order('name'),
             ])
 
             const cds = (c ?? []) as any[]
@@ -104,6 +111,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             }
             setCourses([...cds])
             setCounsellors([...pds])
+            setDepartments(d ?? [])
 
             reset({
                 full_name: student?.full_name ?? '',
@@ -111,12 +119,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 phone: student?.phone ?? '',
                 email: student?.email ?? '',
                 city: student?.city ?? '',
-                enrollment_number: student?.enrollment_number ?? '',
                 enrollment_date: student?.enrollment_date ?? '',
                 course_id: student?.course_id ?? (student as any)?.course?.id ?? '',
                 sub_course_id: student?.sub_course_id ?? (student as any)?.sub_course?.id ?? '',
+                department_id: student?.department_id ?? (student as any)?.department?.id ?? '',
+                sub_section_id: student?.sub_section_id ?? (student as any)?.sub_section?.id ?? '',
                 assigned_counsellor: student?.assigned_counsellor ?? '',
                 status: (student?.status as any) || 'active',
+                mode: student?.mode ?? '',
                 incentive_amount: student?.incentive_amount ?? 0,
                 total_fee: student?.total_fee ?? 0,
                 amount_paid: student?.amount_paid ?? 0,
@@ -140,19 +150,45 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             })
     }, [selectedCourseId, student, setValue])
 
+    useEffect(() => {
+        if (!selectedDeptId) { setSubSections([]); return }
+        supabase.from('department_sub_sections').select('*').eq('department_id', selectedDeptId)
+            .then(({ data }) => {
+                const ssds = (data ?? []) as any[]
+                if (student?.sub_section && student.sub_section.department_id === selectedDeptId) {
+                    if (!ssds.find(x => x.id === student.sub_section?.id)) ssds.push(student.sub_section)
+                }
+                setSubSections([...ssds])
+                if (selectedDeptId === (student?.department_id || student?.department?.id)) {
+                    setValue('sub_section_id', (student?.sub_section_id || (student as any)?.sub_section?.id || '') as any)
+                }
+            })
+    }, [selectedDeptId, student, setValue])
+
     async function onSubmit(data: StudentFormData) {
         setLoading(true)
         try {
+            const payload = {
+                ...data,
+                course_id: data.course_id || null,
+                sub_course_id: data.sub_course_id || null,
+                department_id: data.department_id || null,
+                sub_section_id: data.sub_section_id || null,
+                assigned_counsellor: data.assigned_counsellor || null,
+                mode: data.mode || null,
+                enrollment_date: data.enrollment_date || null,
+            }
+
             if (student?.id) {
                 const { error } = await supabase.from('students').update({
-                    ...data,
+                    ...payload,
                     updated_at: new Date().toISOString(),
                 } as never).eq('id', student.id)
                 if (error) throw error
                 toast.success('Student profile updated')
             } else {
                 const { error } = await supabase.from('students').insert({
-                    ...data,
+                    ...payload,
                 } as never)
                 if (error) throw error
                 toast.success('Student successfully added')
@@ -211,11 +247,17 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
                 <SectionHeader icon={Tag} title="Enrollment Details" color="border-purple-200" />
                 <div className="grid grid-cols-2 gap-4">
-                    <FieldWrapper label="Enrollment #" required error={errors.enrollment_number?.message}>
-                        <div className="relative">
-                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-                            <Input {...register('enrollment_number')} className="pl-9 bg-white border-purple-200 font-mono" />
-                        </div>
+                    <FieldWrapper label="Mode">
+                        <Select value={watch('mode') || ''} onValueChange={(v) => setValue('mode', v as any)}>
+                            <SelectTrigger className="bg-white border-purple-200">
+                                <SelectValue placeholder="Select mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">Select mode</SelectItem>
+                                <SelectItem value="attending">Attending</SelectItem>
+                                <SelectItem value="non-attending">Non-Attending</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </FieldWrapper>
 
                     <FieldWrapper label="Enrollment Date">
@@ -269,6 +311,39 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
                             <Input type="number" {...register('incentive_amount', { valueAsNumber: true })} className="pl-9 bg-white border-purple-200" />
                         </div>
+                    </FieldWrapper>
+                </div>
+            </div>
+
+            <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                <SectionHeader icon={Building2} title="Department & University" color="border-amber-200" />
+                <div className="grid grid-cols-2 gap-4">
+                    <FieldWrapper label="Department">
+                        <Select key={departments.length} value={watch('department_id') || ''} onValueChange={(v) => { setValue('department_id', v || ''); setValue('sub_section_id', '') }}>
+                            <SelectTrigger className="bg-white border-amber-200">
+                                <SelectValue placeholder="Select department">
+                                    {departments.find(d => d.id === watch('department_id'))?.name || (student as any)?.department?.name}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">No department</SelectItem>
+                                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </FieldWrapper>
+
+                    <FieldWrapper label="University/Board">
+                        <Select key={subSections.length} value={watch('sub_section_id') || ''} onValueChange={(v) => setValue('sub_section_id', v || '')} disabled={!selectedDeptId}>
+                            <SelectTrigger className="bg-white border-amber-200 disabled:opacity-50">
+                                <SelectValue placeholder="Select university/board">
+                                    {subSections.find(s => s.id === watch('sub_section_id'))?.name || (student as any)?.sub_section?.name}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">No university/board</SelectItem>
+                                {subSections.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
                     </FieldWrapper>
                 </div>
             </div>

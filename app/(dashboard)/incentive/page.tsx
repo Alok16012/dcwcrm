@@ -111,7 +111,6 @@ export default async function IncentivePage() {
                                     <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                                             {student.full_name}
-                                            <span className="block text-xs text-gray-500 font-normal">{student.enrollment_number}</span>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">{student.courses?.name || '-'}</td>
                                         <td className="px-6 py-4 text-right text-gray-600">₹{(student.total_fee || 0).toLocaleString()}</td>

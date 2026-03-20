@@ -19,6 +19,8 @@ export default async function StudentDetailPage({ params }: Props) {
       *,
       course:courses(id, name, is_active, created_at),
       sub_course:sub_courses(id, name, is_active, created_at, course_id),
+      department:departments(id, name),
+      sub_section:department_sub_sections(id, name),
       counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at)
     `)
     .eq('id', id)

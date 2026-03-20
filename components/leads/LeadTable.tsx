@@ -156,10 +156,6 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
     })
   }
 
-  async function confirmStatusChange() {
-    // This is now handled by ConvertLeadModal
-  }
-
   async function handleBulkDelete() {
     startTransition(async () => {
       const { error } = await supabase.from('leads').delete().in('id', Array.from(selected))
@@ -310,6 +306,8 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dept</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Course</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Standard</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned To</th>
@@ -345,6 +343,16 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                       {LEAD_STATUS_LABELS[lead.status]}
                     </span>
                   </td>
+                  <td className="px-3 py-3">
+                    {lead.mode ? (
+                      <Badge variant="outline" className="capitalize text-[10px] font-normal border-gray-200 text-gray-500">
+                        {lead.mode}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-gray-600 text-[10px]">{lead.department?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.course?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.sub_course?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3">
@@ -448,34 +456,37 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
       {/* Modals */}
       {transferLeadIds.length > 0 && (
         <LeadTransferModal
-          open={true}
+          open={transferLeadIds.length > 0}
           onClose={() => setTransferLeadIds([])}
           leadIds={transferLeadIds}
-          currentAssignee={transferLeadIds.length === 1 ? paginated.find(l => l.id === transferLeadIds[0])?.assigned_to : undefined}
           onSuccess={() => { setTransferLeadIds([]); setSelected(new Set()); onRefresh() }}
         />
       )}
-      {/* Convert modal with fee details */}
-      {statusLead && (
-        <ConvertLeadModal
-          open={true}
-          onClose={() => setStatusLead(null)}
-          lead={statusLead}
-          onSuccess={() => { setStatusLead(null); onRefresh() }}
-        />
-      )}
 
-      {/* Confirm Bulk Delete Dialog */}
+      <Dialog open={!!editLead} onOpenChange={(open) => !open && setEditLead(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Update Lead Details</DialogTitle>
+          </DialogHeader>
+          {editLead && (
+            <LeadForm
+              lead={editLead}
+              onSuccess={() => { setEditLead(null); onRefresh() }}
+              onCancel={() => setEditLead(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDialog
         open={showBulkDelete}
         onCancel={() => setShowBulkDelete(false)}
-        title="Delete Selected Leads"
-        description={`Are you sure you want to delete ${selected.size} lead(s)? This action cannot be undone.`}
+        title="Delete Leads"
+        description={`Are you sure you want to delete ${selected.size} selected lead(s)? This action cannot be undone.`}
         onConfirm={handleBulkDelete}
         destructive
       />
 
-      {/* Confirm Single Delete Dialog */}
       <ConfirmDialog
         open={!!deleteLead}
         onCancel={() => setDeleteLead(null)}
@@ -484,18 +495,6 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
         onConfirm={() => deleteLead && handleDeleteLead(deleteLead)}
         destructive
       />
-
-      {/* Edit Lead Dialog */}
-      <Dialog open={!!editLead} onOpenChange={(open) => !open && setEditLead(null)}>
-        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Update Lead Details</DialogTitle></DialogHeader>
-          <LeadForm
-            lead={editLead!}
-            onSuccess={() => { setEditLead(null); onRefresh() }}
-            onCancel={() => setEditLead(null)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

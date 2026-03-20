@@ -35,7 +35,7 @@ interface LeadFormProps {
   onCancel: () => void
 }
 
-const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'total_fee', 'notes']
+const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'mode', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'enrollment_date', 'total_fee', 'notes']
 
 // Status colors for the status selector
 const STATUS_DOT: Record<string, string> = {
@@ -114,8 +114,10 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       source: lead.source,
       assigned_to: lead.assigned_to ?? '',
       next_followup_date: lead.next_followup_date ?? '',
+      enrollment_date: lead.enrollment_date ?? '',
       total_fee: lead.total_fee ?? undefined,
-    } : { status: 'new', source: 'phone' },
+      mode: lead.mode ?? '',
+    } : { status: 'new', source: 'phone', mode: '', enrollment_date: '' },
   })
 
   const selectedCourseId = watch('course_id')
@@ -166,7 +168,9 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           source: lead.source,
           assigned_to: lead.assigned_to ?? '',
           next_followup_date: lead.next_followup_date ?? '',
+          enrollment_date: lead.enrollment_date ?? '',
           total_fee: lead.total_fee ?? undefined,
+          mode: lead.mode ?? '',
         } as any)
       }
     }
@@ -219,6 +223,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         session_id: rest.session_id || null,
         assigned_to: rest.assigned_to || null,
         next_followup_date: rest.next_followup_date || null,
+        enrollment_date: rest.enrollment_date || null,
         total_fee: rest.total_fee ?? null,
         extra_data: Object.keys(customValues).length ? customValues : null,
       }
@@ -230,6 +235,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         if (data.phone !== lead.phone) changes.push(`Phone: ${lead.phone} → ${data.phone}`)
         if (data.email !== (lead.email ?? '')) changes.push(`Email: ${lead.email ?? 'None'} → ${data.email || 'None'}`)
         if (data.status !== lead.status) changes.push(`Status: ${lead.status} → ${data.status}`)
+        if (data.mode !== (lead.mode ?? '')) changes.push(`Mode: ${lead.mode ?? 'None'} → ${data.mode || 'None'}`)
         if (data.course_id !== (lead.course_id ?? '')) {
           const newCourse = courses.find(c => c.id === data.course_id)?.name || 'None'
           changes.push(`Course: ${lead.course?.name ?? 'None'} → ${newCourse}`)
@@ -415,6 +421,34 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
             </FieldWrapper>
           )}
         </div>
+
+        {isVisible('mode') && (
+          <div className="mt-4 pt-4 border-t border-purple-100">
+            <FieldWrapper label="Mode">
+              <Select value={watch('mode') || ''} onValueChange={(v) => setValue('mode', v as any)}>
+                <SelectTrigger className="bg-white border-purple-200">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Select mode</SelectItem>
+                  <SelectItem value="attending">Attending</SelectItem>
+                  <SelectItem value="non-attending">Non-Attending</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldWrapper>
+          </div>
+        )}
+
+        {isVisible('enrollment_date') && (
+          <div className="mt-4 pt-4 border-t border-purple-100">
+            <FieldWrapper label="Expected Enrollment Date">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+                <Input type="date" {...register('enrollment_date')} className="pl-9 bg-white border-purple-200" />
+              </div>
+            </FieldWrapper>
+          </div>
+        )}
       </div>
 
       {/* ── Section 3: Department & University ── */}

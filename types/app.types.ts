@@ -40,6 +40,7 @@ export const LEAD_COLUMNS = [
   { key: 'sub_section', label: 'University/Board', default: false },
   { key: 'source', label: 'Source', default: true },
   { key: 'assigned_to', label: 'Assigned to', default: true },
+  { key: 'mode', label: 'Mode', default: true },
   { key: 'created_at', label: 'Created on', default: true },
   { key: 'assigned_at', label: 'Assigned date', default: false },
   { key: 'next_followup_date', label: 'Next followup', default: false },
@@ -139,8 +140,9 @@ export interface Lead {
   total_fee?: number
   amount_paid?: number
   converted_at?: string
-  import_batch_id?: string
   created_by?: string
+  mode?: 'attending' | 'non-attending'
+  enrollment_date?: string
   created_at: string
   updated_at: string
   // joins
@@ -195,11 +197,16 @@ export interface Student {
   amount_paid?: number
   incentive_amount?: number
   enrollment_date?: string
+  mode?: 'attending' | 'non-attending'
+  department_id?: string
+  sub_section_id?: string
   status: string
   created_at: string
   updated_at: string
   course?: Course
   sub_course?: SubCourse
+  department?: Department
+  sub_section?: DepartmentSubSection
   counsellor?: Profile
 }
 

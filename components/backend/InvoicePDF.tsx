@@ -151,8 +151,12 @@ export const InvoicePDF = ({ student, payments }: InvoiceProps) => {
                         <Text style={styles.value}>{student.full_name}</Text>
                     </View>
                     <View style={styles.row}>
-                        <Text style={styles.label}>Enrollment #:</Text>
-                        <Text style={styles.value}>{student.enrollment_number}</Text>
+                        <Text style={styles.label}>Mode:</Text>
+                        <Text style={styles.value}>{student.mode ? student.mode.charAt(0).toUpperCase() + student.mode.slice(1) : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Department:</Text>
+                        <Text style={styles.value}>{student.department?.name || 'N/A'}</Text>
                     </View>
                     <View style={styles.row}>
                         <Text style={styles.label}>Course:</Text>

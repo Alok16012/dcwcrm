@@ -42,7 +42,7 @@ export function PrintInvoiceButton({ student }: PrintInvoiceButtonProps) {
         return (
             <PDFDownloadLink
                 document={<InvoicePDF student={student} payments={payments} />}
-                fileName={`Invoice_${student.enrollment_number}_${student.full_name.replace(/\s+/g, '_')}.pdf`}
+                fileName={`Invoice_${student.full_name.replace(/\s+/g, '_')}.pdf`}
                 className="flex items-center"
             >
                 {({ loading: pdfLoading }) => (

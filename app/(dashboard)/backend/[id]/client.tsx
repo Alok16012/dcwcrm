@@ -78,7 +78,6 @@ export function StudentDetailClient({ student: initialStudent, payments: initial
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
         <h1 className="text-xl font-bold flex-1">{student.full_name}</h1>
-        <span className="text-sm text-gray-500 font-mono">{student.enrollment_number}</span>
       </div>
 
       <Tabs defaultValue="profile">

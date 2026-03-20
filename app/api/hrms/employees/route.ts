@@ -193,11 +193,15 @@ export async function PATCH(req: NextRequest) {
       .single()
 
     if (uError) throw uError
+    if (!updated) throw new Error('Failed to fetch updated employee')
+
+    // Handle profile data (it might be an object or an array depending on PostgREST version/config)
+    const profileData = updated ? (Array.isArray((updated as any).profiles) ? (updated as any).profiles[0] : (updated as any).profiles) : null
 
     const final = {
       ...(updated as any),
-      full_name: (updated as any).profiles.full_name,
-      role: (updated as any).profiles.role,
+      full_name: profileData?.full_name || '—',
+      role: profileData?.role || '—',
     }
     delete final.profiles
 
@@ -205,7 +209,10 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error('Update employee error:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      {
+        error: error instanceof Error ? error.message : 'Internal server error',
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }

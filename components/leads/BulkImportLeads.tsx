@@ -22,8 +22,8 @@ const LEAD_FIELDS = [
   { key: 'notes', label: 'Notes', required: false },
 ]
 
-const SOURCE_VALUES = ['phone', 'website', 'referral', 'social_media', 'walk_in', 'other']
-const STATUS_VALUES = ['new', 'contacted', 'interested', 'not_interested', 'converted', 'lost']
+const SOURCE_VALUES = ['website', 'walk_in', 'referral', 'whatsapp', 'phone', 'excel_import', 'social_media', 'other']
+const STATUS_VALUES = ['new', 'contacted', 'interested', 'counselled', 'application_sent', 'converted', 'cold', 'lost']
 
 interface BulkImportLeadsProps {
   onSuccess: () => void

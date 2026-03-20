@@ -35,7 +35,7 @@ interface LeadFormProps {
   onCancel: () => void
 }
 
-const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'mode', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'enrollment_date', 'total_fee', 'notes']
+const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'mode', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'enrollment_date', 'total_fee', 'amount_paid', 'notes']
 
 // Status colors for the status selector
 const STATUS_DOT: Record<string, string> = {
@@ -116,8 +116,9 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       next_followup_date: lead.next_followup_date ?? '',
       enrollment_date: lead.enrollment_date ?? '',
       total_fee: lead.total_fee ?? undefined,
+      amount_paid: lead.amount_paid ?? 0,
       mode: lead.mode ?? '',
-    } : { status: 'new', source: 'phone', mode: '', enrollment_date: '' },
+    } : { status: 'new', source: 'phone', mode: '', enrollment_date: '', amount_paid: 0 },
   })
 
   const selectedCourseId = watch('course_id')
@@ -170,6 +171,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           next_followup_date: lead.next_followup_date ?? '',
           enrollment_date: lead.enrollment_date ?? '',
           total_fee: lead.total_fee ?? undefined,
+          amount_paid: lead.amount_paid ?? 0,
           mode: lead.mode ?? '',
         } as any)
       }
@@ -225,6 +227,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         next_followup_date: rest.next_followup_date || null,
         enrollment_date: rest.enrollment_date || null,
         total_fee: rest.total_fee ?? null,
+        amount_paid: rest.amount_paid ?? 0,
         extra_data: Object.keys(customValues).length ? customValues : null,
       }
 
@@ -535,6 +538,30 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                     {subCourses.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </FieldWrapper>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(isVisible('total_fee') || isVisible('amount_paid')) && (
+        <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
+          <SectionHeader icon={IndianRupee} title="Fees Information" color="border-orange-200" />
+          <div className="grid grid-cols-2 gap-4">
+            {isVisible('total_fee') && (
+              <FieldWrapper label="Total Fee">
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+                  <Input type="number" {...register('total_fee', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
+                </div>
+              </FieldWrapper>
+            )}
+            {isVisible('amount_paid') && (
+              <FieldWrapper label="Amount Paid">
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+                  <Input type="number" {...register('amount_paid', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
+                </div>
               </FieldWrapper>
             )}
           </div>

@@ -394,7 +394,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     <FieldWrapper label="Amount Paid">
                         <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
-                            <Input type="number" {...register('amount_paid', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200 bg-gray-50" readOnly />
+                            <Input type="number" {...register('amount_paid', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
                         </div>
                     </FieldWrapper>
                 </div>

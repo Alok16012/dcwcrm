@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
-import { Download, Plus } from 'lucide-react'
+import { Download, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/DataTable'
 import { useForm } from 'react-hook-form'
@@ -46,35 +46,6 @@ interface IncomeTableProps {
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
-const columns: ColumnDef<PaymentRow>[] = [
-  {
-    accessorKey: 'payment_date',
-    header: 'Date',
-    cell: ({ getValue }) => format(new Date(getValue() as string), 'dd MMM yyyy'),
-  },
-  { accessorKey: 'student_name', header: 'Source/Student' },
-  {
-    accessorKey: 'notes',
-    header: 'Description',
-    cell: ({ getValue }) => (getValue() as string) || '—',
-  },
-  {
-    accessorKey: 'amount',
-    header: 'Amount',
-    cell: ({ getValue }) => fmt(getValue() as number),
-  },
-  {
-    accessorKey: 'payment_mode',
-    header: 'Mode',
-    cell: ({ getValue }) => <span className="capitalize">{(getValue() as string).toUpperCase()}</span>,
-  },
-  {
-    accessorKey: 'receipt_number',
-    header: 'Receipt #',
-    cell: ({ getValue }) => (getValue() as string) || '—',
-  },
-]
-
 export default function IncomeTable({ data: initialData }: IncomeTableProps) {
   const [data, setData] = useState(initialData)
   const [showForm, setShowForm] = useState(false)
@@ -86,6 +57,66 @@ export default function IncomeTable({ data: initialData }: IncomeTableProps) {
     resolver: zodResolver(manualIncomeSchema),
     defaultValues: { payment_mode: 'cash', amount: 0, payment_date: format(new Date(), 'yyyy-MM-dd') },
   })
+
+  const columns: ColumnDef<PaymentRow>[] = [
+    {
+      accessorKey: 'payment_date',
+      header: 'Date',
+      cell: ({ getValue }) => format(new Date(getValue() as string), 'dd MMM yyyy'),
+    },
+    { accessorKey: 'student_name', header: 'Source/Student' },
+    {
+      accessorKey: 'notes',
+      header: 'Description',
+      cell: ({ getValue }) => (getValue() as string) || '—',
+    },
+    {
+      accessorKey: 'amount',
+      header: 'Amount',
+      cell: ({ getValue }) => fmt(getValue() as number),
+    },
+    {
+      accessorKey: 'payment_mode',
+      header: 'Mode',
+      cell: ({ getValue }) => <span className="capitalize">{(getValue() as string).toUpperCase()}</span>,
+    },
+    {
+      accessorKey: 'receipt_number',
+      header: 'Receipt #',
+      cell: ({ getValue }) => (getValue() as string) || '—',
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+          onClick={() => handleDelete(row.original.id)}
+          disabled={isPending}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ]
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this income entry?')) return
+
+    startTransition(async () => {
+      try {
+        const { error } = await supabase.from('payments').delete().eq('id', id)
+        if (error) throw error
+        setData((prev) => prev.filter((item) => item.id !== id))
+        toast.success('Income entry deleted')
+      } catch (e) {
+        toast.error('Failed to delete income entry')
+        console.error(e)
+      }
+    })
+  }
 
   // Export functionality
   const handleExport = () => {

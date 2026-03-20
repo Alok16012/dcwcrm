@@ -73,10 +73,13 @@ export function BackendListClient() {
       if (paymentFilter === 'partial') query = query.gt('amount_paid', 0).lt('amount_paid', 'total_fee')
 
       const { data, error } = await query
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error fetching students:', error)
+        throw error
+      }
       setStudents((data as Student[]) ?? [])
     } catch (err) {
-      console.error('Failed to fetch students:', err)
+      console.error('Catch error fetching students:', err)
     } finally {
       setLoading(false)
     }

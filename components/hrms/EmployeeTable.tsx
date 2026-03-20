@@ -117,11 +117,13 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
 
         if (error || !fullEmp) throw new Error('Failed to fetch employee details')
 
+        const profileData = Array.isArray((fullEmp as any).profiles) ? (fullEmp as any).profiles[0] : (fullEmp as any).profiles
+
         const formData: EmployeeFormData = {
-          full_name: (fullEmp as any).profiles.full_name,
-          email: (fullEmp as any).profiles.email,
-          phone: (fullEmp as any).profiles.phone || '',
-          role: (fullEmp as any).profiles.role,
+          full_name: profileData?.full_name || '',
+          email: profileData?.email || '',
+          phone: profileData?.phone || '',
+          role: profileData?.role || 'lead',
           department: (fullEmp as any).department || '',
           designation: (fullEmp as any).designation || '',
           joining_date: (fullEmp as any).joining_date || '',

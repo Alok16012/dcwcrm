@@ -138,17 +138,24 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Get the employee to find their profile_id
+    console.log('Fetching employee to find profile_id for id:', id)
     const { data: employee, error: fetchError } = await supabase
       .from('employees')
       .select('profile_id')
       .eq('id', id)
       .single()
 
-    if (fetchError || !employee) {
+    if (fetchError) {
+      console.error('Fetch employee error:', fetchError)
+      throw new Error(`Failed to fetch employee: ${fetchError.message}`)
+    }
+    if (!employee) {
+      console.error('Employee not found for id:', id)
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
     }
 
     const profileId = (employee as any).profile_id
+    console.log('Found profileId:', profileId)
 
     // Update Profile
     const profileUpdate: any = {}
@@ -158,10 +165,14 @@ export async function PATCH(req: NextRequest) {
     if (updateData.role) profileUpdate.role = updateData.role
 
     if (Object.keys(profileUpdate).length > 0) {
+      console.log('Updating profile with:', profileUpdate)
       const { error: pError } = await (supabase.from('profiles') as any)
         .update(profileUpdate)
         .eq('id', profileId)
-      if (pError) throw pError
+      if (pError) {
+        console.error('Profile update error:', pError)
+        throw pError
+      }
     }
 
     // Update Employee
@@ -179,21 +190,29 @@ export async function PATCH(req: NextRequest) {
     if (updateData.salary_cycle_start_day !== undefined) empUpdate.salary_cycle_start_day = updateData.salary_cycle_start_day
 
     if (Object.keys(empUpdate).length > 0) {
+      console.log('Updating employee with:', empUpdate)
       const { error: eError } = await (supabase.from('employees') as any)
         .update(empUpdate)
         .eq('id', id)
-      if (eError) throw eError
+      if (eError) {
+        console.error('Employee update error:', eError)
+        throw eError
+      }
     }
 
     // Fetch updated employee
+    console.log('Fetching updated employee data for id:', id)
     const { data: updated, error: uError } = await supabase
       .from('employees')
       .select('*, profiles(full_name, role)')
       .eq('id', id)
       .single()
 
-    if (uError) throw uError
-    if (!updated) throw new Error('Failed to fetch updated employee')
+    if (uError) {
+      console.error('Fetch updated employee error:', uError)
+      throw uError
+    }
+    if (!updated) throw new Error('Failed to fetch updated employee after update')
 
     // Handle profile data (it might be an object or an array depending on PostgREST version/config)
     const profileData = updated ? (Array.isArray((updated as any).profiles) ? (updated as any).profiles[0] : (updated as any).profiles) : null
@@ -207,11 +226,12 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ employee: final })
   } catch (error) {
-    console.error('Update employee error:', error)
+    console.error('Update employee overall error:', error)
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Internal server error',
-        details: error instanceof Error ? error.stack : undefined
+        details: error instanceof Error ? error.stack : undefined,
+        raw: JSON.stringify(error)
       },
       { status: 500 }
     )

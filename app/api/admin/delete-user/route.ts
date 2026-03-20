@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
         const profile = data as any
 
-        if (profile?.role !== 'admin') {
+        if (!['admin', 'backend'].includes(profile?.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 

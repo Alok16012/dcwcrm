@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -20,11 +20,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataTable } from '@/components/shared/DataTable'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { createClient } from '@/lib/supabase/client'
 import { StudentForm } from '@/components/backend/StudentForm'
 import { PrintInvoiceButton } from '@/components/backend/PrintInvoiceButton'
+import { toast } from 'sonner'
 import { formatCurrency, type Student } from '@/types/app.types'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -42,7 +44,9 @@ export function BackendListClient() {
   const [statusFilter, setStatusFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
   const [editStudent, setEditStudent] = useState<Student | null>(null)
+  const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
   const fetchStudents = useCallback(async () => {
@@ -75,6 +79,21 @@ export function BackendListClient() {
       setLoading(false)
     }
   }, [search, statusFilter, paymentFilter])
+
+  async function handleDeleteStudent(id: string) {
+    startTransition(async () => {
+      try {
+        const { error } = await supabase.from('students').delete().eq('id', id)
+        if (error) throw error
+        setStudents((prev) => prev.filter((s) => s.id !== id))
+        toast.success('Student deleted successfully')
+      } catch (err) {
+        toast.error('Failed to delete student')
+        console.error(err)
+      }
+      setDeleteStudent(null)
+    })
+  }
 
   useEffect(() => {
     const timer = setTimeout(fetchStudents, 300)
@@ -120,6 +139,13 @@ export function BackendListClient() {
             <div onClick={(e) => e.stopPropagation()}>
               <PrintInvoiceButton student={row.original} />
             </div>
+            <DropdownMenuItem
+              className="text-red-500 focus:text-red-600 focus:bg-red-50"
+              onClick={(e) => { e.stopPropagation(); setDeleteStudent(row.original) }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Student
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -204,6 +230,15 @@ export function BackendListClient() {
           />
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteStudent}
+        onCancel={() => setDeleteStudent(null)}
+        title="Delete Student"
+        description={`Are you sure you want to delete ${deleteStudent?.full_name}? This will permanently remove their record and payment history. This action cannot be undone.`}
+        onConfirm={() => deleteStudent && handleDeleteStudent(deleteStudent.id)}
+        destructive
+      />
     </div>
   )
 }

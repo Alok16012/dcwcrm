@@ -75,6 +75,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [statusLead, setStatusLead] = useState<Lead | null>(null)
   const [showBulkDelete, setShowBulkDelete] = useState(false)
+  const [deleteLead, setDeleteLead] = useState<Lead | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [showFilters, setShowFilters] = useState(false)
@@ -167,6 +168,16 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
       toast.success(`Deleted ${selected.size} lead(s) successfully`)
       setSelected(new Set())
       setShowBulkDelete(false)
+      onRefresh()
+    })
+  }
+  async function handleDeleteLead(lead: Lead) {
+    startTransition(async () => {
+      const { error } = await supabase.from('leads').delete().eq('id', lead.id)
+      if (error) { toast.error('Failed to delete lead'); return }
+
+      toast.success('Lead deleted successfully')
+      setDeleteLead(null)
       onRefresh()
     })
   }
@@ -370,6 +381,13 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                               Mark as {v}
                             </DropdownMenuItem>
                           ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                          onClick={() => setDeleteLead(lead)}
+                        >
+                          Delete Lead
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -454,6 +472,16 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
         title="Delete Selected Leads"
         description={`Are you sure you want to delete ${selected.size} lead(s)? This action cannot be undone.`}
         onConfirm={handleBulkDelete}
+        destructive
+      />
+
+      {/* Confirm Single Delete Dialog */}
+      <ConfirmDialog
+        open={!!deleteLead}
+        onCancel={() => setDeleteLead(null)}
+        title="Delete Lead"
+        description={`Are you sure you want to delete ${deleteLead?.full_name}? This action cannot be undone.`}
+        onConfirm={() => deleteLead && handleDeleteLead(deleteLead)}
         destructive
       />
 

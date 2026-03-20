@@ -1,6 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
@@ -59,6 +59,20 @@ export function FeeTracker({ student, payments, onPaymentAdded }: FeeTrackerProp
     })
   }
 
+  async function handleDeletePayment(id: string) {
+    if (!confirm('Are you sure you want to delete this payment record?')) return
+    startTransition(async () => {
+      try {
+        const { error } = await supabase.from('payments').delete().eq('id', id)
+        if (error) throw error
+        toast.success('Payment deleted')
+        onPaymentAdded()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete payment')
+      }
+    })
+  }
+
   return (
     <div className="space-y-4">
       {/* Stat cards */}
@@ -87,6 +101,7 @@ export function FeeTracker({ student, payments, onPaymentAdded }: FeeTrackerProp
                 <th className="text-left px-4 py-2 text-gray-600 font-medium">Mode</th>
                 <th className="text-left px-4 py-2 text-gray-600 font-medium">Receipt</th>
                 <th className="text-left px-4 py-2 text-gray-600 font-medium">Recorded By</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -97,6 +112,17 @@ export function FeeTracker({ student, payments, onPaymentAdded }: FeeTrackerProp
                   <td className="px-4 py-2">{PAYMENT_MODE_LABELS[p.payment_mode]}</td>
                   <td className="px-4 py-2">{p.receipt_number ?? '-'}</td>
                   <td className="px-4 py-2">{(p as Payment & { recorder?: { full_name: string } }).recorder?.full_name ?? '-'}</td>
+                  <td className="px-4 py-2 text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDeletePayment(p.id)}
+                      disabled={isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>

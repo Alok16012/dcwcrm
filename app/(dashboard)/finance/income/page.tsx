@@ -18,28 +18,30 @@ export default async function IncomeePage() {
 
   const { data: paymentsRaw, error } = await supabase
     .from('payments')
-    .select('id, payment_date, amount, payment_mode, receipt_number, notes, student_id, recorded_by')
+    .select(`
+      id, payment_date, amount, payment_mode, receipt_number, notes, student_id, lead_id, recorded_by,
+      student:students(full_name),
+      lead:leads(full_name),
+      recorder:profiles!payments_recorded_by_fkey(full_name)
+    `)
     .order('payment_date', { ascending: false })
 
   if (error) {
     return <div className="p-4 text-red-500">Failed to load payments: {error.message}</div>
   }
 
-  const payments = paymentsRaw as {
-    id: string; payment_date: string; amount: number; payment_mode: string;
-    receipt_number: string | null; notes: string | null; student_id: string | null; recorded_by: string | null;
-  }[] | null
+  const payments = paymentsRaw as any[]
 
-  const rows = (payments ?? []).map((p) => ({
+  const rows = payments.map((p) => ({
     id: p.id,
     payment_date: p.payment_date,
-    student_name: p.student_id ? 'Student Payment' : 'Manual Income', // Simplified indicator
+    student_name: p.student?.full_name || p.lead?.full_name || 'Manual Income',
     course_name: '—',
     amount: p.amount,
     payment_mode: p.payment_mode,
     receipt_number: p.receipt_number,
     notes: p.notes,
-    recorded_by_name: '—',
+    recorded_by_name: p.recorder?.full_name || '—',
   }))
 
   return (

@@ -24,10 +24,13 @@ interface Props {
 }
 
 export function IncentiveClient({ role, myEmployeeId, employees }: Props) {
+  const canAdd = role === 'admin' || role === 'backend'
+  const defaultView = myEmployeeId ?? (canAdd && employees.length > 0 ? employees[0].id : '')
   const [payrollRows, setPayrollRows] = useState<PayrollRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewEmployeeId, setViewEmployeeId] = useState(defaultView)
   const [showAdd, setShowAdd] = useState(false)
-  const [selectedEmployee, setSelectedEmployee] = useState(myEmployeeId ?? '')
+  const [selectedEmployee, setSelectedEmployee] = useState(myEmployeeId ?? (employees[0]?.id ?? ''))
   const [addMonth, setAddMonth] = useState(String(new Date().getMonth() + 1))
   const [addYear, setAddYear] = useState(String(new Date().getFullYear()))
   const [addIncentive, setAddIncentive] = useState('')
@@ -35,17 +38,17 @@ export function IncentiveClient({ role, myEmployeeId, employees }: Props) {
   const supabase = createClient()
 
   const fetchPayroll = useCallback(async () => {
-    if (!myEmployeeId) { setPayrollRows([]); setLoading(false); return }
+    if (!viewEmployeeId) { setPayrollRows([]); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('payroll')
       .select('id, month, year, incentive, net, status, payment_date')
-      .eq('employee_id', myEmployeeId)
+      .eq('employee_id', viewEmployeeId)
       .order('year', { ascending: false })
       .order('month', { ascending: false })
     setPayrollRows((data ?? []) as PayrollRow[])
     setLoading(false)
-  }, [myEmployeeId])
+  }, [viewEmployeeId])
 
   useEffect(() => { fetchPayroll() }, [fetchPayroll])
 
@@ -94,7 +97,6 @@ export function IncentiveClient({ role, myEmployeeId, employees }: Props) {
     }
   }
 
-  const canAdd = role === 'admin' || role === 'backend'
   const totalIncentive = payrollRows.reduce((s, r) => s + (r.incentive ?? 0), 0)
   const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
   const unpaidIncentive = totalIncentive - paidIncentive
@@ -102,13 +104,28 @@ export function IncentiveClient({ role, myEmployeeId, employees }: Props) {
 
   return (
     <div className="space-y-6">
-      {canAdd && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setShowAdd(true)}>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        {canAdd && employees.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 font-medium">Employee:</span>
+            <Select value={viewEmployeeId} onValueChange={(v) => setViewEmployeeId(v ?? '')}>
+              <SelectTrigger className="w-48 h-9">
+                <SelectValue>{employees.find(e => e.id === viewEmployeeId)?.name ?? 'Select employee'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {canAdd && (
+          <Button size="sm" onClick={() => setShowAdd(true)} className="ml-auto">
             <Plus className="mr-2 h-4 w-4" /> Add Incentive for Old Month
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border p-4 bg-purple-50">
@@ -133,7 +150,7 @@ export function IncentiveClient({ role, myEmployeeId, employees }: Props) {
           <div className="px-4 py-8 text-center text-sm text-gray-500">Loading...</div>
         ) : payrollRows.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-gray-500">
-            {myEmployeeId ? 'No payroll records found.' : 'No employee record linked to your account. Contact admin.'}
+            {viewEmployeeId ? 'No payroll records found.' : 'No employee record linked to your account. Contact admin.'}
           </div>
         ) : (
           <table className="w-full text-sm">

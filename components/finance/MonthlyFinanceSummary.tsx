@@ -48,7 +48,7 @@ export function MonthlyFinanceSummary() {
         <h3 className="font-semibold text-sm text-gray-700">Monthly Overview</h3>
         <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
           <SelectTrigger className="w-36 h-8 text-sm">
-            <SelectValue />
+            <SelectValue>{MONTH_NAMES[month - 1]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {MONTH_NAMES.map((m, i) => (

@@ -197,6 +197,7 @@ export function BackendListClient() {
       cell: ({ row }) => <span className="text-gray-500 tabular-nums">{row.index + 1}</span>,
     },
     { accessorKey: 'full_name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.full_name}</span> },
+    { id: 'guardian_name', header: "Father's Name", cell: ({ row }) => row.original.guardian_name ?? '-' },
     { accessorKey: 'phone', header: 'Phone' },
     { id: 'mode', header: 'Mode', cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.mode ?? '-'}</Badge> },
     { id: 'session', header: 'Session', cell: ({ row }) => row.original.session?.name ?? '-' },

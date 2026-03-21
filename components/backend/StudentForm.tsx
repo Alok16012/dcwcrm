@@ -12,7 +12,8 @@ import { toast } from 'sonner'
 import { studentSchema, type StudentFormData } from '@/lib/validations/student.schema'
 import {
     type Student, type Course, type SubCourse, type Profile,
-    type Department, type DepartmentSubSection, type Session
+    type Department, type DepartmentSubSection, type Session,
+    PAYMENT_MODE_LABELS
 } from '@/types/app.types'
 
 interface StudentFormProps {
@@ -67,6 +68,11 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     const [sessions, setSessions] = useState<Session[]>([])
     const [counsellors, setCounsellors] = useState<Profile[]>([])
     const [loading, setLoading] = useState(false)
+    // Payment fields for new payment entry
+    const [paymentAmount, setPaymentAmount] = useState('')
+    const [paymentMode, setPaymentMode] = useState('cash')
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+    const [paymentReceipt, setPaymentReceipt] = useState('')
     const supabase = createClient()
 
     const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<StudentFormData>({
@@ -194,18 +200,24 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 } as never).eq('id', student.id)
                 if (error) throw error
 
-                // If amount_paid was increased, record the difference as a payment
-                const diff = (data.amount_paid ?? 0) - (student.amount_paid ?? 0)
-                if (diff > 0) {
-                    await supabase.from('payments').insert({
+                // Record new payment if amount entered
+                const newPayAmt = parseFloat(paymentAmount)
+                if (!isNaN(newPayAmt) && newPayAmt > 0) {
+                    const { error: payErr } = await supabase.from('payments').insert({
                         student_id: student.id,
                         lead_id: student.lead_id ?? null,
-                        amount: diff,
-                        payment_mode: 'cash',
-                        payment_date: new Date().toISOString().split('T')[0],
-                        notes: 'Payment adjustment via student form',
+                        amount: newPayAmt,
+                        payment_mode: paymentMode,
+                        payment_date: paymentDate,
+                        receipt_number: paymentReceipt || null,
+                        notes: null,
                         recorded_by: user?.id,
                     } as never)
+                    if (payErr) throw payErr
+                    // Update amount_paid on student
+                    await supabase.from('students').update({
+                        amount_paid: (student.amount_paid ?? 0) + newPayAmt,
+                    } as never).eq('id', student.id)
                 }
                 toast.success('Student profile updated')
             } else {
@@ -440,13 +452,73 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </div>
                     </FieldWrapper>
 
-                    <FieldWrapper label="Amount Paid">
+                    <FieldWrapper label="Amount Paid (so far)">
                         <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
-                            <Input type="number" {...register('amount_paid', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
+                            <Input
+                                type="number"
+                                value={student?.id ? (student.amount_paid ?? 0) : undefined}
+                                readOnly={!!student?.id}
+                                {...(!student?.id ? register('amount_paid', { valueAsNumber: true }) : {})}
+                                className="pl-9 bg-white border-orange-200 read-only:bg-gray-50 read-only:text-gray-500"
+                            />
                         </div>
                     </FieldWrapper>
                 </div>
+
+                {/* New payment entry — only when editing existing student */}
+                {student?.id && (
+                    <div className="mt-4 pt-4 border-t border-orange-200">
+                        <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-3">Record New Payment</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <FieldWrapper label="Payment Amount (₹)">
+                                <div className="relative">
+                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={paymentAmount}
+                                        onChange={(e) => setPaymentAmount(e.target.value)}
+                                        className="pl-9 bg-white border-orange-200"
+                                    />
+                                </div>
+                            </FieldWrapper>
+
+                            <FieldWrapper label="Payment Mode">
+                                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v ?? 'cash')}>
+                                    <SelectTrigger className="bg-white border-orange-200">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(PAYMENT_MODE_LABELS).map(([k, v]) => (
+                                            <SelectItem key={k} value={k}>{v}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FieldWrapper>
+
+                            <FieldWrapper label="Payment Date">
+                                <Input
+                                    type="date"
+                                    value={paymentDate}
+                                    onChange={(e) => setPaymentDate(e.target.value)}
+                                    className="bg-white border-orange-200"
+                                />
+                            </FieldWrapper>
+
+                            <FieldWrapper label="Receipt Number">
+                                <Input
+                                    placeholder="Optional"
+                                    value={paymentReceipt}
+                                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                                    className="bg-white border-orange-200"
+                                />
+                            </FieldWrapper>
+                        </div>
+                        <p className="text-xs text-orange-600 mt-2">Leave amount as 0 to skip recording a payment.</p>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

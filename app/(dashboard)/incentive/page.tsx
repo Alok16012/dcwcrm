@@ -1,135 +1,113 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Card } from '@/components/ui/card'
-import { DollarSign, Gift, Target } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
+
 export default async function IncentivePage() {
-    const supabase = await createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
+  const supabase = await createServerClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) redirect('/login')
 
-    if (!session?.user) {
-        redirect('/login')
-    }
+  const { data: rawProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single() as { data: { role: string } | null }
 
-    const { data: rawProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
+  if (rawProfile?.role !== 'lead' && rawProfile?.role !== 'admin') redirect('/')
 
-    const profile = rawProfile as any
+  // Find employee record for current user
+  const { data: empRow } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('profile_id', session.user.id)
+    .single()
 
-    if (profile?.role !== 'lead' && profile?.role !== 'admin') {
-        return (
-            <div className="p-6">
-                <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-                <p>You do not have permission to view this page.</p>
-            </div>
-        )
-    }
+  type PayrollRow = { month: number; year: number; incentive: number; net: number; status: string; payment_date: string | null }
+  let payrollRows: PayrollRow[] = []
 
-    // Fetch students assigned to this counsellor
-    const { data: students } = await supabase
-        .from('students')
-        .select('*, courses:course_id(name)')
-        .eq('assigned_counsellor', session.user.id)
-        .order('created_at', { ascending: false })
+  if (empRow) {
+    const { data } = await supabase
+      .from('payroll')
+      .select('month, year, incentive, net, status, payment_date')
+      .eq('employee_id', (empRow as { id: string }).id)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
 
-    const validStudents = (students || []) as any[]
+    payrollRows = (data ?? []) as PayrollRow[]
+  }
 
-    const totalIncentive = validStudents.reduce((acc, s) => acc + (s.incentive_amount || 0), 0)
-    const totalStudents = validStudents.length
-    const activeStudents = validStudents.filter(s => s.status === 'active').length
+  const totalIncentive = payrollRows.reduce((s, r) => s + (r.incentive ?? 0), 0)
+  const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
+  const unpaidIncentive = totalIncentive - paidIncentive
 
-    return (
-        <div className="space-y-6">
-            <PageHeader
-                title="My Incentives"
-                description="Track your earnings and enrolled students"
-            />
+  return (
+    <div className="space-y-6">
+      <PageHeader title="My Incentives" description="Month-wise incentive status from payroll" />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="p-6 flex items-center gap-4 bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">
-                    <div className="p-3 bg-white/20 rounded-lg">
-                        <Gift className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <p className="text-white/80 font-medium">Total Incentive Earned</p>
-                        <h3 className="text-3xl font-bold">₹{totalIncentive.toLocaleString()}</h3>
-                    </div>
-                </Card>
-
-                <Card className="p-6 flex items-center gap-4 shadow-sm border border-gray-100">
-                    <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
-                        <Target className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <p className="text-gray-500 font-medium text-sm">Total Enrolled Students</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{totalStudents}</h3>
-                    </div>
-                </Card>
-
-                <Card className="p-6 flex items-center gap-4 shadow-sm border border-gray-100">
-                    <div className="p-3 bg-green-100 text-green-600 rounded-lg">
-                        <DollarSign className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <p className="text-gray-500 font-medium text-sm">Active Students</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{activeStudents}</h3>
-                    </div>
-                </Card>
-            </div>
-
-            <Card className="p-0 overflow-hidden border-gray-200 shadow-sm">
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
-                    <h3 className="font-semibold text-gray-800">Incentive Breakdown</h3>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-200">
-                            <tr>
-                                <th className="px-6 py-4">Student Name</th>
-                                <th className="px-6 py-4">Course</th>
-                                <th className="px-6 py-4 text-right">Total Fee</th>
-                                <th className="px-6 py-4 text-right">Fee Paid</th>
-                                <th className="px-6 py-4 text-right">Status</th>
-                                <th className="px-6 py-4 text-right text-purple-600 font-bold">Your Incentive</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {validStudents.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                                        No students enrolled yet. Start converting leads to earn incentives!
-                                    </td>
-                                </tr>
-                            ) : (
-                                validStudents.map((student) => (
-                                    <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                                            {student.full_name}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600">{student.courses?.name || '-'}</td>
-                                        <td className="px-6 py-4 text-right text-gray-600">₹{(student.total_fee || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right text-green-600 font-medium">₹{(student.amount_paid || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                {student.status || 'Enrolled'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-purple-600 font-bold">
-                                            ₹{(student.incentive_amount || 0).toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg border p-4 bg-purple-50">
+          <p className="text-sm text-purple-700 font-medium">Total Incentive</p>
+          <p className="text-2xl font-bold text-purple-900">{fmt(totalIncentive)}</p>
         </div>
-    )
+        <div className="rounded-lg border p-4 bg-green-50">
+          <p className="text-sm text-green-700 font-medium">Paid</p>
+          <p className="text-2xl font-bold text-green-900">{fmt(paidIncentive)}</p>
+        </div>
+        <div className="rounded-lg border p-4 bg-amber-50">
+          <p className="text-sm text-amber-700 font-medium">Pending / Not Paid</p>
+          <p className="text-2xl font-bold text-amber-900">{fmt(unpaidIncentive)}</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border overflow-hidden">
+        <div className="px-4 py-3 border-b bg-gray-50">
+          <h3 className="font-semibold text-sm">Month-wise Incentive Breakdown</h3>
+        </div>
+        {payrollRows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-gray-500">
+            {empRow ? 'No payroll records found.' : 'No employee record linked to your account. Contact admin.'}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-4 py-2 text-gray-600 font-medium">Month</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium">Incentive</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium">Net Pay</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium">Payment Date</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {payrollRows.map((row, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium">{MONTH_NAMES[row.month - 1]} {row.year}</td>
+                  <td className="px-4 py-3 text-right text-purple-700 font-semibold">{fmt(row.incentive ?? 0)}</td>
+                  <td className="px-4 py-3 text-right">{fmt(row.net ?? 0)}</td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    {row.payment_date ? new Date(row.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Badge
+                      variant={row.status === 'paid' ? 'default' : row.status === 'processed' ? 'secondary' : 'outline'}
+                      className="text-xs"
+                    >
+                      {row.status === 'paid' ? 'Paid' : row.status === 'processed' ? 'Processed' : 'Pending'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
 }

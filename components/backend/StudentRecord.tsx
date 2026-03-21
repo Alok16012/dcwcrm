@@ -20,13 +20,14 @@ export function StudentRecord({ student }: StudentRecordProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div><p className="text-gray-500">Full Name</p><p className="font-medium">{student.full_name}</p></div>
+        <div><p className="text-gray-500">Father&apos;s Name</p><p className="font-medium">{student.guardian_name ?? '-'}</p></div>
+        <div><p className="text-gray-500">Phone</p><p className="font-medium">{student.phone}</p></div>
+        <div><p className="text-gray-500">Email</p><p className="font-medium">{student.email ?? '-'}</p></div>
+        <div><p className="text-gray-500">City</p><p className="font-medium">{student.city ?? '-'}</p></div>
         <div><p className="text-gray-500">Mode</p><p className="font-medium capitalize">{student.mode ?? '-'}</p></div>
         <div><p className="text-gray-500">Session</p><p className="font-medium">{student.session?.name ?? '-'}</p></div>
         <div><p className="text-gray-500">Department</p><p className="font-medium">{student.department?.name ?? '-'}</p></div>
         <div><p className="text-gray-500">Sub-section</p><p className="font-medium">{student.sub_section?.name ?? '-'}</p></div>
-        <div><p className="text-gray-500">Phone</p><p className="font-medium">{student.phone}</p></div>
-        <div><p className="text-gray-500">Email</p><p className="font-medium">{student.email ?? '-'}</p></div>
-        <div><p className="text-gray-500">City</p><p className="font-medium">{student.city ?? '-'}</p></div>
         <div><p className="text-gray-500">Course</p><p className="font-medium">{student.course?.name ?? '-'}</p></div>
         <div><p className="text-gray-500">Sub-course</p><p className="font-medium">{student.sub_course?.name ?? '-'}</p></div>
         <div><p className="text-gray-500">Counsellor</p><p className="font-medium">{student.counsellor?.full_name ?? '-'}</p></div>

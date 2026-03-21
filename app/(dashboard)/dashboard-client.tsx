@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns'
 import { StatCard } from '@/components/shared/StatCard'
+import { Badge } from '@/components/ui/badge'
 
 interface RecentLead {
   id: string
@@ -24,6 +25,14 @@ interface TopTelecaller {
   conversions: number
 }
 
+interface IncentiveRow {
+  month: number
+  year: number
+  incentive: number
+  status: string
+  net: number
+}
+
 interface DashboardClientProps {
   totalLeads: number
   newToday: number
@@ -36,7 +45,11 @@ interface DashboardClientProps {
   recentLeads: RecentLead[]
   followupsToday: FollowupLead[]
   topTelecallers: TopTelecaller[]
+  incentiveHistory?: IncentiveRow[]
+  isLead?: boolean
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -53,6 +66,8 @@ export default function DashboardClient({
   recentLeads,
   followupsToday,
   topTelecallers,
+  incentiveHistory = [],
+  isLead = false,
 }: DashboardClientProps) {
   return (
     <div className="space-y-6">
@@ -160,6 +175,41 @@ export default function DashboardClient({
           )}
         </div>
       </div>
+
+      {/* Incentive section — only for telecallers */}
+      {isLead && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <h2 className="font-semibold text-sm">My Incentives (Month-wise)</h2>
+          {incentiveHistory.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No incentive records found. Contact admin if this seems incorrect.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left py-1">Month</th>
+                  <th className="text-right py-1">Incentive</th>
+                  <th className="text-right py-1">Net Pay</th>
+                  <th className="text-right py-1">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incentiveHistory.map((row, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="py-1.5 font-medium">{MONTH_NAMES[row.month - 1]} {row.year}</td>
+                    <td className="py-1.5 text-right text-green-700">{fmt(row.incentive ?? 0)}</td>
+                    <td className="py-1.5 text-right">{fmt(row.net ?? 0)}</td>
+                    <td className="py-1.5 text-right">
+                      <Badge variant={row.status === 'paid' ? 'default' : row.status === 'processed' ? 'secondary' : 'outline'} className="text-xs">
+                        {row.status === 'paid' ? 'Paid' : row.status === 'processed' ? 'Processed' : 'Draft'}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   )
 }

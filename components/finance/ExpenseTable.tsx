@@ -57,7 +57,7 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
   })
 
   const supabase = createClient()
-  const canApprove = currentUserRole === 'admin' || currentUserRole === 'finance'
+  const canApprove = currentUserRole === 'admin' || currentUserRole === 'backend'
 
   const onSubmit = (values: ExpenseFormData) => {
     startTransition(async () => {

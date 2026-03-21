@@ -36,6 +36,8 @@ const STATUS_COLORS: Record<string, string> = {
   on_hold: 'bg-yellow-100 text-yellow-800',
 }
 
+interface FilterOption { id: string; name: string }
+
 export function BackendListClient() {
   const router = useRouter()
   const [students, setStudents] = useState<Student[]>([])
@@ -44,11 +46,33 @@ export function BackendListClient() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
+  const [courseFilter, setCourseFilter] = useState('')
+  const [sessionFilter, setSessionFilter] = useState('')
+  const [counsellorFilter, setCounsellorFilter] = useState('')
+  const [modeFilter, setModeFilter] = useState('')
+  const [courses, setCourses] = useState<FilterOption[]>([])
+  const [sessions, setSessions] = useState<FilterOption[]>([])
+  const [counsellors, setCounsellors] = useState<FilterOption[]>([])
   const [editStudent, setEditStudent] = useState<Student | null>(null)
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
+
+  // Load filter options once
+  useEffect(() => {
+    async function loadOptions() {
+      const [coursesRes, sessionsRes, counsellorsRes] = await Promise.all([
+        supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('sessions').select('id, name').order('name'),
+        supabase.from('profiles').select('id, full_name').eq('role', 'lead').order('full_name'),
+      ])
+      setCourses((coursesRes.data ?? []) as FilterOption[])
+      setSessions((sessionsRes.data ?? []) as FilterOption[])
+      setCounsellors(((counsellorsRes.data ?? []) as { id: string; full_name: string }[]).map(p => ({ id: p.id, name: p.full_name })))
+    }
+    loadOptions()
+  }, [])
 
   const fetchStudents = useCallback(async () => {
     setLoading(true)
@@ -64,12 +88,14 @@ export function BackendListClient() {
           session:sessions(id, name),
           counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at)
         `)
-        .order('created_at', { ascending: false })
+        .order('enrollment_date', { ascending: true })
 
-      if (search) {
-        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
-      }
+      if (search) query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
       if (statusFilter) query = query.eq('status', statusFilter)
+      if (courseFilter) query = query.eq('course_id', courseFilter)
+      if (sessionFilter) query = query.eq('session_id', sessionFilter)
+      if (counsellorFilter) query = query.eq('assigned_counsellor', counsellorFilter)
+      if (modeFilter) query = query.eq('mode', modeFilter)
       if (paymentFilter === 'paid') query = query.gt('amount_paid', 0).gte('amount_paid', 'total_fee')
       if (paymentFilter === 'unpaid') query = query.eq('amount_paid', 0)
       if (paymentFilter === 'partial') query = query.gt('amount_paid', 0).lt('amount_paid', 'total_fee')
@@ -85,7 +111,7 @@ export function BackendListClient() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, paymentFilter])
+  }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter])
 
   async function handleDeleteStudent(id: string) {
     try {
@@ -242,8 +268,8 @@ export function BackendListClient() {
       />
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search name, phone..."
@@ -253,7 +279,7 @@ export function BackendListClient() {
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Status</SelectItem>
             <SelectItem value="active">Active</SelectItem>
@@ -262,8 +288,39 @@ export function BackendListClient() {
             <SelectItem value="on_hold">On Hold</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={modeFilter} onValueChange={(v) => setModeFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Mode" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Modes</SelectItem>
+            <SelectItem value="open_schooling">Open Schooling</SelectItem>
+            <SelectItem value="college">College</SelectItem>
+            <SelectItem value="online">Online</SelectItem>
+            <SelectItem value="offline">Offline</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Course" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Courses</SelectItem>
+            {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={sessionFilter} onValueChange={(v) => setSessionFilter(v ?? '')}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Session" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Sessions</SelectItem>
+            {sessions.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={counsellorFilter} onValueChange={(v) => setCounsellorFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Counsellor" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Counsellors</SelectItem>
+            {counsellors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Payment" /></SelectTrigger>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Payment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="">All</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
@@ -271,9 +328,6 @@ export function BackendListClient() {
             <SelectItem value="unpaid">Unpaid</SelectItem>
           </SelectContent>
         </Select>
-        <Button onClick={() => setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-          + Add Student
-        </Button>
       </div>
 
       <DataTable

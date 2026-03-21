@@ -110,8 +110,10 @@ export default function LeadImportPage() {
         created_by: user?.id,
       }))
 
-      const { data, error } = await supabase.from('leads').insert(chunk as never).select()
+      const { data, error } = await supabase.from('leads').upsert(chunk as never, { onConflict: 'phone', ignoreDuplicates: true }).select()
       if (error) {
+        console.error('Import chunk error:', error.message)
+        toast.error(`Import error: ${error.message}`)
         failed.push(...validRows.slice(i, i + chunkSize))
       } else {
         success += data?.length ?? 0

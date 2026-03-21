@@ -16,5 +16,5 @@ export default async function AnalyticsPage() {
 
   if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
-  return <AnalyticsClient />
+  return <AnalyticsClient role={profile.role} />
 }

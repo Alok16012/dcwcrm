@@ -24,14 +24,35 @@ export default async function DashboardPage() {
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
   const todayDate = format(now, 'yyyy-MM-dd')
 
+  const isLead = profile?.role === 'lead'
+
   const applyScope = (q: any, table: string) => {
-    if (profile?.role === 'lead') {
+    if (isLead) {
       if (table === 'leads') return q.eq('assigned_to', user!.id)
       if (table === 'students') return q.eq('assigned_counsellor', user!.id)
-      if (table === 'payments') return q.eq('recorded_by', user!.id)
     }
     return q
   }
+
+  // For telecaller: scope payments & pending docs by their assigned students
+  let telecallerStudentIds: string[] = []
+  if (isLead) {
+    const { data: assignedStudents } = await supabase
+      .from('students')
+      .select('id')
+      .eq('assigned_counsellor', user!.id)
+    telecallerStudentIds = ((assignedStudents ?? []) as { id: string }[]).map((s) => s.id)
+  }
+
+  const paymentsQuery = isLead
+    ? (telecallerStudentIds.length > 0
+        ? supabase.from('payments').select('amount').in('student_id', telecallerStudentIds).gte('payment_date', monthStart).lte('payment_date', monthEnd)
+        : supabase.from('payments').select('amount').eq('recorded_by', user!.id).gte('payment_date', monthStart).lte('payment_date', monthEnd))
+    : supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd)
+
+  const pendingDocsQuery = isLead && telecallerStudentIds.length > 0
+    ? supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending').in('student_id', telecallerStudentIds)
+    : supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending')
 
   const [
     { count: totalLeads },
@@ -50,10 +71,10 @@ export default async function DashboardPage() {
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
-    applyScope(supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd), 'payments'),
+    paymentsQuery,
     applyScope(supabase.from('students').select('total_fee, amount_paid'), 'students'),
     applyScope(supabase.from('students').select('*', { count: 'exact', head: true }), 'students'),
-    supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'), // Leave unfiltered or skip
+    pendingDocsQuery,
     applyScope(supabase.from('leads').select('id, full_name, status, created_at, courses ( name )'), 'leads').order('created_at', { ascending: false }).limit(10),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
     applyScope(supabase.from('leads').select('assigned_to, profiles!assigned_to ( id, full_name )'), 'leads').eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd),
@@ -93,6 +114,27 @@ export default async function DashboardPage() {
     .sort((a, b) => b.conversions - a.conversions)
     .slice(0, 5)
 
+  // Fetch incentive data for telecallers
+  type IncentiveRow = { month: number; year: number; incentive: number; status: string; net: number }
+  let incentiveHistory: IncentiveRow[] = []
+  if (isLead && user) {
+    const { data: empRow } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('profile_id', user.id)
+      .single()
+    if (empRow) {
+      const { data: payrollRows } = await supabase
+        .from('payroll')
+        .select('month, year, incentive, status, net')
+        .eq('employee_id', (empRow as { id: string }).id)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .limit(12)
+      incentiveHistory = ((payrollRows ?? []) as IncentiveRow[])
+    }
+  }
+
   return (
     <DashboardClient
       totalLeads={totalLeads ?? 0}
@@ -106,6 +148,8 @@ export default async function DashboardPage() {
       recentLeads={recentLeads}
       followupsToday={followupsToday}
       topTelecallers={topTelecallers}
+      incentiveHistory={incentiveHistory}
+      isLead={isLead}
     />
   )
 }

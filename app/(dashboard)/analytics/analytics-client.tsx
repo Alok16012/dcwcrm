@@ -24,7 +24,7 @@ function ChartSkeleton() {
   return <Skeleton className="w-full h-64" />
 }
 
-export default function AnalyticsClient() {
+export default function AnalyticsClient({ role }: { role?: string }) {
   const supabase = createClient()
   const now = new Date()
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(now), 'yyyy-MM-dd'))
@@ -299,9 +299,9 @@ export default function AnalyticsClient() {
         </div>
       </div>
 
-      <Tabs defaultValue="leads">
+      <Tabs defaultValue={role === 'backend' ? 'revenue' : 'leads'}>
         <TabsList className="flex-wrap">
-          <TabsTrigger value="leads">Lead Analytics</TabsTrigger>
+          {role !== 'backend' && <TabsTrigger value="leads">Lead Analytics</TabsTrigger>}
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="ops">Operations</TabsTrigger>
           <TabsTrigger value="hr">HR</TabsTrigger>

@@ -21,6 +21,7 @@ export default async function StudentDetailPage({ params }: Props) {
       sub_course:sub_courses(id, name, is_active, created_at, course_id),
       department:departments(id, name),
       sub_section:department_sub_sections(id, name),
+      session:sessions(id, name),
       counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at)
     `)
     .eq('id', id)
@@ -34,23 +35,10 @@ export default async function StudentDetailPage({ params }: Props) {
     .eq('student_id', id)
     .order('payment_date', { ascending: false })
 
-  const { data: documents } = await supabase
-    .from('student_documents')
-    .select('*')
-    .eq('student_id', id)
-
-  const { data: exams } = await supabase
-    .from('student_exams')
-    .select('*')
-    .eq('student_id', id)
-    .order('created_at', { ascending: false })
-
   return (
     <StudentDetailClient
       student={student as never}
       payments={(payments ?? []) as never}
-      documents={(documents ?? []) as never}
-      exams={(exams ?? []) as never}
     />
   )
 }

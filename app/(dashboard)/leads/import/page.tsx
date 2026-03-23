@@ -92,14 +92,22 @@ export default function LeadImportPage() {
     setImporting(true)
     setProgress(0)
     const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+    const user = session?.user ?? null
     const batchId = `import-${Date.now()}`
     let success = 0
     const failed: ImportRow[] = []
-    const chunkSize = 100
 
-    for (let i = 0; i < validRows.length; i += chunkSize) {
-      const chunk = validRows.slice(i, i + chunkSize).map((r) => ({
+    // Fetch existing phones to skip duplicates (avoids 400 from missing unique constraint)
+    const phones = validRows.map((r) => r.phone)
+    const { data: existing } = await supabase.from('leads').select('phone').in('phone', phones)
+    const existingPhones = new Set((existing ?? []).map((r) => r.phone))
+
+    const newRows = validRows.filter((r) => !existingPhones.has(r.phone))
+    const skipped = validRows.length - newRows.length
+
+    const chunkSize = 100
+    for (let i = 0; i < newRows.length; i += chunkSize) {
+      const chunk = newRows.slice(i, i + chunkSize).map((r) => ({
         full_name: r.full_name,
         phone: r.phone,
         email: r.email ?? null,
@@ -110,21 +118,22 @@ export default function LeadImportPage() {
         created_by: user?.id,
       }))
 
-      const { data, error } = await supabase.from('leads').upsert(chunk as never, { onConflict: 'phone', ignoreDuplicates: true }).select()
+      const { data, error } = await supabase.from('leads').insert(chunk as never).select()
       if (error) {
         console.error('Import chunk error:', error.message)
         toast.error(`Import error: ${error.message}`)
-        failed.push(...validRows.slice(i, i + chunkSize))
+        failed.push(...newRows.slice(i, i + chunkSize))
       } else {
         success += data?.length ?? 0
       }
-      setProgress(Math.round(((i + chunkSize) / validRows.length) * 100))
+      setProgress(Math.round(((i + chunkSize) / newRows.length) * 100))
     }
 
     setResult({ success, failed: failed.length })
     setFailedRows(failed)
     setImporting(false)
-    toast.success(`Import complete: ${success} records imported`)
+    if (skipped > 0) toast.info(`${skipped} duplicate phone(s) skipped`)
+    toast.success(`Import complete: ${success} new records imported`)
   }
 
   function downloadFailed() {

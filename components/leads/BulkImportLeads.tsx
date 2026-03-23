@@ -121,10 +121,6 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
           state: mapping.state ? row[mapping.state]?.trim() || null : null,
           source: SOURCE_VALUES.includes(source) ? source : 'other',
           status: STATUS_VALUES.includes(status) ? status : 'new',
-          course_id: null,
-          sub_course_id: null,
-          department_id: null,
-          sub_section_id: null,
           notes: mapping.notes ? row[mapping.notes]?.trim() || null : null,
           created_by: user?.id,
         }

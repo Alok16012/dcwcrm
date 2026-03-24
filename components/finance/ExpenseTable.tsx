@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
-import { Plus, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, CheckCircle, XCircle, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -48,7 +48,7 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
   const [data, setData] = useState(initialData)
   const [showForm, setShowForm] = useState(false)
   const [billUrl, setBillUrl] = useState('')
-  const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'approved' | 'rejected' } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'approved' | 'rejected' | 'delete' } | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<ExpenseFormData>({
@@ -80,6 +80,21 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
         setBillUrl('')
       } catch (e) {
         toast.error('Failed to submit expense')
+      }
+    })
+  }
+
+  const handleDelete = (id: string) => {
+    startTransition(async () => {
+      try {
+        const { error } = await supabase.from('expenses').delete().eq('id', id)
+        if (error) throw error
+        setData((prev) => prev.filter((e) => e.id !== id))
+        toast.success('Expense deleted')
+      } catch {
+        toast.error('Failed to delete expense')
+      } finally {
+        setConfirmAction(null)
       }
     })
   }
@@ -138,24 +153,36 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
       id: 'actions',
       header: 'Actions',
       cell: ({ row }) => {
-        if (!canApprove || row.original.status !== 'pending') return null
+        if (!canApprove) return null
         return (
           <div className="flex gap-1">
+            {row.original.status === 'pending' && (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-green-600 hover:text-green-700"
+                  onClick={() => setConfirmAction({ id: row.original.id, action: 'approved' })}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() => setConfirmAction({ id: row.original.id, action: 'rejected' })}
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </>
+            )}
             <Button
               size="sm"
               variant="ghost"
-              className="text-green-600 hover:text-green-700"
-              onClick={() => setConfirmAction({ id: row.original.id, action: 'approved' })}
+              className="text-gray-400 hover:text-red-600"
+              onClick={() => setConfirmAction({ id: row.original.id, action: 'delete' })}
             >
-              <CheckCircle className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-red-600 hover:text-red-700"
-              onClick={() => setConfirmAction({ id: row.original.id, action: 'rejected' })}
-            >
-              <XCircle className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         )
@@ -265,11 +292,11 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
       {confirmAction && (
         <ConfirmDialog
           open
-          title={`${confirmAction.action === 'approved' ? 'Approve' : 'Reject'} Expense`}
-          description={`Are you sure you want to ${confirmAction.action === 'approved' ? 'approve' : 'reject'} this expense?`}
-          confirmLabel={confirmAction.action === 'approved' ? 'Approve' : 'Reject'}
-          destructive={confirmAction.action === 'rejected'}
-          onConfirm={() => handleStatusChange(confirmAction.id, confirmAction.action)}
+          title={confirmAction.action === 'delete' ? 'Delete Expense' : `${confirmAction.action === 'approved' ? 'Approve' : 'Reject'} Expense`}
+          description={confirmAction.action === 'delete' ? 'Are you sure you want to delete this expense? This cannot be undone.' : `Are you sure you want to ${confirmAction.action === 'approved' ? 'approve' : 'reject'} this expense?`}
+          confirmLabel={confirmAction.action === 'delete' ? 'Delete' : confirmAction.action === 'approved' ? 'Approve' : 'Reject'}
+          destructive={confirmAction.action !== 'approved'}
+          onConfirm={() => confirmAction.action === 'delete' ? handleDelete(confirmAction.id) : handleStatusChange(confirmAction.id, confirmAction.action as 'approved' | 'rejected')}
           onCancel={() => setConfirmAction(null)}
         />
       )}

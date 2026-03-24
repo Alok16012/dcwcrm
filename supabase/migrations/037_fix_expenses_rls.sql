@@ -17,3 +17,10 @@ CREATE POLICY "Admin and backend can update expenses"
 CREATE POLICY "Users can view own expenses"
   ON expenses FOR SELECT
   USING (submitted_by = auth.uid());
+
+-- Allow admin and backend to delete expenses
+CREATE POLICY "Admin and backend can delete expenses"
+  ON expenses FOR DELETE
+  USING (
+    exists (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'backend'))
+  );

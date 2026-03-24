@@ -306,7 +306,31 @@ export function BackendListClient() {
         )
       })()}
 
-      {/* Filters */}
+      {/* Layer 1: Department + Board */}
+      <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border mb-2">
+        <span className="text-xs font-semibold text-gray-500 self-center w-full mb-1">Step 1 — Department &amp; Board</span>
+        <Select value={departmentFilter} onValueChange={(v) => setDepartmentFilter(v ?? '')}>
+          <SelectTrigger className="w-44 h-9"><SelectValue placeholder="All Departments" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Departments</SelectItem>
+            {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={boardFilter} onValueChange={(v) => setBoardFilter(v ?? '')}>
+          <SelectTrigger className="w-44 h-9"><SelectValue placeholder="All Boards" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Boards</SelectItem>
+            {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {(departmentFilter || boardFilter) && (
+          <button onClick={() => { setDepartmentFilter(''); setBoardFilter('') }} className="text-xs text-red-500 hover:underline self-center ml-1">
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Layer 2: Remaining filters + search */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -356,20 +380,6 @@ export function BackendListClient() {
           <SelectContent>
             <SelectItem value="">All Counsellors</SelectItem>
             {counsellors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={departmentFilter} onValueChange={(v) => setDepartmentFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Department" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Depts</SelectItem>
-            {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={boardFilter} onValueChange={(v) => setBoardFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Board" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Boards</SelectItem>
-            {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v ?? '')}>

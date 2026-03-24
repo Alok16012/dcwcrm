@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
         if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single() as { data: any }
-        if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        if (!['admin', 'backend'].includes(profile?.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
         const body = await req.json()
         const { employee_id, month, year, incentive } = body

@@ -14,6 +14,10 @@ interface PayrollRow {
   id: string
   employee_id: string
   employee_name: string
+  employee_code?: string
+  designation?: string
+  department?: string
+  bank_account?: string
   month: number
   year: number
   basic: number
@@ -105,48 +109,43 @@ export default function PayrollTable({ data: initialData, isAdmin, employeeId, e
   const downloadSlip = async (row: PayrollRow) => {
     try {
       const { pdf } = await import('@react-pdf/renderer')
-      const { Document, Page, Text, View, StyleSheet } = await import('@react-pdf/renderer')
-      const styles = StyleSheet.create({
-        page: { padding: 40, fontFamily: 'Helvetica' },
-        title: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-        row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-        label: { fontSize: 11, color: '#666' },
-        value: { fontSize: 11, fontWeight: 'bold' },
-        divider: { borderBottomWidth: 1, borderBottomColor: '#ddd', marginVertical: 10 },
-      })
+      const { SalarySlipPDF } = await import('./SalarySlipPDF')
+      const logoBase64 = await fetch('/brand-logo.png')
+        .then(r => r.blob())
+        .then(blob => new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        }))
+        .catch(() => '')
       const monthName = format(new Date(row.year, row.month - 1), 'MMMM yyyy')
-      const SalarySlip = () => (
-        <Document>
-          <Page size="A4" style={styles.page}>
-            <Text style={styles.title}>Salary Slip — {monthName}</Text>
-            <View style={styles.row}><Text style={styles.label}>Employee</Text><Text style={styles.value}>{row.employee_name}</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.row}><Text style={styles.label}>Basic</Text><Text style={styles.value}>{fmt(row.basic)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>HRA</Text><Text style={styles.value}>{fmt(row.hra)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>Allowances</Text><Text style={styles.value}>{fmt(row.allowances)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>Incentive</Text><Text style={styles.value}>{fmt(row.incentive)}</Text></View>
-            <View style={styles.row}><Text style={{ ...styles.label, fontWeight: 'bold' }}>Gross</Text><Text style={styles.value}>{fmt(row.gross)}</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.row}><Text style={styles.label}>PF Deduction</Text><Text style={styles.value}>- {fmt(row.pf)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>TDS</Text><Text style={styles.value}>- {fmt(row.tds)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>Leave Deduction</Text><Text style={styles.value}>- {fmt(row.leave_deduction)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>Other Deductions</Text><Text style={styles.value}>- {fmt(row.other_deductions)}</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.row}><Text style={{ ...styles.label, fontSize: 13, fontWeight: 'bold' }}>Net Pay</Text><Text style={{ ...styles.value, fontSize: 13 }}>{fmt(row.net)}</Text></View>
-            {row.payment_date && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Paid On</Text>
-                <Text style={styles.value}>{format(new Date(row.payment_date), 'dd MMM yyyy')}</Text>
-              </View>
-            )}
-          </Page>
-        </Document>
-      )
-      const blob = await pdf(<SalarySlip />).toBlob()
+      const blob = await pdf(
+        <SalarySlipPDF
+          employeeName={row.employee_name}
+          employeeCode={row.employee_code}
+          designation={row.designation}
+          department={row.department}
+          bankAccount={row.bank_account}
+          month={row.month}
+          year={row.year}
+          basic={row.basic}
+          hra={row.hra}
+          allowances={row.allowances}
+          incentive={row.incentive}
+          gross={row.gross}
+          pf={row.pf}
+          tds={row.tds}
+          leaveDeduction={row.leave_deduction}
+          otherDeductions={row.other_deductions}
+          net={row.net}
+          paymentDate={row.payment_date}
+          logoBase64={logoBase64}
+        />
+      ).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `salary-slip-${row.employee_name.replace(/\s+/g, '-')}-${monthName}.pdf`
+      a.download = `Salary_Slip_${row.employee_name.replace(/\s+/g, '_')}_${monthName.replace(' ', '_')}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {

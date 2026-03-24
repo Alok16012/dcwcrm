@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getMonth, getYear } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import PayrollTable from '@/components/hrms/PayrollTable'
+import PayrollMonthSelector from '@/components/hrms/PayrollMonthSelector'
 
 export default async function PayrollPage({
   searchParams,
@@ -39,47 +40,61 @@ export default async function PayrollPage({
   type RawPayroll = { id: string; employee_id: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; leave_deduction: number; net: number; status: string; payment_date: string | null }
   const payrollData = payRaw as RawPayroll[] | null
 
-  // Fetch employee names
+  // Fetch employee names + details
   const empIds = (payrollData ?? []).map((p) => p.employee_id)
   const { data: empsRaw } = empIds.length > 0
-    ? await supabase.from('employees').select('id, profile_id').in('id', empIds)
+    ? await supabase.from('employees').select('id, profile_id, employee_code, designation, department, bank_account').in('id', empIds)
     : { data: [] }
-  const empToProfile = Object.fromEntries(((empsRaw ?? []) as { id: string; profile_id: string }[]).map((e) => [e.id, e.profile_id]))
-  const profileIds = Object.values(empToProfile)
+
+  type EmpRaw = { id: string; profile_id: string; employee_code: string | null; designation: string | null; department: string | null; bank_account: string | null }
+  const emps = (empsRaw ?? []) as EmpRaw[]
+  const empMap = Object.fromEntries(emps.map((e) => [e.id, e]))
+
+  const profileIds = emps.map((e) => e.profile_id).filter(Boolean)
   const { data: profsRaw } = profileIds.length > 0
     ? await supabase.from('profiles').select('id, full_name').in('id', profileIds)
     : { data: [] }
   const profNameMap = Object.fromEntries(((profsRaw ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name]))
 
-  const rows = (payrollData ?? []).map((p) => ({
-    id: p.id,
-    employee_id: p.employee_id,
-    employee_name: profNameMap[empToProfile[p.employee_id]] ?? '—',
-    month: p.month,
-    year: p.year,
-    basic: p.basic,
-    hra: p.hra,
-    allowances: p.allowances,
-    incentive: p.incentive,
-    gross: p.gross,
-    pf: p.pf,
-    tds: p.tds,
-    other_deductions: p.other_deductions,
-    leave_deduction: p.leave_deduction,
-    net: p.net,
-    status: p.status as 'draft' | 'processed' | 'paid',
-    payment_date: p.payment_date,
-  }))
+  const rows = (payrollData ?? []).map((p) => {
+    const emp = empMap[p.employee_id]
+    return {
+      id: p.id,
+      employee_id: p.employee_id,
+      employee_name: profNameMap[emp?.profile_id] ?? '—',
+      employee_code: emp?.employee_code ?? undefined,
+      designation: emp?.designation ?? undefined,
+      department: emp?.department ?? undefined,
+      bank_account: emp?.bank_account ?? undefined,
+      month: p.month,
+      year: p.year,
+      basic: p.basic,
+      hra: p.hra,
+      allowances: p.allowances,
+      incentive: p.incentive,
+      gross: p.gross,
+      pf: p.pf,
+      tds: p.tds,
+      other_deductions: p.other_deductions,
+      leave_deduction: p.leave_deduction,
+      net: p.net,
+      status: p.status as 'draft' | 'processed' | 'paid',
+      payment_date: p.payment_date,
+    }
+  })
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Payroll</h1>
-        <p className="text-sm text-muted-foreground">
-          {new Date(year, month - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Payroll</h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date(year, month - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <PayrollMonthSelector month={month} year={year} />
       </div>
-      <PayrollTable data={rows} isAdmin={true} />
+      <PayrollTable data={rows} isAdmin={profile.role === 'admin'} />
     </div>
   )
 }

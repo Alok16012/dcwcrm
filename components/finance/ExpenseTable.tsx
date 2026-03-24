@@ -89,7 +89,7 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
       try {
         const { error } = await supabase
           .from('expenses')
-          .update({ status, reviewed_by: currentUserId, reviewed_at: new Date().toISOString() } as never)
+          .update({ status, approved_by: currentUserId } as never)
           .eq('id', id)
         if (error) throw error
         setData((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)))

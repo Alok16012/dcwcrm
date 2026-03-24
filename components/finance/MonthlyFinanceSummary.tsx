@@ -29,7 +29,7 @@ export function MonthlyFinanceSummary() {
 
       const [incRes, expRes] = await Promise.all([
         supabase.from('payments').select('amount').gte('payment_date', start).lte('payment_date', end),
-        supabase.from('expenses').select('amount').eq('status', 'approved').gte('expense_date', start).lte('expense_date', end),
+        supabase.from('expenses').select('amount').neq('status', 'rejected').gte('expense_date', start).lte('expense_date', end),
       ])
 
       setIncome(((incRes.data ?? []) as { amount: number }[]).reduce((s, r) => s + (r.amount ?? 0), 0))

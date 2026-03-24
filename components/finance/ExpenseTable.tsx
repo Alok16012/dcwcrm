@@ -163,8 +163,31 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
     },
   ]
 
+  const now = new Date()
+  const thisMonthExpenses = data.filter((e) => {
+    const d = new Date(e.expense_date)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && e.status !== 'rejected'
+  })
+  const thisMonthTotal = thisMonthExpenses.reduce((s, e) => s + e.amount, 0)
+  const pendingCount = data.filter((e) => e.status === 'pending').length
+
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg bg-red-50 border border-red-100 p-3">
+          <p className="text-xs text-red-700 font-medium">This Month's Expenses</p>
+          <p className="text-xl font-bold text-red-900">{fmt(thisMonthTotal)}</p>
+        </div>
+        <div className="rounded-lg bg-yellow-50 border border-yellow-100 p-3">
+          <p className="text-xs text-yellow-700 font-medium">Pending Approval</p>
+          <p className="text-xl font-bold text-yellow-900">{pendingCount}</p>
+        </div>
+        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3">
+          <p className="text-xs text-gray-600 font-medium">Total Records</p>
+          <p className="text-xl font-bold text-gray-900">{data.length}</p>
+        </div>
+      </div>
+
       <div className="flex justify-end">
         <Button onClick={() => setShowForm(true)}>
           <Plus className="mr-2 h-4 w-4" /> Add Expense

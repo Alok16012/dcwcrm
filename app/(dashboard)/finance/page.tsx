@@ -25,7 +25,7 @@ export default async function FinancePage() {
 
   const [incomeRes, expenseRes, studentRes, pendingRes] = await Promise.all([
     supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd),
-    supabase.from('expenses').select('amount').eq('status', 'approved').gte('expense_date', monthStart).lte('expense_date', monthEnd),
+    supabase.from('expenses').select('amount').neq('status', 'rejected').gte('expense_date', monthStart).lte('expense_date', monthEnd),
     supabase.from('students').select('total_fee, amount_paid'),
     supabase.from('expenses').select('id').eq('status', 'pending'),
   ])

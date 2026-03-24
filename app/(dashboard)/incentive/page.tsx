@@ -52,10 +52,29 @@ export default async function IncentivePage() {
     }
   }
 
+  // For lead: fetch their students with incentive
+  let studentIncentives: { id: string; full_name: string; course_name: string; enrollment_date: string | null; incentive_amount: number }[] = []
+  if (rawProfile.role === 'lead') {
+    const { data: studs } = await supabase
+      .from('students')
+      .select('id, full_name, enrollment_date, incentive_amount, course:courses(name)')
+      .eq('assigned_counsellor', session.user.id)
+      .gt('incentive_amount', 0)
+      .order('enrollment_date', { ascending: false })
+
+    studentIncentives = ((studs ?? []) as any[]).map((s) => ({
+      id: s.id,
+      full_name: s.full_name,
+      course_name: s.course?.name ?? '—',
+      enrollment_date: s.enrollment_date,
+      incentive_amount: s.incentive_amount,
+    }))
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Incentives" description="Month-wise incentive status from payroll" />
-      <IncentiveClient role={rawProfile.role} myEmployeeId={myEmployeeId} employees={employees} />
+      <IncentiveClient role={rawProfile.role} myEmployeeId={myEmployeeId} employees={employees} studentIncentives={studentIncentives} />
     </div>
   )
 }

@@ -291,8 +291,8 @@ export const InvoicePDF = ({ student, payments, logoBase64 }: InvoiceProps) => {
               <Text style={styles.companyName}>DISTANCE COURSES WALA</Text>
               <Text style={styles.companyDetail}>K-212, Near SBI ATM, Kankarbagh</Text>
               <Text style={styles.companyDetail}>Hanuman Nagar, Patna, Bihar – 800020</Text>
-              <Text style={styles.companyDetail}>📞 099395 87009</Text>
-              <Text style={styles.companyDetail}>✉ info@distancecourseswala.in</Text>
+              <Text style={styles.companyDetail}>Ph: 099395 87009</Text>
+              <Text style={styles.companyDetail}>Email: info@distancecourseswala.in</Text>
             </View>
             <View style={styles.invoiceBlock}>
               <View style={styles.invoiceBadge}>

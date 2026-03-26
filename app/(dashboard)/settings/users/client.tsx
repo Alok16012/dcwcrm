@@ -17,12 +17,13 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Profile, UserRole } from '@/types/app.types'
+import { ROLE_LABELS } from '@/types/app.types'
 
 const createUserSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(8, 'Min 8 characters'),
-  role: z.enum(['admin', 'lead', 'backend']),
+  role: z.enum(['admin', 'lead', 'backend', 'housekeeping']),
   phone: z.string().optional(),
 })
 
@@ -125,7 +126,7 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
     { accessorKey: 'email', header: 'Email' },
     {
       accessorKey: 'role', header: 'Role', cell: ({ row }) => (
-        <Badge variant="outline" className="capitalize">{row.original.role}</Badge>
+        <Badge variant="outline">{ROLE_LABELS[row.original.role] ?? row.original.role}</Badge>
       )
     },
     { accessorKey: 'phone', header: 'Phone', cell: ({ row }) => row.original.phone ?? '-' },
@@ -190,8 +191,9 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
                     <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="lead">Counselor</SelectItem>
                       <SelectItem value="backend">Backend</SelectItem>
+                      <SelectItem value="housekeeping">Housekeeping</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.role && <p className="text-xs text-red-500">{errors.role.message}</p>}

@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { format, getMonth, getYear } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
+import { ROLE_LABELS } from '@/types/app.types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AttendanceGrid from '@/components/hrms/AttendanceGrid'
 import PayrollTable from '@/components/hrms/PayrollTable'
@@ -102,7 +103,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
             <InfoRow label="Full Name" value={profile?.full_name ?? '—'} />
             <InfoRow label="Email" value={profile?.email ?? '—'} />
             <InfoRow label="Phone" value={profile?.phone ?? '—'} />
-            <InfoRow label="Role" value={profile?.role ?? '—'} className="capitalize" />
+            <InfoRow label="Role" value={profile?.role ? (ROLE_LABELS[profile.role as import('@/types/app.types').UserRole] ?? profile.role) : '—'} />
             <InfoRow label="Department" value={employee.department ?? '—'} />
             <InfoRow label="Designation" value={employee.designation ?? '—'} />
             <InfoRow label="Joining Date" value={employee.joining_date ? format(new Date(employee.joining_date), 'dd MMM yyyy') : '—'} />

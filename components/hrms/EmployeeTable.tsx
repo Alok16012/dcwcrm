@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { employeeSchema, type EmployeeFormData } from '@/lib/validations/employee.schema'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { UserRole } from '@/types/app.types'
+import { ROLE_LABELS } from '@/types/app.types'
 
 interface EmployeeRow {
   id: string
@@ -34,7 +35,7 @@ interface EmployeeTableProps {
   data: EmployeeRow[]
 }
 
-const ROLES: UserRole[] = ['admin', 'lead', 'backend']
+const ROLES: UserRole[] = ['admin', 'lead', 'backend', 'housekeeping']
 
 export default function EmployeeTable({ data: initialData }: EmployeeTableProps) {
   const [data, setData] = useState(initialData)
@@ -141,9 +142,10 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
     {
       accessorKey: 'role',
       header: 'Role',
-      cell: ({ getValue }) => (
-        <Badge variant="outline" className="capitalize">{getValue() as string}</Badge>
-      ),
+      cell: ({ getValue }) => {
+        const role = getValue() as UserRole
+        return <Badge variant="outline">{ROLE_LABELS[role] ?? role}</Badge>
+      },
     },
     { accessorKey: 'department', header: 'Department' },
     { accessorKey: 'designation', header: 'Designation' },
@@ -202,7 +204,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
             {ROLES.map((r) => (
-              <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+              <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -245,7 +247,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                      <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

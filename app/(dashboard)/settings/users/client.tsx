@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck, Trash2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,6 +33,8 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
   const [open, setOpen] = useState(false)
   const [confirmUser, setConfirmUser] = useState<Profile | null>(null)
   const [deleteUser, setDeleteUser] = useState<Profile | null>(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState<Profile | null>(null)
+  const [newPassword, setNewPassword] = useState('')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
@@ -75,6 +77,29 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
     setConfirmUser(null)
   }
 
+  async function handleUpdatePassword() {
+    if (!resetPasswordUser || newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+    startTransition(async () => {
+      try {
+        const res = await fetch('/api/admin/update-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: resetPasswordUser.id, newPassword }),
+        })
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error)
+        toast.success(`Password updated for ${resetPasswordUser.full_name}`)
+        setResetPasswordUser(null)
+        setNewPassword('')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to update password')
+      }
+    })
+  }
+
   async function handleDeleteUser(user: Profile) {
     startTransition(async () => {
       try {
@@ -114,6 +139,14 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
     {
       id: 'actions', header: 'Actions', cell: ({ row }) => (
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Change Password"
+            onClick={() => { setResetPasswordUser(row.original); setNewPassword('') }}
+          >
+            <KeyRound className="w-4 h-4 text-blue-500" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -192,6 +225,34 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
           onCancel={() => setDeleteUser(null)}
         />
       )}
+
+      <Dialog open={!!resetPasswordUser} onOpenChange={(o) => { if (!o) { setResetPasswordUser(null); setNewPassword('') } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Password — {resetPasswordUser?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                placeholder="Min 8 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              {newPassword.length > 0 && newPassword.length < 8 && (
+                <p className="text-xs text-red-500 mt-1">Minimum 8 characters required</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setResetPasswordUser(null); setNewPassword('') }}>Cancel</Button>
+              <Button onClick={handleUpdatePassword} disabled={isPending || newPassword.length < 8}>
+                {isPending ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

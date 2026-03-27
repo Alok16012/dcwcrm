@@ -33,10 +33,17 @@ export function LeadsClient() {
   const [showForm, setShowForm] = useState(false)
   const [courses, setCourses] = useState<Course[]>([])
   const [telecallers, setTelecallers] = useState<Profile[]>([])
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
   const { filters } = useLeadStore()
   const supabase = createClient()
 
   useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setCurrentProfile(profile as Profile)
+    })
+
     Promise.all([
       supabase.from('courses').select('*').eq('is_active', true).order('name'),
       supabase.from('profiles').select('*').eq('role', 'lead').eq('is_active', true),
@@ -47,8 +54,11 @@ export function LeadsClient() {
   }, [])
 
   const fetchLeads = useCallback(async () => {
+    if (!currentProfile) return
     setLoading(true)
     try {
+      const isTelecaller = currentProfile.role === 'lead'
+
       let query = supabase
         .from('leads')
         .select(`
@@ -61,9 +71,14 @@ export function LeadsClient() {
         `)
         .order('created_at', { ascending: false })
 
+      // Telecallers only see their own assigned leads
+      if (isTelecaller) {
+        query = query.eq('assigned_to', currentProfile.id)
+      }
+
       if (filters.status?.length) query = query.in('status', filters.status)
       if (filters.source?.length) query = query.in('source', filters.source)
-      if (filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
+      if (!isTelecaller && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
       if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.created_from) query = query.gte('created_at', filters.created_from)
@@ -79,12 +94,18 @@ export function LeadsClient() {
       setLeads((data as Lead[]) ?? [])
 
       const today = format(new Date(), 'yyyy-MM-dd')
+      // Stats scoped to assigned leads for telecallers
+      const base = isTelecaller
+        ? supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', currentProfile.id)
+        : supabase.from('leads').select('*', { count: 'exact', head: true })
+
       const [{ count: totalCount }, { count: newTodayCount }, { count: convertedCount }, { count: followupCount }] = await Promise.all([
-        supabase.from('leads').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', today),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'converted'),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('next_followup_date', today),
+        (isTelecaller ? supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', currentProfile.id) : supabase.from('leads').select('*', { count: 'exact', head: true })),
+        (isTelecaller ? supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', currentProfile.id).gte('created_at', today) : supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', today)),
+        (isTelecaller ? supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', currentProfile.id).eq('status', 'converted') : supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'converted')),
+        (isTelecaller ? supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', currentProfile.id).eq('next_followup_date', today) : supabase.from('leads').select('*', { count: 'exact', head: true }).eq('next_followup_date', today)),
       ])
+      void base
       setStats({ total: totalCount ?? 0, newToday: newTodayCount ?? 0, converted: convertedCount ?? 0, followupDue: followupCount ?? 0 })
     } catch (err: unknown) {
       const e = err as { message?: string }
@@ -92,9 +113,9 @@ export function LeadsClient() {
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [filters, currentProfile])
 
-  useEffect(() => { fetchLeads() }, [fetchLeads])
+  useEffect(() => { if (currentProfile) fetchLeads() }, [fetchLeads, currentProfile])
 
   return (
     <div className="space-y-5">
@@ -104,9 +125,11 @@ export function LeadsClient() {
           <h1 className="text-xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage and track all your leads</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add Lead
-        </Button>
+        {currentProfile?.role !== 'lead' && (
+          <Button onClick={() => setShowForm(true)} className="gap-1.5">
+            <Plus className="w-4 h-4" /> Add Lead
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -123,7 +146,8 @@ export function LeadsClient() {
         isLoading={loading}
         onRefresh={fetchLeads}
         courses={courses}
-        telecallers={telecallers}
+        telecallers={currentProfile?.role === 'lead' ? [] : telecallers}
+        isTelecaller={currentProfile?.role === 'lead'}
       />
 
       {/* Add Lead Dialog */}

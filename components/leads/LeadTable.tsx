@@ -62,11 +62,12 @@ interface LeadTableProps {
   onRefresh: () => void
   courses?: Course[]
   telecallers?: Profile[]
+  isTelecaller?: boolean
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50]
 
-export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecallers = [] }: LeadTableProps) {
+export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecallers = [], isTelecaller = false }: LeadTableProps) {
   const router = useRouter()
   const { filters, setFilters, clearFilters } = useLeadStore()
   const [search, setSearch] = useState(filters.search ?? '')

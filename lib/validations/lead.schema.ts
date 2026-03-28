@@ -15,6 +15,7 @@ export const leadSchema = z.object({
   source: z.enum(['website', 'walk_in', 'referral', 'whatsapp', 'phone', 'excel_import', 'social_media', 'other']),
   assigned_to: z.string().uuid().optional().or(z.literal('')),
   next_followup_date: z.string().optional(),
+  next_followup_time: z.string().optional(),
   notes: z.string().optional(),
   total_fee: z.number().positive().optional(),
   amount_paid: z.number().min(0).optional(),

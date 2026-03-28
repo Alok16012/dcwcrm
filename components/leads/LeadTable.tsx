@@ -50,10 +50,15 @@ const STATUS_COLORS: Record<string, string> = {
   contacted: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   interested: 'bg-purple-50 text-purple-700 border-purple-200',
   counselled: 'bg-orange-50 text-orange-700 border-orange-200',
-  application_sent: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  document_received: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   converted: 'bg-green-50 text-green-700 border-green-200',
-  cold: 'bg-gray-50 text-gray-600 border-gray-200',
   lost: 'bg-red-50 text-red-700 border-red-200',
+  dnp: 'bg-slate-50 text-slate-600 border-slate-200',
+  switch_off: 'bg-zinc-50 text-zinc-600 border-zinc-200',
+  not_reachable: 'bg-gray-50 text-gray-600 border-gray-200',
+  // Legacy values (still in DB)
+  application_sent: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  cold: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
 interface LeadTableProps {
@@ -124,7 +129,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
-  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length
+  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length || filters.mode || filters.city || filters.followup_from || filters.followup_to
 
   function toggleStatus(s: LeadStatus) {
     const cur = filters.status ?? []
@@ -268,6 +273,50 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
               </SelectContent>
             </Select>
           )}
+
+          {/* Mode filter */}
+          <Select
+            value={filters.mode ?? ''}
+            onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); setPage(1) }}
+          >
+            <SelectTrigger className={`w-36 h-9 text-sm ${filters.mode ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
+              <SelectValue placeholder="Mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All modes</SelectItem>
+              <SelectItem value="attending">Attending</SelectItem>
+              <SelectItem value="non-attending">Non-Attending</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Followup date filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400 whitespace-nowrap">Followup:</span>
+            <input
+              type="date"
+              value={filters.followup_from ?? ''}
+              onChange={(e) => { setFilters({ followup_from: e.target.value || undefined }); setPage(1) }}
+              className="h-9 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              placeholder="From"
+            />
+            <span className="text-xs text-gray-400">–</span>
+            <input
+              type="date"
+              value={filters.followup_to ?? ''}
+              onChange={(e) => { setFilters({ followup_to: e.target.value || undefined }); setPage(1) }}
+              className="h-9 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              placeholder="To"
+            />
+          </div>
+
+          {/* City filter */}
+          <input
+            type="text"
+            placeholder="City..."
+            value={filters.city ?? ''}
+            onChange={(e) => { setFilters({ city: e.target.value || undefined }); setPage(1) }}
+            className="h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-28"
+          />
 
           {/* Clear filters */}
           {activeFilters ? (

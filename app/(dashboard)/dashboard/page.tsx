@@ -102,6 +102,18 @@ export default async function DashboardPage() {
     assigned_to_name: (l.profiles as { full_name: string } | null)?.full_name ?? '—',
   }))
 
+  // Extra stats for telecallers
+  let docReceivedCount = 0
+  let expectedEnrollmentCount = 0
+  if (isLead && user) {
+    const [{ count: docCount }, { count: enrollCount }] = await Promise.all([
+      supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', user.id).eq('status', 'document_received'),
+      supabase.from('leads').select('*', { count: 'exact', head: true }).eq('assigned_to', user.id).not('enrollment_date', 'is', null),
+    ])
+    docReceivedCount = docCount ?? 0
+    expectedEnrollmentCount = enrollCount ?? 0
+  }
+
   // Tally top telecallers
   const tallyMap: Record<string, { id: string; full_name: string; conversions: number }> = {}
   for (const l of (topConverters ?? []) as { assigned_to: string | null; profiles: { id: string; full_name: string } | null }[]) {
@@ -150,6 +162,8 @@ export default async function DashboardPage() {
       topTelecallers={topTelecallers}
       incentiveHistory={incentiveHistory}
       isLead={isLead}
+      docReceivedCount={docReceivedCount}
+      expectedEnrollmentCount={expectedEnrollmentCount}
     />
   )
 }

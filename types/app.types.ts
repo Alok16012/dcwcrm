@@ -79,6 +79,7 @@ export interface LeadFilters {
   followup_to?: string
   payment_status?: 'paid' | 'partial' | 'unpaid'
   import_batch_id?: string
+  mode?: 'attending' | 'non-attending'
 }
 
 export interface Profile {

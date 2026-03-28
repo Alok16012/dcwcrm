@@ -47,6 +47,8 @@ interface DashboardClientProps {
   topTelecallers: TopTelecaller[]
   incentiveHistory?: IncentiveRow[]
   isLead?: boolean
+  docReceivedCount?: number
+  expectedEnrollmentCount?: number
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -68,6 +70,8 @@ export default function DashboardClient({
   topTelecallers,
   incentiveHistory = [],
   isLead = false,
+  docReceivedCount = 0,
+  expectedEnrollmentCount = 0,
 }: DashboardClientProps) {
   return (
     <div className="space-y-6">
@@ -91,6 +95,14 @@ export default function DashboardClient({
         <StatCard label="Active Students" value={activeStudents} color="blue" />
         <StatCard label="Pending Documents" value={pendingDocs} color={pendingDocs > 0 ? 'amber' : 'default'} />
       </div>
+
+      {/* Telecaller extra stats */}
+      {isLead && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard label="Document Received" value={docReceivedCount} color="blue" />
+          <StatCard label="Expected Enrollment" value={expectedEnrollmentCount} color="green" />
+        </div>
+      )}
 
       {/* 3-column grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

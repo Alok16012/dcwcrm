@@ -35,7 +35,16 @@ interface LeadFormProps {
   onCancel: () => void
 }
 
-const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'mode', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'enrollment_date', 'total_fee', 'amount_paid', 'notes']
+const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'source', 'status', 'mode', 'course_id', 'sub_course_id', 'department_id', 'sub_section_id', 'session_id', 'assigned_to', 'next_followup_date', 'next_followup_time', 'enrollment_date', 'total_fee', 'amount_paid', 'notes']
+
+// Map old/legacy status values to new ones
+function sanitizeStatus(status: string): LeadFormData['status'] {
+  const valid = ['new', 'contacted', 'interested', 'counselled', 'document_received', 'converted', 'lost', 'dnp', 'switch_off', 'not_reachable']
+  if (valid.includes(status)) return status as LeadFormData['status']
+  if (status === 'application_sent') return 'document_received'
+  if (status === 'cold') return 'dnp'
+  return 'new'
+}
 
 // Status colors for the status selector
 const STATUS_DOT: Record<string, string> = {
@@ -112,10 +121,11 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       department_id: lead.department_id ?? '',
       sub_section_id: lead.sub_section_id ?? '',
       session_id: lead.session_id ?? '',
-      status: lead.status,
+      status: sanitizeStatus(lead.status),
       source: lead.source,
       assigned_to: lead.assigned_to ?? '',
       next_followup_date: lead.next_followup_date ?? '',
+      next_followup_time: (lead as any).extra_data?.followup_time ?? '',
       enrollment_date: lead.enrollment_date ?? '',
       total_fee: lead.total_fee ?? undefined,
       amount_paid: lead.amount_paid ?? 0,
@@ -167,10 +177,11 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           department_id: lead.department_id ?? (lead as any).department?.id ?? '',
           sub_section_id: lead.sub_section_id ?? (lead as any).sub_section?.id ?? '',
           session_id: lead.session_id ?? (lead as any).session?.id ?? '',
-          status: lead.status,
+          status: sanitizeStatus(lead.status),
           source: lead.source,
           assigned_to: lead.assigned_to ?? '',
           next_followup_date: lead.next_followup_date ?? '',
+          next_followup_time: (lead as any).extra_data?.followup_time ?? '',
           enrollment_date: lead.enrollment_date ?? '',
           total_fee: lead.total_fee ?? undefined,
           amount_paid: lead.amount_paid ?? 0,
@@ -214,7 +225,11 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
   async function onSubmit(data: LeadFormData) {
     setLoading(true)
     try {
-      const { notes, ...rest } = data
+      const { notes, next_followup_time, ...rest } = data
+      const mergedExtra = {
+        ...(Object.keys(customValues).length ? customValues : {}),
+        ...(next_followup_time ? { followup_time: next_followup_time } : {}),
+      }
       const payload = {
         ...rest,
         email: rest.email || null,
@@ -230,7 +245,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         enrollment_date: rest.enrollment_date || null,
         total_fee: rest.total_fee ?? null,
         amount_paid: rest.amount_paid ?? 0,
-        extra_data: Object.keys(customValues).length ? customValues : null,
+        extra_data: Object.keys(mergedExtra).length ? mergedExtra : null,
       }
 
       if (lead) {
@@ -648,14 +663,28 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
-              {watch('next_followup_date') && (
-                <p className="text-xs text-rose-500 mt-1 flex items-center gap-1">
-                  <Bell className="w-3 h-3" />
-                  Reminder set for {new Date(watch('next_followup_date')!).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              )}
+            </FieldWrapper>
+            <FieldWrapper label="Follow-up Time">
+              <div className="relative">
+                <Bell className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400" />
+                <Input
+                  type="time"
+                  {...register('next_followup_time')}
+                  className="pl-9 bg-white border-rose-200 focus:border-rose-400"
+                />
+              </div>
             </FieldWrapper>
           </div>
+          {(watch('next_followup_date') || watch('next_followup_time')) && (
+            <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">
+              <Bell className="w-3 h-3" />
+              Reminder set for{' '}
+              {watch('next_followup_date')
+                ? new Date(watch('next_followup_date')!).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+                : '—'}
+              {watch('next_followup_time') ? ` at ${watch('next_followup_time')}` : ''}
+            </p>
+          )}
         </div>
       )}
 

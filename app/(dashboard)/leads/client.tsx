@@ -87,6 +87,7 @@ export function LeadsClient() {
       if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
       if (filters.payment_status === 'paid') query = query.gt('amount_paid', 0).filter('amount_paid', 'gte', 'total_fee')
       if (filters.payment_status === 'unpaid') query = query.eq('amount_paid', 0)
+      if (filters.mode) query = query.eq('mode', filters.mode)
       if (filters.import_batch_id) query = query.eq('import_batch_id', filters.import_batch_id)
 
       const { data, error } = await query

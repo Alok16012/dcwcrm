@@ -235,6 +235,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         email: rest.email || null,
         city: rest.city || null,
         state: rest.state || null,
+        mode: rest.mode || null,
         course_id: rest.course_id || null,
         sub_course_id: rest.sub_course_id || null,
         department_id: rest.department_id || null,
@@ -358,8 +359,10 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         toast.success('Lead created successfully!')
       }
       onSuccess()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save lead')
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? 'Failed to save lead'
+      toast.error(msg)
+      console.error('Lead save error:', err)
     } finally {
       setLoading(false)
     }

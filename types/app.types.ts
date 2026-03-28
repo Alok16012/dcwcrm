@@ -9,7 +9,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export type LeadStatus =
   | 'new' | 'contacted' | 'interested' | 'counselled'
-  | 'application_sent' | 'converted' | 'cold' | 'lost'
+  | 'document_received' | 'converted' | 'lost'
+  | 'dnp' | 'switch_off' | 'not_reachable'
 
 export type LeadSource =
   | 'website' | 'walk_in' | 'referral' | 'whatsapp'
@@ -279,10 +280,12 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   contacted: 'Contacted',
   interested: 'Interested',
   counselled: 'Counselled',
-  application_sent: 'Application Sent',
+  document_received: 'Document Received',
   converted: 'Converted',
-  cold: 'Cold',
   lost: 'Lost',
+  dnp: 'DNP',
+  switch_off: 'Switch Off',
+  not_reachable: 'Not Reachable',
 }
 
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
@@ -290,10 +293,12 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   contacted: 'bg-purple-100 text-purple-800',
   interested: 'bg-yellow-100 text-yellow-800',
   counselled: 'bg-orange-100 text-orange-800',
-  application_sent: 'bg-indigo-100 text-indigo-800',
+  document_received: 'bg-indigo-100 text-indigo-800',
   converted: 'bg-green-100 text-green-800',
-  cold: 'bg-gray-100 text-gray-800',
   lost: 'bg-red-100 text-red-800',
+  dnp: 'bg-slate-100 text-slate-700',
+  switch_off: 'bg-zinc-100 text-zinc-700',
+  not_reachable: 'bg-gray-100 text-gray-700',
 }
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Building2, Calendar, IndianRupee, FileText, Sparkles, CalendarDays, Bell, MessageSquare } from 'lucide-react'
+import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Building2, Calendar, FileText, CalendarDays, Bell, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,10 +43,12 @@ const STATUS_DOT: Record<string, string> = {
   contacted: 'bg-yellow-500',
   interested: 'bg-purple-500',
   counselled: 'bg-orange-500',
-  application_sent: 'bg-cyan-500',
+  document_received: 'bg-cyan-500',
   converted: 'bg-green-500',
-  cold: 'bg-gray-400',
   lost: 'bg-red-500',
+  dnp: 'bg-slate-400',
+  switch_off: 'bg-zinc-400',
+  not_reachable: 'bg-gray-400',
 }
 
 // Source icons as emoji/text
@@ -584,30 +586,6 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         </div>
       )}
 
-      {(isVisible('total_fee') || isVisible('amount_paid')) && (
-        <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
-          <SectionHeader icon={IndianRupee} title="Fees Information" color="border-orange-200" />
-          <div className="grid grid-cols-2 gap-4">
-            {isVisible('total_fee') && (
-              <FieldWrapper label="Total Fee">
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
-                  <Input type="number" {...register('total_fee', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
-                </div>
-              </FieldWrapper>
-            )}
-            {isVisible('amount_paid') && (
-              <FieldWrapper label="Amount Paid">
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
-                  <Input type="number" {...register('amount_paid', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />
-                </div>
-              </FieldWrapper>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Section 5: Academic Sessions ── */}
       {isVisible('session_id') && (
         <div className="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100">
@@ -693,44 +671,6 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
               className="bg-white border-slate-200 focus:border-slate-400 resize-none"
             />
           </FieldWrapper>
-        </div>
-      )}
-
-      {/* ── Section 9: Custom Fields ── */}
-      {customFields.length > 0 && (
-        <div className="bg-pink-50/50 rounded-xl p-4 border border-pink-100">
-          <SectionHeader icon={Sparkles} title="Additional Fields" color="border-pink-200" />
-          <div className="grid grid-cols-2 gap-4">
-            {customFields.map((field) => (
-              <FieldWrapper key={field.field_key} label={field.label} required={field.is_required}>
-                {field.field_type === 'textarea' ? (
-                  <Textarea
-                    value={customValues[field.field_key] ?? ''}
-                    onChange={(e) => setCustomValues((p) => ({ ...p, [field.field_key]: e.target.value }))}
-                    rows={2}
-                    className="bg-white border-pink-200"
-                  />
-                ) : field.field_type === 'select' && field.options ? (
-                  <Select
-                    value={customValues[field.field_key] ?? ''}
-                    onValueChange={(v) => setCustomValues((p) => ({ ...p, [field.field_key]: v || '' }))}
-                  >
-                    <SelectTrigger className="bg-white border-pink-200"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      {field.options.map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'email' ? 'email' : 'text'}
-                    value={customValues[field.field_key] ?? ''}
-                    onChange={(e) => setCustomValues((p) => ({ ...p, [field.field_key]: e.target.value }))}
-                    className="bg-white border-pink-200"
-                  />
-                )}
-              </FieldWrapper>
-            ))}
-          </div>
         </div>
       )}
 

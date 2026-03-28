@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import {
   MoreHorizontal, Search, ChevronLeft, ChevronRight,
-  ChevronDown, X, SlidersHorizontal, ArrowUpDown
+  ChevronDown, X, SlidersHorizontal, ArrowUpDown, Phone, MessageCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -416,7 +416,34 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-gray-700 font-mono text-xs">{lead.phone}</td>
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline underline-offset-2 transition-colors">
+                          {lead.phone}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-44">
+                        <DropdownMenuItem asChild>
+                          <a href={`tel:${lead.phone}`} className="flex items-center gap-2 cursor-pointer">
+                            <Phone className="w-4 h-4 text-blue-600" />
+                            <span>Call</span>
+                          </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <a
+                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4 text-green-600" />
+                            <span>WhatsApp</span>
+                          </a>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
                   <td className="px-3 py-3 text-gray-500 text-xs max-w-[160px] truncate">{lead.email ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>

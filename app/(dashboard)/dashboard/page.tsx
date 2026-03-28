@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
   const todayDate = format(now, 'yyyy-MM-dd')
 
-  const isLead = profile?.role === 'lead'
+  const isLead = profile?.role === 'lead' || profile?.role === 'telecaller'
 
   const applyScope = (q: any, table: string) => {
     if (isLead) {

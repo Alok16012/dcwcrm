@@ -424,22 +424,19 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-44">
-                        <DropdownMenuItem asChild>
-                          <a href={`tel:${lead.phone}`} className="flex items-center gap-2 cursor-pointer">
-                            <Phone className="w-4 h-4 text-blue-600" />
-                            <span>Call</span>
-                          </a>
+                        <DropdownMenuItem
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={() => window.location.href = `tel:${lead.phone}`}
+                        >
+                          <Phone className="w-4 h-4 text-blue-600" />
+                          <span>Call</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <a
-                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <MessageCircle className="w-4 h-4 text-green-600" />
-                            <span>WhatsApp</span>
-                          </a>
+                        <DropdownMenuItem
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                        >
+                          <MessageCircle className="w-4 h-4 text-green-600" />
+                          <span>WhatsApp</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

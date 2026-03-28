@@ -28,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
   { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
-  { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['admin', 'lead', 'backend'] },
+  { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead'] },
   { label: 'Performance', href: '/performance', icon: TrendingUp, roles: ['lead'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
 ]

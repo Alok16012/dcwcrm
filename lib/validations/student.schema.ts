@@ -14,7 +14,7 @@ export const studentSchema = z.object({
     session_id: z.string().uuid().optional().or(z.literal('')),
     assigned_counsellor: z.string().uuid().optional().or(z.literal('')),
     status: z.enum(['active', 'completed', 'dropped', 'on_hold']),
-    mode: z.enum(['attending', 'non-attending']).optional().or(z.literal('')),
+    mode: z.enum(['attending', 'non-attending', 'regular', 'distance', 'online']).optional().or(z.literal('')),
     total_fee: z.number().min(0).optional(),
     amount_paid: z.number().min(0).optional(),
     incentive_amount: z.number().min(0).optional(),

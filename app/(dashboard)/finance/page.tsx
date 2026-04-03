@@ -23,17 +23,19 @@ export default async function FinancePage() {
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
 
-  const [incomeRes, expenseRes, studentRes, pendingRes] = await Promise.all([
+  const [incomeRes, expenseRes, studentRes, pendingRes, totalIncomeRes] = await Promise.all([
     supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd),
     supabase.from('expenses').select('amount').neq('status', 'rejected').gte('expense_date', monthStart).lte('expense_date', monthEnd),
     supabase.from('students').select('total_fee, amount_paid'),
     supabase.from('expenses').select('id').eq('status', 'pending'),
+    supabase.from('payments').select('amount'),
   ])
 
   const incomeData = incomeRes.data as { amount: number }[] | null
   const expenseData = expenseRes.data as { amount: number }[] | null
   const studentData = studentRes.data as { total_fee: number | null; amount_paid: number }[] | null
   const pendingData = pendingRes.data as { id: string }[] | null
+  const totalIncomeData = totalIncomeRes.data as { amount: number }[] | null
 
   const totalIncomeThisMonth = (incomeData ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
   const totalExpensesThisMonth = (expenseData ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
@@ -42,6 +44,7 @@ export default async function FinancePage() {
     0
   )
   const pendingExpenseCount = (pendingData ?? []).length
+  const totalIncomeEver = (totalIncomeData ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
 
   return (
     <div className="space-y-6">
@@ -55,6 +58,7 @@ export default async function FinancePage() {
         totalExpensesThisMonth={totalExpensesThisMonth}
         outstandingReceivables={outstandingReceivables}
         pendingExpenseCount={pendingExpenseCount}
+        totalIncomeEver={totalIncomeEver}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link href="/finance/income" className="group rounded-lg border p-4 hover:bg-muted/50 transition-colors flex justify-between items-center">

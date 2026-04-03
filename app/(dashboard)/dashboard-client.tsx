@@ -1,16 +1,9 @@
 'use client'
 
 import { format } from 'date-fns'
+import Link from 'next/link'
 import { StatCard } from '@/components/shared/StatCard'
 import { Badge } from '@/components/ui/badge'
-
-interface RecentLead {
-  id: string
-  full_name: string
-  course_name: string
-  status: string
-  created_at: string
-}
 
 interface FollowupLead {
   id: string
@@ -33,22 +26,30 @@ interface IncentiveRow {
   net: number
 }
 
+interface DepartmentStat {
+  id: string
+  name: string
+  total_students: number
+  collected_fee: number
+  pending_fee: number
+}
+
 interface DashboardClientProps {
   totalLeads: number
   newToday: number
   convertedThisMonth: number
   conversionRate: string
-  feeCollectedThisMonth: number
+  totalFeeCollected: number
   outstandingFees: number
   activeStudents: number
   pendingDocs: number
-  recentLeads: RecentLead[]
   followupsToday: FollowupLead[]
   topTelecallers: TopTelecaller[]
   incentiveHistory?: IncentiveRow[]
   isLead?: boolean
   docReceivedCount?: number
   expectedEnrollmentCount?: number
+  departmentStats?: DepartmentStat[]
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -61,17 +62,17 @@ export default function DashboardClient({
   newToday,
   convertedThisMonth,
   conversionRate,
-  feeCollectedThisMonth,
+  totalFeeCollected,
   outstandingFees,
   activeStudents,
   pendingDocs,
-  recentLeads,
   followupsToday,
   topTelecallers,
   incentiveHistory = [],
   isLead = false,
   docReceivedCount = 0,
   expectedEnrollmentCount = 0,
+  departmentStats = [],
 }: DashboardClientProps) {
   return (
     <div className="space-y-6">
@@ -90,7 +91,7 @@ export default function DashboardClient({
 
       {/* Stat cards — row 2 (fee stats hidden for telecallers) */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {!isLead && <StatCard label="Fee Collected (Month)" value={fmt(feeCollectedThisMonth)} color="green" />}
+        {!isLead && <StatCard label="Total Fee Collected" value={fmt(totalFeeCollected)} color="green" />}
         {!isLead && <StatCard label="Outstanding Fees" value={fmt(outstandingFees)} color="amber" />}
         <StatCard label="Active Students" value={activeStudents} color="blue" />
         <StatCard label="Pending Documents" value={pendingDocs} color={pendingDocs > 0 ? 'amber' : 'default'} />
@@ -104,34 +105,8 @@ export default function DashboardClient({
         </div>
       )}
 
-      {/* 3-column grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Recent Leads */}
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-semibold text-sm">Recent Leads</h2>
-          {recentLeads.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No recent leads</p>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-muted-foreground">
-                  <th className="text-left pb-1">Name</th>
-                  <th className="text-left pb-1">Course</th>
-                  <th className="text-left pb-1">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentLeads.map((l) => (
-                  <tr key={l.id} className="border-t">
-                    <td className="py-1 font-medium">{l.full_name}</td>
-                    <td className="py-1 text-muted-foreground">{l.course_name || '—'}</td>
-                    <td className="py-1 capitalize">{l.status.replace('_', ' ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      {/* 2-column grid */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
         {/* Followups Due Today */}
         <div className="rounded-lg border p-4 space-y-3">
@@ -220,6 +195,39 @@ export default function DashboardClient({
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* Department-wise Stats (Admin Only) */}
+      {!isLead && departmentStats.length > 0 && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <h2 className="font-semibold text-sm">Department-wise Fees & Students</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b border-gray-100">
+                  <th className="text-left font-medium pb-2">Department</th>
+                  <th className="text-right font-medium pb-2">Total Students</th>
+                  <th className="text-right font-medium pb-2">Fee Collected</th>
+                  <th className="text-right font-medium pb-2">Pending Fees</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {departmentStats.map((dept) => (
+                  <tr key={dept.id} className="group hover:bg-muted/30 transition-colors">
+                    <td className="py-2.5 font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                      <Link href={`/backend?dept=${dept.id}`}>
+                        {dept.name}
+                      </Link>
+                    </td>
+                    <td className="py-2.5 text-right">{dept.total_students}</td>
+                    <td className="py-2.5 text-right text-green-700 font-medium">{fmt(dept.collected_fee)}</td>
+                    <td className="py-2.5 text-right text-amber-600 font-medium">{fmt(dept.pending_fee)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

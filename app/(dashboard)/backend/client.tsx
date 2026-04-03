@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { MoreVertical, Pencil, FileText, Search, Trash2, Download } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -41,6 +41,9 @@ interface BoardOption { id: string; name: string; department_id: string }
 
 export function BackendListClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const deptParam = searchParams.get('dept')
+
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -51,7 +54,7 @@ export function BackendListClient() {
   const [sessionFilter, setSessionFilter] = useState('')
   const [counsellorFilter, setCounsellorFilter] = useState('')
   const [modeFilter, setModeFilter] = useState('')
-  const [departmentFilter, setDepartmentFilter] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState(deptParam || '')
   const [boardFilter, setBoardFilter] = useState('')
   const [courses, setCourses] = useState<FilterOption[]>([])
   const [sessions, setSessions] = useState<FilterOption[]>([])
@@ -381,10 +384,11 @@ export function BackendListClient() {
           <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Mode" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Modes</SelectItem>
-            <SelectItem value="open_schooling">Open Schooling</SelectItem>
-            <SelectItem value="college">College</SelectItem>
+            <SelectItem value="attending">Attending</SelectItem>
+            <SelectItem value="non-attending">Non-Attending</SelectItem>
+            <SelectItem value="regular">Regular</SelectItem>
+            <SelectItem value="distance">Distance</SelectItem>
             <SelectItem value="online">Online</SelectItem>
-            <SelectItem value="offline">Offline</SelectItem>
           </SelectContent>
         </Select>
         <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>

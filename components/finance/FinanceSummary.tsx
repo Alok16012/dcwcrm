@@ -7,6 +7,7 @@ interface FinanceSummaryProps {
   totalExpensesThisMonth: number
   outstandingReceivables: number
   pendingExpenseCount: number
+  totalIncomeEver: number
 }
 
 const fmt = (n: number) =>
@@ -17,11 +18,13 @@ export default function FinanceSummary({
   totalExpensesThisMonth,
   outstandingReceivables,
   pendingExpenseCount,
+  totalIncomeEver,
 }: FinanceSummaryProps) {
   const netProfitLoss = totalIncomeThisMonth - totalExpensesThisMonth
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <StatCard label="Total Fee Collected" value={fmt(totalIncomeEver)} color="blue" />
       <StatCard label="Income This Month" value={fmt(totalIncomeThisMonth)} color="green" />
       <StatCard label="Expenses This Month" value={fmt(totalExpensesThisMonth)} color="red" />
       <StatCard

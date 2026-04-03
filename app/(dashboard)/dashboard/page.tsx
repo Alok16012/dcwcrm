@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     ? (telecallerStudentIds.length > 0
         ? supabase.from('payments').select('amount').in('student_id', telecallerStudentIds).gte('payment_date', monthStart).lte('payment_date', monthEnd)
         : supabase.from('payments').select('amount').eq('recorded_by', user!.id).gte('payment_date', monthStart).lte('payment_date', monthEnd))
-    : supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd)
+    : supabase.from('payments').select('amount')
 
   const pendingDocsQuery = isLead && telecallerStudentIds.length > 0
     ? supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending').in('student_id', telecallerStudentIds)
@@ -66,6 +66,7 @@ export default async function DashboardPage() {
     { data: recentLeadsRaw },
     { data: followupLeads },
     { data: topConverters },
+    { data: departmentsRaw },
   ] = await Promise.all([
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd), 'leads'),
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
     applyScope(supabase.from('leads').select('id, full_name, status, created_at, courses ( name )'), 'leads').order('created_at', { ascending: false }).limit(10),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
     applyScope(supabase.from('leads').select('assigned_to, profiles!assigned_to ( id, full_name )'), 'leads').eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd),
+    supabase.from('departments').select('id, name, students(id, amount_paid, total_fee)'),
   ])
 
   const feeCollectedThisMonth = ((paymentsThisMonth ?? []) as { amount: number }[]).reduce((s, p) => s + (p.amount ?? 0), 0)
@@ -147,23 +149,38 @@ export default async function DashboardPage() {
     }
   }
 
+  // Calculate department stats
+  const departmentStats = ((departmentsRaw ?? []) as { id: string; name: string; students: { id: string; amount_paid: number; total_fee: number }[] | null }[]).map(dept => {
+    const students = dept.students ?? []
+    const total_students = students.length
+    const collected_fee = students.reduce((sum, s) => sum + (s.amount_paid ?? 0), 0)
+    const pending_fee = students.reduce((sum, s) => sum + Math.max(0, (s.total_fee ?? 0) - (s.amount_paid ?? 0)), 0)
+    return {
+      id: dept.id,
+      name: dept.name,
+      total_students,
+      collected_fee,
+      pending_fee,
+    }
+  }).sort((a, b) => b.collected_fee - a.collected_fee)
+
   return (
     <DashboardClient
       totalLeads={totalLeads ?? 0}
       newToday={newToday ?? 0}
       convertedThisMonth={conversionCount}
       conversionRate={conversionRate}
-      feeCollectedThisMonth={feeCollectedThisMonth}
+      totalFeeCollected={feeCollectedThisMonth}
       outstandingFees={outstandingFees}
       activeStudents={activeStudents ?? 0}
       pendingDocs={pendingDocs ?? 0}
-      recentLeads={recentLeads}
       followupsToday={followupsToday}
       topTelecallers={topTelecallers}
       incentiveHistory={incentiveHistory}
       isLead={isLead}
       docReceivedCount={docReceivedCount}
       expectedEnrollmentCount={expectedEnrollmentCount}
+      departmentStats={departmentStats}
     />
   )
 }

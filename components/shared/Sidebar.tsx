@@ -22,16 +22,17 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend'] },
   { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
-  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
-  { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
-  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
   { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
-  { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
+  { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
+  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
+  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
+  { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
+  // Lead specific items kept at the end
   { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead'] },
   { label: 'Performance', href: '/performance', icon: TrendingUp, roles: ['lead'] },
-  { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
 ]
 
 interface SidebarProps {

@@ -42,6 +42,12 @@ export function StudentRecord({ student }: StudentRecordProps) {
             {student.status.charAt(0).toUpperCase() + student.status.slice(1)}
           </Badge>
         </div>
+        {(student as any).drop_reason && (
+          <div className="col-span-2">
+            <p className="text-gray-500">Drop Reason</p>
+            <p className="font-medium text-red-700">{(student as any).drop_reason}</p>
+          </div>
+        )}
       </div>
 
       {student.lead_id && (

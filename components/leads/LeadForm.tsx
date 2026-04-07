@@ -106,6 +106,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
   const [formFields, setFormFields] = useState<FormField[]>([])
   const [customValues, setCustomValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [duplicateLead, setDuplicateLead] = useState<{ id: string; full_name: string; phone: string } | null>(null)
   const supabase = createClient()
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<LeadFormData>({
@@ -226,6 +227,14 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                 }
             })
     }, [selectedDeptId, lead?.id, setValue])
+
+  async function checkDuplicate(phone: string) {
+    if (!phone || phone.length < 7) { setDuplicateLead(null); return }
+    const q = supabase.from('leads').select('id, full_name, phone').eq('phone', phone.trim()).limit(1)
+    if (lead?.id) q.neq('id', lead.id)
+    const { data } = await q.maybeSingle()
+    setDuplicateLead(data as any ?? null)
+  }
 
   async function onSubmit(data: LeadFormData) {
     setLoading(true)
@@ -386,9 +395,25 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
               <Input
                 {...register('phone')}
                 placeholder="e.g. 9876543210"
-                className="pl-9 bg-white border-blue-200 focus:border-blue-400"
+                className={`pl-9 bg-white focus:border-blue-400 ${duplicateLead ? 'border-orange-400 bg-orange-50' : 'border-blue-200'}`}
+                onBlur={(e) => checkDuplicate(e.target.value)}
               />
             </div>
+            {duplicateLead && (
+              <div className="mt-1.5 flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-700">
+                <span className="text-orange-500 font-bold mt-0.5">⚠</span>
+                <span>
+                  Duplicate! <span className="font-semibold">{duplicateLead.full_name}</span> already has this number.{' '}
+                  <button
+                    type="button"
+                    className="underline font-semibold text-blue-600 hover:text-blue-800"
+                    onClick={() => window.open(`/leads/${duplicateLead.id}`, '_blank')}
+                  >
+                    View lead
+                  </button>
+                </span>
+              </div>
+            )}
           </FieldWrapper>
 
           {isVisible('email') && (
@@ -587,8 +612,8 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         </div>
       )}
 
-      {/* ── Section 5: Budget & Fees ── */}
-      {(isVisible('total_fee')) && (
+      {/* ── Section 5: Budget & Fees ── only shown when editing an existing lead */}
+      {!!lead && (isVisible('total_fee')) && (
         <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
           <SectionHeader icon={IndianRupee} title="Budget & Fees" color="border-orange-200" />
           <div className="grid grid-cols-2 gap-4">

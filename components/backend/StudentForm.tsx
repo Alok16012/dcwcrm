@@ -88,6 +88,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             session_id: student?.session_id ?? '',
             assigned_counsellor: student?.assigned_counsellor ?? '',
             status: (student?.status as any) || 'active',
+            drop_reason: (student as any)?.drop_reason ?? '',
             mode: student?.mode ?? '',
             incentive_amount: student?.incentive_amount ?? 0,
             total_fee: student?.total_fee ?? 0,
@@ -133,6 +134,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         session_id: student?.session_id ?? (student as any)?.session?.id ?? '',
                         assigned_counsellor: student?.assigned_counsellor ?? '',
                         status: (student?.status as any) || 'active',
+                        drop_reason: (student as any)?.drop_reason ?? '',
                         mode: student?.mode ?? '',
                         incentive_amount: student?.incentive_amount ?? 0,
                         total_fee: student?.total_fee ?? 0,
@@ -220,7 +222,27 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 } as never).eq('id', student.id)
                 if (error) throw error
 
-                toast.success('Student profile updated')
+                // Auto-create litigation when status changed to dropped
+                if (data.status === 'dropped' && student.status !== 'dropped') {
+                    const pending = (student.total_fee ?? 0) - (student.amount_paid ?? 0)
+                    await supabase.from('department_litigations').insert({
+                        student_id: student.id,
+                        student_name: student.full_name,
+                        father_name: student.guardian_name || null,
+                        phone: student.phone || null,
+                        department_id: data.department_id || student.department_id || null,
+                        sub_section_id: data.sub_section_id || student.sub_section_id || null,
+                        session_id: data.session_id || student.session_id || null,
+                        litigation_type: 'debt_recovery',
+                        reason: data.drop_reason || null,
+                        litigation_amount: pending > 0 ? pending : 0,
+                        amount_paid: 0,
+                        record_type: 'litigation',
+                    } as never)
+                    toast.success('Student marked as dropped & added to Litigation')
+                } else {
+                    toast.success('Student profile updated')
+                }
             } else {
                 const newPayload = {
                     ...data,
@@ -350,6 +372,19 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                             </SelectContent>
                         </Select>
                     </FieldWrapper>
+
+                    {watch('status') === 'dropped' && (
+                        <FieldWrapper label="Reason for Drop">
+                            <div className="relative">
+                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-400" />
+                                <Input
+                                    {...register('drop_reason')}
+                                    placeholder="e.g. Fee not paid, shifted city..."
+                                    className="pl-9 bg-white border-red-200 focus:border-red-400"
+                                />
+                            </div>
+                        </FieldWrapper>
+                    )}
 
                     <FieldWrapper label="Counsellor">
                         <div className="relative">

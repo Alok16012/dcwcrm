@@ -75,6 +75,8 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         defaultValues: {
             full_name: student?.full_name ?? '',
             guardian_name: student?.guardian_name ?? '',
+            guardian_phone: (student as any)?.guardian_phone ?? '',
+            guardian_relationship: (student as any)?.guardian_relationship ?? '',
             phone: student?.phone ?? '',
             email: student?.email ?? '',
             city: student?.city ?? '',
@@ -118,6 +120,8 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     reset({
                         full_name: student?.full_name ?? '',
                         guardian_name: student?.guardian_name ?? '',
+                        guardian_phone: (student as any)?.guardian_phone ?? '',
+                        guardian_relationship: (student as any)?.guardian_relationship ?? '',
                         phone: student?.phone ?? '',
                         email: student?.email ?? '',
                         city: student?.city ?? '',
@@ -252,12 +256,6 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </div>
                     </FieldWrapper>
 
-                    <FieldWrapper label="Guardian / Father Name" error={errors.guardian_name?.message}>
-                        <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
-                            <Input {...register('guardian_name')} className="pl-9 bg-white border-blue-200" />
-                        </div>
-                    </FieldWrapper>
 
                     <FieldWrapper label="Phone" required error={errors.phone?.message}>
                         <div className="relative">
@@ -277,6 +275,33 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         <div className="relative">
                             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                             <Input {...register('city')} className="pl-9 bg-white border-blue-200" />
+                        </div>
+                    </FieldWrapper>
+                </div>
+            </div>
+
+            {/* ── Guardian / Associate ── */}
+            <div className="bg-teal-50/50 rounded-xl p-4 border border-teal-100">
+                <SectionHeader icon={UserCheck} title="Guardian / Associate" color="border-teal-200" />
+                <div className="grid grid-cols-2 gap-4">
+                    <FieldWrapper label="Guardian / Father Name">
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400" />
+                            <Input {...register('guardian_name')} placeholder="Guardian name" className="pl-9 bg-white border-teal-200" />
+                        </div>
+                    </FieldWrapper>
+
+                    <FieldWrapper label="Guardian Phone Number">
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400" />
+                            <Input {...register('guardian_phone')} placeholder="Guardian mobile number" className="pl-9 bg-white border-teal-200" />
+                        </div>
+                    </FieldWrapper>
+
+                    <FieldWrapper label="Relationship">
+                        <div className="relative">
+                            <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400" />
+                            <Input {...register('guardian_relationship')} placeholder="e.g. Father, Mother, Spouse" className="pl-9 bg-white border-teal-200" />
                         </div>
                     </FieldWrapper>
                 </div>

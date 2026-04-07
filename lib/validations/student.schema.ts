@@ -5,6 +5,8 @@ export const studentSchema = z.object({
     phone: z.string().min(10, 'Valid phone required'),
     email: z.string().email().optional().or(z.literal('')),
     guardian_name: z.string().optional().or(z.literal('')),
+    guardian_phone: z.string().optional().or(z.literal('')),
+    guardian_relationship: z.string().optional().or(z.literal('')),
     city: z.string().optional(),
     enrollment_date: z.string().optional(),
     course_id: z.string().uuid().optional().or(z.literal('')),

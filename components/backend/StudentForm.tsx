@@ -464,7 +464,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
                 <SectionHeader icon={IndianRupee} title="Fees Information" color="border-orange-200" />
                 <div className="grid grid-cols-2 gap-4">
-                    <FieldWrapper label="Discussed Amount">
+                    <FieldWrapper label="Total Fee">
                         <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
                             <Input type="number" {...register('total_fee', { valueAsNumber: true })} className="pl-9 bg-white border-orange-200" />

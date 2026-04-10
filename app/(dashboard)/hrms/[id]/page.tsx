@@ -58,16 +58,32 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
   const { data: profileRaw } = await supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single()
   const profile = profileRaw as { id: string; full_name: string; email: string; phone: string | null; role: string } | null
 
-  // Build attendance map
-  const attendanceMap: Record<number, import('@/types/app.types').AttendanceStatus> = {}
+  // Build attendance map keyed by date string
+  const attendanceMap: Record<string, import('@/types/app.types').AttendanceStatus> = {}
   for (const a of attendanceRaw ?? []) {
-    const day = Number(a.date.split('-')[2])
-    attendanceMap[day] = a.status as import('@/types/app.types').AttendanceStatus
+    attendanceMap[a.date] = a.status as import('@/types/app.types').AttendanceStatus
   }
+
+  // Compute cycle dates for this employee
+  const cycleDay = employee.salary_cycle_start_day ?? 1
+  const cycleStartDate = cycleDay === 1
+    ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+    : (() => {
+        const d = new Date(currentYear, currentMonth - 2, cycleDay)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
+  const cycleEndDate = cycleDay === 1
+    ? (() => { const d = new Date(currentYear, currentMonth, 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+    : (() => {
+        const d = new Date(currentYear, currentMonth - 1, cycleDay - 1)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
 
   const employeeAttendance = [{
     employee_id: employee.id,
     employee_name: profile?.full_name ?? '—',
+    cycle_start: cycleStartDate,
+    cycle_end: cycleEndDate,
     attendance: attendanceMap,
   }]
 
@@ -158,6 +174,8 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
             data={employeeAttendance}
             year={currentYear}
             month={currentMonth}
+            rangeStart={cycleStartDate}
+            rangeEnd={cycleEndDate}
           />
         </TabsContent>
 

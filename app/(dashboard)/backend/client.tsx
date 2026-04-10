@@ -145,6 +145,17 @@ export function BackendListClient() {
     }
   }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
 
+  // Calculate board-wise counts for tabs
+  const boardStats = students.reduce((acc, s) => {
+    const b = s.sub_section?.name
+    const bid = s.sub_section?.id
+    if (b && bid) {
+      if (!acc[bid]) acc[bid] = { name: b, count: 0 }
+      acc[bid].count++
+    }
+    return acc
+  }, {} as Record<string, { name: string; count: number }>)
+
   async function handleDeleteStudent(id: string) {
     try {
       const { error } = await supabase.from('students').delete().eq('id', id)
@@ -301,32 +312,47 @@ export function BackendListClient() {
         )}
       />
 
-      {/* Board-wise count stats */}
-      {!loading && students.length > 0 && (() => {
-        const boardCounts = students.reduce((acc, s) => {
-          const b = s.sub_section?.name
-          if (b) acc[b] = (acc[b] ?? 0) + 1
-          return acc
-        }, {} as Record<string, number>)
-        const entries = Object.entries(boardCounts)
-        if (!entries.length) return null
-        return (
-          <div className="flex flex-wrap gap-2 mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <span className="text-xs font-medium text-blue-600 self-center">Board-wise:</span>
-            {entries.map(([board, count]) => (
-              <Badge
-                key={board}
-                variant="outline"
-                className="text-xs cursor-pointer border-blue-200 text-blue-700 bg-white hover:bg-blue-100"
-                onClick={() => setBoardFilter(boards.find(b => b.name === board)?.id ?? '')}
+      {/* Premium Board Tabs */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
+            <button
+              onClick={() => setBoardFilter('')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+                boardFilter === ''
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-100'
+                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              All Students
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                boardFilter === '' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {students.length}
+              </span>
+            </button>
+
+            {Object.entries(boardStats).map(([id, stat]) => (
+              <button
+                key={id}
+                onClick={() => setBoardFilter(id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+                  boardFilter === id
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-2 ring-indigo-100'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
               >
-                {board}: {count}
-              </Badge>
+                {stat.name}
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                  boardFilter === id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {stat.count}
+                </span>
+              </button>
             ))}
-            <span className="text-xs text-blue-500 self-center ml-auto">Total: {students.length}</span>
           </div>
-        )
-      })()}
+        </div>
+      </div>
 
       {/* Layer 1: Department + Board */}
       <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border mb-2">

@@ -152,6 +152,7 @@ export interface Lead {
   created_by?: string
   mode?: 'attending' | 'non-attending' | 'regular' | 'distance' | 'online'
   enrollment_date?: string
+  metadata?: Record<string, any>
   created_at: string
   updated_at: string
   // joins
@@ -196,6 +197,8 @@ export interface Student {
   enrollment_number: string
   full_name: string
   guardian_name?: string
+  guardian_phone?: string
+  guardian_relationship?: string
   phone: string
   email?: string
   city?: string

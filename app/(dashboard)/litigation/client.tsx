@@ -235,8 +235,7 @@ export function LitigationClient({
   const [payForm, setPayForm] = useState<PayForm>(EMPTY_PAY)
   const [showHistory, setShowHistory] = useState<Litigation | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Litigation | null>(null)
-  const [editFundDept, setEditFundDept] = useState<Dept | null>(null)
-  const [fundValue, setFundValue] = useState('')
+
   const [expandedDropped, setExpandedDropped] = useState(false)
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -436,17 +435,7 @@ export function LitigationClient({
     setDeleteTarget(null)
   }
 
-  function saveDeptFund() {
-    if (!editFundDept) return
-    const val = parseFloat(fundValue) || 0
-    startTransition(async () => {
-      const { error } = await supabase.from('departments').update({ dept_fund: val } as never).eq('id', editFundDept.id)
-      if (error) { toast.error('Fund update failed'); return }
-      setDepts((prev) => prev.map((d) => d.id === editFundDept.id ? { ...d, dept_fund: val } : d))
-      toast.success('Department fund updated!')
-      setEditFundDept(null)
-    })
-  }
+
 
   function statusBadge(l: Litigation) {
     const pending = l.litigation_amount - l.amount_paid
@@ -568,30 +557,7 @@ export function LitigationClient({
         </div>
       </div>
 
-      {/* Department Fund Cards */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">Department Fund Balance</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {depts.map((d) => (
-            <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 font-medium">{d.name}</p>
-                  <p className="text-lg font-bold text-indigo-700 mt-0.5">{formatCurrency(d.dept_fund ?? 0)}</p>
-                </div>
-                <button
-                  onClick={() => { setEditFundDept(d); setFundValue(String(d.dept_fund ?? 0)) }}
-                  className="w-6 h-6 rounded-md hover:bg-blue-50 text-blue-500 flex items-center justify-center"
-                  title="Update fund"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1">Fund Balance</p>
-            </div>
-          ))}
-        </div>
-      </div>
+
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -737,7 +703,11 @@ export function LitigationClient({
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Department *</label>
               <Select value={form.department_id} onValueChange={handleDeptChange}>
-                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                <SelectTrigger>
+                  <span className="text-sm truncate">
+                    {form.department_id ? departments.find((d) => d.id === form.department_id)?.name ?? 'Select department' : 'Select department'}
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                 </SelectContent>
@@ -751,7 +721,11 @@ export function LitigationClient({
                 disabled={!form.department_id}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={form.department_id ? 'Select board' : 'Select department first'} />
+                  <span className="text-sm truncate">
+                    {form.sub_section_id
+                      ? formBoards.find((b) => b.id === form.sub_section_id)?.name ?? '— None —'
+                      : form.department_id ? 'Select board' : 'Select department first'}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">— None —</SelectItem>
@@ -762,7 +736,11 @@ export function LitigationClient({
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Session</label>
               <Select value={form.session_id} onValueChange={(v) => setForm((f) => ({ ...f, session_id: v ?? '' }))}>
-                <SelectTrigger><SelectValue placeholder="Select session" /></SelectTrigger>
+                <SelectTrigger>
+                  <span className="text-sm truncate">
+                    {form.session_id ? sessions.find((s) => s.id === form.session_id)?.name ?? 'Select session' : 'Select session'}
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">— None —</SelectItem>
                   {sessions.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -954,37 +932,8 @@ export function LitigationClient({
         </DialogContent>
       </Dialog>
 
-      {/* Dept Fund Edit Dialog */}
-      <Dialog open={!!editFundDept} onOpenChange={(o) => { if (!o) setEditFundDept(null) }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-indigo-600" /> Update Department Fund
-            </DialogTitle>
-          </DialogHeader>
-          {editFundDept && (
-            <div className="space-y-4 mt-2">
-              <p className="text-sm text-gray-600">Update fund balance for <span className="font-semibold">{editFundDept.name}</span></p>
-              <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Fund Amount (₹)</label>
-                <Input
-                  type="number"
-                  autoFocus
-                  value={fundValue}
-                  onChange={(e) => setFundValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && saveDeptFund()}
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button className="flex-1" onClick={saveDeptFund} disabled={isPending}>
-                  {isPending ? 'Saving...' : 'Update'}
-                </Button>
-                <Button variant="outline" onClick={() => setEditFundDept(null)}>Cancel</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+
 
       {/* Delete Confirm */}
       {deleteTarget && (

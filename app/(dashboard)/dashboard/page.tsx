@@ -50,9 +50,10 @@ export default async function DashboardPage() {
         : supabase.from('payments').select('amount').eq('recorded_by', user!.id).gte('payment_date', monthStart).lte('payment_date', monthEnd))
     : supabase.from('payments').select('amount')
 
-  const pendingDocsQuery = isLead && telecallerStudentIds.length > 0
-    ? supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending').in('student_id', telecallerStudentIds)
-    : supabase.from('student_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+  const droppedStudentsQuery = applyScope(
+    supabase.from('students').select('*', { count: 'exact', head: true }).eq('status', 'dropped'),
+    'students'
+  )
 
   const [
     { count: totalLeads },
@@ -62,13 +63,11 @@ export default async function DashboardPage() {
     { data: paymentsThisMonth },
     { data: studentFees },
     { count: activeStudents },
-    { count: pendingDocs },
+    { count: droppedStudents },
     { data: recentLeadsRaw },
     { data: followupLeads },
-    { data: topConverters },
-    { data: assignedLeadsRaw },
-    { data: callsMadeRaw },
     { data: telecallersRaw },
+    { data: interestedLeadsRaw },
     { data: departmentsRaw },
   ] = await Promise.all([
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
@@ -78,13 +77,11 @@ export default async function DashboardPage() {
     paymentsQuery,
     applyScope(supabase.from('students').select('total_fee, amount_paid'), 'students'),
     applyScope(supabase.from('students').select('*', { count: 'exact', head: true }), 'students'),
-    pendingDocsQuery,
+    droppedStudentsQuery,
     applyScope(supabase.from('leads').select('id, full_name, status, created_at, courses ( name )'), 'leads').order('created_at', { ascending: false }).limit(10),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
-    applyScope(supabase.from('leads').select('assigned_to, profiles!assigned_to ( id, full_name )'), 'leads').eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd),
-    applyScope(supabase.from('leads').select('assigned_to'), 'leads').gte('created_at', monthStart).lte('created_at', monthEnd),
-    supabase.from('lead_activities').select('performed_by').eq('activity_type', 'call_made').gte('created_at', monthStart).lte('created_at', monthEnd),
     supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller']).eq('is_active', true),
+    applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested'), 'leads'),
     supabase.from('departments').select('id, name, students(id, amount_paid, total_fee)'),
   ])
 
@@ -122,43 +119,27 @@ export default async function DashboardPage() {
     expectedEnrollmentCount = enrollCount ?? 0
   }
 
-  // Tally top telecallers
-  const tallyMap: Record<string, { id: string; full_name: string; conversions: number; assigned: number; calls: number }> = {}
+  // Tally interested leads (Counselor-wise)
+  const tallyMap: Record<string, { id: string; full_name: string; interested_total: number; interested_month: number }> = {}
   
   // Initialize with all active telecallers
   for (const t of (telecallersRaw ?? []) as { id: string; full_name: string }[]) {
-    tallyMap[t.id] = { id: t.id, full_name: t.full_name, conversions: 0, assigned: 0, calls: 0 }
+    tallyMap[t.id] = { id: t.id, full_name: t.full_name, interested_total: 0, interested_month: 0 }
   }
 
-  // Tally conversions
-  for (const l of (topConverters ?? []) as { assigned_to: string | null; profiles: { id: string; full_name: string } | null }[]) {
-    const p = l.profiles
-    if (!p || !tallyMap[p.id]) continue
-    tallyMap[p.id].conversions++
-  }
-
-  // Tally assigned leads this month
-  for (const l of (assignedLeadsRaw ?? []) as { assigned_to: string | null }[]) {
+  // Tally interested leads
+  for (const l of (interestedLeadsRaw ?? []) as { assigned_to: string | null; created_at: string }[]) {
     if (l.assigned_to && tallyMap[l.assigned_to]) {
-      tallyMap[l.assigned_to].assigned++
+      tallyMap[l.assigned_to].interested_total++
+      if (l.created_at >= monthStart && l.created_at <= monthEnd) {
+        tallyMap[l.assigned_to].interested_month++
+      }
     }
   }
 
-  // Tally calls made this month
-  for (const c of (callsMadeRaw ?? []) as { performed_by: string | null }[]) {
-    if (c.performed_by && tallyMap[c.performed_by]) {
-      tallyMap[c.performed_by].calls++
-    }
-  }
-
-  const topTelecallers = Object.values(tallyMap)
-    .map(t => ({
-      ...t,
-      calls_made: t.calls,
-      conversion_rate: t.assigned > 0 ? ((t.conversions / t.assigned) * 100).toFixed(1) + '%' : '0%'
-    }))
-    .sort((a, b) => b.conversions - a.conversions)
-    .slice(0, 5)
+  const counselorInterestedStats = Object.values(tallyMap)
+    .sort((a, b) => b.interested_total - a.interested_total)
+    .slice(0, 10) // Show top 10 counselors by interested count
 
   // Fetch incentive data for telecallers
   type IncentiveRow = { month: number; year: number; incentive: number; status: string; net: number }
@@ -205,9 +186,9 @@ export default async function DashboardPage() {
       totalFeeCollected={feeCollectedThisMonth}
       outstandingFees={outstandingFees}
       activeStudents={activeStudents ?? 0}
-      pendingDocs={pendingDocs ?? 0}
+      droppedStudents={droppedStudents ?? 0}
       followupsToday={followupsToday}
-      topTelecallers={topTelecallers}
+      interestedStats={counselorInterestedStats}
       incentiveHistory={incentiveHistory}
       isLead={isLead}
       docReceivedCount={docReceivedCount}

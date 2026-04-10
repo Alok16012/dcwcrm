@@ -1,16 +1,12 @@
 'use client'
 import { useState, useTransition, useRef } from 'react'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Building2, School, X, Check, IndianRupee } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Building2, School, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { formatCurrency } from '@/types/app.types'
 
 interface SubSectionRow { id: string; name: string; is_active: boolean; department_id: string }
 interface DepartmentRow { id: string; name: string; is_active: boolean; department_sub_sections: SubSectionRow[]; dept_fund?: number | null }
@@ -115,8 +111,6 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
     const [addingSubTo, setAddingSubTo] = useState<string | null>(null)
     const [addingDept, setAddingDept] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'dept' | 'sub'; id: string; name: string; deptId?: string } | null>(null)
-    const [editFundDept, setEditFundDept] = useState<DepartmentRow | null>(null)
-    const [fundValue, setFundValue] = useState('')
     const [isPending, startTransition] = useTransition()
     const supabase = createClient()
 
@@ -198,17 +192,6 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
         setDeleteTarget(null)
     }
 
-    function saveDeptFund() {
-        if (!editFundDept) return
-        const val = parseFloat(fundValue) || 0
-        startTransition(async () => {
-            const { error } = await supabase.from('departments').update({ dept_fund: val } as never).eq('id', editFundDept.id)
-            if (error) { toast.error('Fund update failed'); return }
-            setDepartments((prev) => prev.map((d) => d.id === editFundDept.id ? { ...d, dept_fund: val } : d))
-            toast.success('Department fund updated!')
-            setEditFundDept(null)
-        })
-    }
 
     return (
         <div className="max-w-2xl">
@@ -259,20 +242,10 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
                                 <>
                                     <div className="flex-1 min-w-0">
                                         <span className="font-semibold text-gray-800">{dept.name}</span>
-                                        {dept.dept_fund != null && (
-                                            <span className="ml-2 text-xs text-indigo-600 font-medium">Fund: {formatCurrency(dept.dept_fund)}</span>
-                                        )}
                                     </div>
                                     <Badge variant="outline" className="text-xs text-gray-500 border-gray-200 mr-1">
                                         {dept.department_sub_sections.length} board{dept.department_sub_sections.length !== 1 ? 's' : ''}
                                     </Badge>
-                                    <button
-                                        onClick={() => { setEditFundDept(dept); setFundValue(String(dept.dept_fund ?? 0)) }}
-                                        title="Update fund balance"
-                                        className="w-7 h-7 rounded-lg hover:bg-indigo-50 text-indigo-500 flex items-center justify-center transition-colors"
-                                    >
-                                        <IndianRupee className="w-3.5 h-3.5" />
-                                    </button>
                                     <button onClick={() => { setAddingSubTo(dept.id); setExpanded((p) => new Set(p).add(dept.id)) }} title="Add sub-sections" className="w-7 h-7 rounded-lg hover:bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors">
                                         <Plus className="w-4 h-4" />
                                     </button>
@@ -331,29 +304,6 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
                 ))}
             </div>
 
-            {/* Fund Edit Dialog */}
-            <Dialog open={!!editFundDept} onOpenChange={(o) => { if (!o) setEditFundDept(null) }}>
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-indigo-600" /> Update Department Fund
-                        </DialogTitle>
-                    </DialogHeader>
-                    {editFundDept && (
-                        <div className="space-y-4 mt-2">
-                            <p className="text-sm text-gray-600">Update fund balance for <span className="font-semibold">{editFundDept.name}</span></p>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-600 mb-1 block">Fund Amount (₹)</label>
-                                <Input type="number" autoFocus value={fundValue} onChange={(e) => setFundValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveDeptFund()} />
-                            </div>
-                            <div className="flex gap-3">
-                                <Button className="flex-1" onClick={saveDeptFund} disabled={isPending}>{isPending ? 'Saving...' : 'Update'}</Button>
-                                <Button variant="outline" onClick={() => setEditFundDept(null)}>Cancel</Button>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
 
             {deleteTarget && (
                 <ConfirmDialog

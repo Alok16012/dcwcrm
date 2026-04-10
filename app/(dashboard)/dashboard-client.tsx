@@ -1,9 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { StatCard } from '@/components/shared/StatCard'
 import { Badge } from '@/components/ui/badge'
+import {
+  LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
+} from 'lucide-react'
 
 interface FollowupLead {
   id: string
@@ -12,12 +16,11 @@ interface FollowupLead {
   assigned_to_name: string
 }
 
-interface TopTelecaller {
+interface InterestedStat {
   id: string
   full_name: string
-  conversions: number
-  calls_made: number
-  conversion_rate: string
+  interested_total: number
+  interested_month: number
 }
 
 interface IncentiveRow {
@@ -44,9 +47,9 @@ interface DashboardClientProps {
   totalFeeCollected: number
   outstandingFees: number
   activeStudents: number
-  pendingDocs: number
+  droppedStudents: number
   followupsToday: FollowupLead[]
-  topTelecallers: TopTelecaller[]
+  interestedStats: InterestedStat[]
   incentiveHistory?: IncentiveRow[]
   isLead?: boolean
   docReceivedCount?: number
@@ -59,6 +62,38 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
+// ─── Tab Button ────────────────────────────────────────────────────────────────
+function TabBtn({
+  active, onClick, icon: Icon, label, badge,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ElementType
+  label: string
+  badge?: number
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+        active
+          ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+      {badge !== undefined && badge > 0 && (
+        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+          active ? 'bg-blue-500 text-white' : 'bg-red-100 text-red-600'
+        }`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  )
+}
+
 export default function DashboardClient({
   totalLeads,
   newToday,
@@ -67,165 +102,245 @@ export default function DashboardClient({
   totalFeeCollected,
   outstandingFees,
   activeStudents,
-  pendingDocs,
+  droppedStudents,
   followupsToday,
-  topTelecallers,
+  interestedStats,
   incentiveHistory = [],
   isLead = false,
   docReceivedCount = 0,
   expectedEnrollmentCount = 0,
   departmentStats = [],
 }: DashboardClientProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'interested' | 'followups' | 'incentives' | 'departments'>('overview')
+
+  // Total interested count for badge
+  const totalInterested = interestedStats.reduce((s, r) => s + r.interested_total, 0)
+  const monthInterested = interestedStats.reduce((s, r) => s + r.interested_month, 0)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
       </div>
 
-      {/* Stat cards — row 1 */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total Leads" value={totalLeads} />
-        <StatCard label="New Today" value={newToday} color="blue" />
-        <StatCard label="Converted This Month" value={convertedThisMonth} color="green" />
-        <StatCard label="Conversion Rate" value={conversionRate} color="green" />
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1.5 flex-wrap bg-slate-50 rounded-2xl p-1.5 border border-slate-200">
+        <TabBtn
+          active={activeTab === 'overview'}
+          onClick={() => setActiveTab('overview')}
+          icon={LayoutDashboard}
+          label="Overview"
+        />
+        <TabBtn
+          active={activeTab === 'interested'}
+          onClick={() => setActiveTab('interested')}
+          icon={Star}
+          label="Interested Students"
+          badge={monthInterested}
+        />
+        <TabBtn
+          active={activeTab === 'followups'}
+          onClick={() => setActiveTab('followups')}
+          icon={Bell}
+          label="Followups Today"
+          badge={followupsToday.length}
+        />
+        {isLead && (
+          <TabBtn
+            active={activeTab === 'incentives'}
+            onClick={() => setActiveTab('incentives')}
+            icon={IndianRupee}
+            label="My Incentives"
+          />
+        )}
+        {!isLead && departmentStats.length > 0 && (
+          <TabBtn
+            active={activeTab === 'departments'}
+            onClick={() => setActiveTab('departments')}
+            icon={TrendingUp}
+            label="Departments"
+          />
+        )}
       </div>
 
-      {/* Stat cards — row 2 (fee stats hidden for telecallers) */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {!isLead && <StatCard label="Total Fee Collected" value={fmt(totalFeeCollected)} color="green" />}
-        {!isLead && <StatCard label="Outstanding Fees" value={fmt(outstandingFees)} color="amber" />}
-        <StatCard label="Active Students" value={activeStudents} color="blue" />
-        <StatCard label="Pending Documents" value={pendingDocs} color={pendingDocs > 0 ? 'amber' : 'default'} />
-      </div>
+      {/* ── Overview Tab ──────────────────────────────────────── */}
+      {activeTab === 'overview' && (
+        <div className="space-y-4">
+          {/* Row 1 */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatCard label="Total Leads" value={totalLeads} />
+            <StatCard label="New Today" value={newToday} color="blue" />
+            <StatCard label="Converted This Month" value={convertedThisMonth} color="green" />
+            <StatCard label="Conversion Rate" value={conversionRate} color="green" />
+          </div>
 
-      {/* Telecaller extra stats */}
-      {isLead && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard label="Document Received" value={docReceivedCount} color="blue" />
-          <StatCard label="Expected Enrollment" value={expectedEnrollmentCount} color="green" />
+          {/* Row 2 */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {!isLead && <StatCard label="Total Fee Collected" value={fmt(totalFeeCollected)} color="green" />}
+            {!isLead && <StatCard label="Outstanding Fees" value={fmt(outstandingFees)} color="amber" />}
+            <StatCard label="Active Students" value={activeStudents} color="blue" />
+            <StatCard label="Dropped Students" value={droppedStudents} color={droppedStudents > 0 ? 'amber' : 'default'} />
+            {isLead && <StatCard label="Document Received" value={docReceivedCount} color="blue" />}
+            {isLead && <StatCard label="Expected Enrollment" value={expectedEnrollmentCount} color="green" />}
+          </div>
+
+          {/* Quick summary tiles for counselor */}
+          {isLead && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div
+                onClick={() => setActiveTab('interested')}
+                className="cursor-pointer rounded-xl border border-yellow-100 bg-yellow-50 p-4 hover:bg-yellow-100 transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="w-4 h-4 text-yellow-600" />
+                  <span className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">Interested</span>
+                </div>
+                <p className="text-2xl font-bold text-yellow-800">{totalInterested}</p>
+                <p className="text-xs text-yellow-600 mt-0.5">{monthInterested} this month</p>
+              </div>
+
+              <div
+                onClick={() => setActiveTab('followups')}
+                className="cursor-pointer rounded-xl border border-orange-100 bg-orange-50 p-4 hover:bg-orange-100 transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Bell className="w-4 h-4 text-orange-600" />
+                  <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Followups</span>
+                </div>
+                <p className="text-2xl font-bold text-orange-800">{followupsToday.length}</p>
+                <p className="text-xs text-orange-600 mt-0.5">Due today</p>
+              </div>
+
+              <div
+                onClick={() => setActiveTab('incentives')}
+                className="cursor-pointer rounded-xl border border-green-100 bg-green-50 p-4 hover:bg-green-100 transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <IndianRupee className="w-4 h-4 text-green-600" />
+                  <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Incentives</span>
+                </div>
+                <p className="text-2xl font-bold text-green-800">
+                  {incentiveHistory.length > 0
+                    ? fmt(incentiveHistory[0]?.incentive ?? 0)
+                    : '—'}
+                </p>
+                <p className="text-xs text-green-600 mt-0.5">Last month earned</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2-column grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-
-        {/* Followups Due Today */}
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-semibold text-sm">
-            Followups Due Today
-            {followupsToday.length > 0 && (
-              <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                {followupsToday.length}
-              </span>
-            )}
-          </h2>
-          {followupsToday.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No followups due today</p>
+      {/* ── Interested Students Tab ───────────────────────────── */}
+      {activeTab === 'interested' && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-yellow-50 to-orange-50 flex items-center gap-2">
+            <Star className="w-4 h-4 text-yellow-600" />
+            <h2 className="font-semibold text-sm text-yellow-800">Interested Students — Counselor-wise</h2>
+          </div>
+          {interestedStats.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">No interested students data yet</div>
           ) : (
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="text-muted-foreground">
-                  <th className="text-left pb-1">Name</th>
-                  <th className="text-left pb-1">Phone</th>
-                  <th className="text-left pb-1">Assigned To</th>
+                <tr className="text-xs text-muted-foreground border-b border-slate-100 bg-slate-50">
+                  <th className="text-left px-5 py-3 font-semibold">Counselor</th>
+                  <th className="text-right px-5 py-3 font-semibold">This Month</th>
+                  <th className="text-right px-5 py-3 font-semibold">Total</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
+                {interestedStats.map((stat) => (
+                  <tr key={stat.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 font-medium text-slate-700 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {stat.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      {stat.full_name}
+                    </td>
+                    <td className="px-5 py-3 text-right font-bold text-blue-600">{stat.interested_month}</td>
+                    <td className="px-5 py-3 text-right font-bold text-slate-900">{stat.interested_total}</td>
+                  </tr>
+                ))}
+                {/* Totals row */}
+                <tr className="bg-slate-50 border-t-2 border-slate-200">
+                  <td className="px-5 py-3 font-bold text-slate-700">Total</td>
+                  <td className="px-5 py-3 text-right font-bold text-blue-700">{monthInterested}</td>
+                  <td className="px-5 py-3 text-right font-bold text-slate-900">{totalInterested}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── Followups Tab ─────────────────────────────────────── */}
+      {activeTab === 'followups' && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-orange-50 to-red-50 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-orange-600" />
+            <h2 className="font-semibold text-sm text-orange-800">
+              Followups Due Today
+              {followupsToday.length > 0 && (
+                <span className="ml-2 rounded-full bg-orange-200 px-2 py-0.5 text-xs text-orange-800">
+                  {followupsToday.length}
+                </span>
+              )}
+            </h2>
+          </div>
+          {followupsToday.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">No followups due today 🎉</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b border-slate-100 bg-slate-50">
+                  <th className="text-left px-5 py-3 font-semibold">Name</th>
+                  <th className="text-left px-5 py-3 font-semibold">Phone</th>
+                  <th className="text-left px-5 py-3 font-semibold">Assigned To</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
                 {followupsToday.map((l) => (
-                  <tr key={l.id} className="border-t">
-                    <td className="py-1 font-medium">{l.full_name}</td>
-                    <td className="py-1">{l.phone}</td>
-                    <td className="py-1 text-muted-foreground">{l.assigned_to_name}</td>
+                  <tr key={l.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 font-medium text-slate-800">{l.full_name}</td>
+                    <td className="px-5 py-3 text-slate-600">{l.phone}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{l.assigned_to_name}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
+      )}
 
-        {/* Top Telecallers */}
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-semibold text-sm">Top Telecallers (This Month)</h2>
-          {topTelecallers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No data yet</p>
-          ) : (
-            <ul className="space-y-4">
-              {topTelecallers.map((tc, i) => (
-                <li key={tc.id} className="group relative flex items-center gap-4 p-2 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm ${
-                    i === 0 ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-50' : 
-                    i === 1 ? 'bg-slate-100 text-slate-700' :
-                    i === 2 ? 'bg-orange-50 text-orange-700' :
-                    'bg-muted text-muted-foreground'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="font-semibold text-sm truncate text-slate-800">{tc.full_name}</p>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${
-                        parseFloat(tc.conversion_rate) > 20 ? 'bg-emerald-100 text-emerald-700' :
-                        parseFloat(tc.conversion_rate) > 10 ? 'bg-blue-100 text-blue-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {tc.conversion_rate}%
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <span className="font-bold text-slate-900">{tc.conversions}</span>
-                        <span className="text-slate-400 text-[10px]">Conversions</span>
-                      </div>
-                      <div className="w-1 h-1 rounded-full bg-slate-300" />
-                      <div className="flex items-center gap-1">
-                        <span className="font-bold text-slate-900">{tc.calls_made}</span>
-                        <span className="text-slate-400 text-[10px]">Calls</span>
-                      </div>
-                    </div>
-                    
-                    {/* Subtle progress bar for conversion rate */}
-                    <div className="mt-2 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 rounded-full ${
-                          parseFloat(tc.conversion_rate) > 20 ? 'bg-emerald-500' :
-                          parseFloat(tc.conversion_rate) > 10 ? 'bg-blue-500' :
-                          'bg-slate-400'
-                        }`}
-                        style={{ width: `${Math.min(100, parseFloat(tc.conversion_rate))}%` }}
-                      />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Incentive section — only for telecallers */}
-      {isLead && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-semibold text-sm">My Incentives (Month-wise)</h2>
+      {/* ── Incentives Tab (counselor only) ───────────────────── */}
+      {activeTab === 'incentives' && isLead && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center gap-2">
+            <IndianRupee className="w-4 h-4 text-green-600" />
+            <h2 className="font-semibold text-sm text-green-800">My Incentives (Month-wise)</h2>
+          </div>
           {incentiveHistory.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No incentive records found. Contact admin if this seems incorrect.</p>
+            <div className="py-16 text-center text-sm text-muted-foreground">No incentive records found. Contact admin if this seems incorrect.</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-muted-foreground border-b">
-                  <th className="text-left py-1">Month</th>
-                  <th className="text-right py-1">Incentive</th>
-                  <th className="text-right py-1">Net Pay</th>
-                  <th className="text-right py-1">Status</th>
+                <tr className="text-xs text-muted-foreground border-b border-slate-100 bg-slate-50">
+                  <th className="text-left px-5 py-3 font-semibold">Month</th>
+                  <th className="text-right px-5 py-3 font-semibold">Incentive</th>
+                  <th className="text-right px-5 py-3 font-semibold">Net Pay</th>
+                  <th className="text-right px-5 py-3 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {incentiveHistory.map((row, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-1.5 font-medium">{MONTH_NAMES[row.month - 1]} {row.year}</td>
-                    <td className="py-1.5 text-right text-green-700">{fmt(row.incentive ?? 0)}</td>
-                    <td className="py-1.5 text-right">{fmt(row.net ?? 0)}</td>
-                    <td className="py-1.5 text-right">
+                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 font-medium">{MONTH_NAMES[row.month - 1]} {row.year}</td>
+                    <td className="px-5 py-3 text-right text-green-700 font-semibold">{fmt(row.incentive ?? 0)}</td>
+                    <td className="px-5 py-3 text-right">{fmt(row.net ?? 0)}</td>
+                    <td className="px-5 py-3 text-right">
                       <Badge variant={row.status === 'paid' ? 'default' : row.status === 'processed' ? 'secondary' : 'outline'} className="text-xs">
                         {row.status === 'paid' ? 'Paid' : row.status === 'processed' ? 'Processed' : 'Draft'}
                       </Badge>
@@ -238,38 +353,38 @@ export default function DashboardClient({
         </div>
       )}
 
-      {/* Department-wise Stats (Admin Only) */}
-      {!isLead && departmentStats.length > 0 && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-semibold text-sm">Department-wise Fees & Students</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-muted-foreground border-b border-gray-100">
-                  <th className="text-left font-medium pb-2">Department</th>
-                  <th className="text-right font-medium pb-2">Total Students</th>
-                  <th className="text-right font-medium pb-2">Fee Collected</th>
-                  <th className="text-right font-medium pb-2">Pending Fees</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {departmentStats.map((dept) => (
-                  <tr key={dept.id} className="group hover:bg-muted/30 transition-colors">
-                    <td className="py-2.5 font-medium text-blue-600 hover:text-blue-800 hover:underline">
-                      <Link href={`/backend?dept=${dept.id}`}>
-                        {dept.name}
-                      </Link>
-                    </td>
-                    <td className="py-2.5 text-right">{dept.total_students}</td>
-                    <td className="py-2.5 text-right text-green-700 font-medium">{fmt(dept.collected_fee)}</td>
-                    <td className="py-2.5 text-right text-amber-600 font-medium">{fmt(dept.pending_fee)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* ── Departments Tab (admin only) ───────────────────────── */}
+      {activeTab === 'departments' && !isLead && departmentStats.length > 0 && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" />
+            <h2 className="font-semibold text-sm text-blue-800">Department-wise Fees &amp; Students</h2>
           </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted-foreground border-b border-slate-100 bg-slate-50">
+                <th className="text-left px-5 py-3 font-semibold">Department</th>
+                <th className="text-right px-5 py-3 font-semibold">Total Students</th>
+                <th className="text-right px-5 py-3 font-semibold">Fee Collected</th>
+                <th className="text-right px-5 py-3 font-semibold">Pending Fees</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {departmentStats.map((dept) => (
+                <tr key={dept.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-5 py-3 font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                    <Link href={`/backend?dept=${dept.id}`}>{dept.name}</Link>
+                  </td>
+                  <td className="px-5 py-3 text-right">{dept.total_students}</td>
+                  <td className="px-5 py-3 text-right text-green-700 font-medium">{fmt(dept.collected_fee)}</td>
+                  <td className="px-5 py-3 text-right text-amber-600 font-medium">{fmt(dept.pending_fee)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   )
 }
+

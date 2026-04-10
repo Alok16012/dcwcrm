@@ -20,7 +20,9 @@ export function StudentRecord({ student }: StudentRecordProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div><p className="text-gray-500">Full Name</p><p className="font-medium">{student.full_name}</p></div>
-        <div><p className="text-gray-500">Father&apos;s Name</p><p className="font-medium">{student.guardian_name ?? '-'}</p></div>
+        <div><p className="text-gray-500">Guardian Name</p><p className="font-medium">{student.guardian_name ?? '-'}</p></div>
+        <div><p className="text-gray-500">Guardian Phone</p><p className="font-medium">{student.guardian_phone ?? '-'}</p></div>
+        <div><p className="text-gray-500">Relationship</p><p className="font-medium">{student.guardian_relationship ?? '-'}</p></div>
         <div><p className="text-gray-500">Phone</p><p className="font-medium">{student.phone}</p></div>
         <div><p className="text-gray-500">Email</p><p className="font-medium">{student.email ?? '-'}</p></div>
         <div><p className="text-gray-500">City</p><p className="font-medium">{student.city ?? '-'}</p></div>

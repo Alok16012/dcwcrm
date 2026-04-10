@@ -146,6 +146,25 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
             </CardContent>
           </Card>
 
+          {/* Social Media Lead Data */}
+          {lead.metadata && Object.keys(lead.metadata).length > 0 && (
+            <Card className="bg-blue-50/20 border-blue-100 shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-blue-800">Extra Form Data (Meta)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {Object.entries(lead.metadata).map(([key, value]) => (
+                    <div key={key}>
+                      <span className="text-[10px] uppercase text-blue-500 font-bold tracking-wider">{key.replace(/_/g, ' ')}</span>
+                      <p className="text-sm font-medium text-slate-700">{String(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Payment summary */}
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>

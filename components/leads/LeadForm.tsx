@@ -324,7 +324,9 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         toast.success('Lead updated successfully')
       } else {
         const { data: { user } } = await supabase.auth.getUser()
-        const { error } = await supabase.from('leads').insert({ ...payload, created_by: user?.id } as never)
+        // If telecaller didn't assign to someone else, auto-assign to themselves
+        const assignedTo = payload.assigned_to || user?.id
+        const { error } = await supabase.from('leads').insert({ ...payload, assigned_to: assignedTo, created_by: user?.id } as never)
         if (error) throw new Error(error.message || error.details || error.hint || `DB error: ${error.code}`)
         toast.success('Lead created successfully!')
       }

@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
             .gte('enrollment_date', startDate.toISOString().split('T')[0])
             .lte('enrollment_date', endDate.toISOString().split('T')[0])
 
-        const calculatedIncentive = (studentIncentives || []).reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
+        const calculatedIncentive = ((studentIncentives as any[]) || []).reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
 
         const basic = emp.basic_salary || 0
         const hra = emp.hra || 0

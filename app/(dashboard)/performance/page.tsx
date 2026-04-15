@@ -10,14 +10,14 @@ export default async function PerformancePage() {
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!session?.user) {
+    if (!user) {
         redirect('/login')
     }
 
     const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single() as any
 
     if (profile?.role !== 'lead' && profile?.role !== 'admin') {
@@ -33,7 +33,7 @@ export default async function PerformancePage() {
     const { data: leads } = await supabase
         .from('leads')
         .select('status, created_at')
-        .eq('assigned_to', session.user.id)
+        .eq('assigned_to', user.id)
 
     const validLeads = (leads || []) as any[]
     const totalAssigned = validLeads.length
@@ -46,7 +46,7 @@ export default async function PerformancePage() {
     const { data: activities } = await supabase
         .from('lead_activities')
         .select('activity_type')
-        .eq('performed_by', session.user.id)
+        .eq('performed_by', user.id)
 
     const activitiesArray = (activities || []) as any[]
     const totalActivities = activitiesArray.length

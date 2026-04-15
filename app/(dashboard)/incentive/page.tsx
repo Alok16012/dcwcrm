@@ -16,7 +16,7 @@ export default async function IncentivePage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!rawProfile?.role || !['lead', 'admin', 'backend', 'telecaller'].includes(rawProfile.role)) redirect('/')
+  if (!rawProfile?.role || !['lead', 'admin', 'backend'].includes(rawProfile.role)) redirect('/')
 
   // Find employee record for current user
   const { data: empRow } = await supabase

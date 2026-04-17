@@ -15,6 +15,9 @@ const LEAD_FIELDS = [
   { key: 'state', label: 'State', required: false },
   { key: 'source', label: 'Source', required: false },
   { key: 'status', label: 'Status', required: false },
+  { key: 'department', label: 'Department', required: false },
+  { key: 'course', label: 'Course', required: false },
+  { key: 'standard', label: 'Standard', required: false },
 ]
 
 const SOURCE_VALUES = ['website', 'walk_in', 'referral', 'whatsapp', 'phone', 'excel_import', 'social_media', 'other']
@@ -109,9 +112,44 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
     setImporting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
+
+      interface LookupItem { id: string; name: string; course_id?: string }
+
+      const [deptRes, courseRes, subCourseRes] = await Promise.all([
+        supabase.from('departments').select('id, name').returns<LookupItem[]>(),
+        supabase.from('courses').select('id, name').returns<LookupItem[]>(),
+        supabase.from('sub_courses').select('id, name, course_id').returns<LookupItem[]>(),
+      ])
+
+      const deptMap = new Map((deptRes.data ?? []).map(d => [d.name.toLowerCase(), d.id]))
+      const courseMap = new Map((courseRes.data ?? []).map(c => [c.name.toLowerCase(), c.id]))
+
       const leads = rows.map((row) => {
         const source = row[mapping.source ?? '']?.toLowerCase().trim()
         const status = row[mapping.status ?? '']?.toLowerCase().trim()
+        const deptName = mapping.department ? row[mapping.department]?.trim() : null
+        const courseName = mapping.course ? row[mapping.course]?.trim() : null
+        const standardName = mapping.standard ? row[mapping.standard]?.trim() : null
+
+        let department_id: string | null = null
+        let course_id: string | null = null
+        let sub_course_id: string | null = null
+
+        if (deptName) {
+          const deptId = deptMap.get(deptName.toLowerCase())
+          if (deptId) department_id = deptId
+        }
+        if (courseName) {
+          const cId = courseMap.get(courseName.toLowerCase())
+          if (cId) course_id = cId
+        }
+        if (standardName && course_id) {
+          const sc = (subCourseRes.data ?? []).find(s => 
+            s.name.toLowerCase() === standardName.toLowerCase() && s.course_id === course_id
+          )
+          if (sc) sub_course_id = sc.id
+        }
+
         return {
           full_name: row[mapping.full_name]?.trim() || '',
           phone: String(row[mapping.phone] ?? '').trim(),
@@ -120,6 +158,9 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
           state: mapping.state ? row[mapping.state]?.trim() || null : null,
           source: SOURCE_VALUES.includes(source) ? source : 'other',
           status: STATUS_VALUES.includes(status) ? status : 'new',
+          department_id,
+          course_id,
+          sub_course_id,
           created_by: user?.id,
         }
       }).filter((l) => l.full_name && l.phone)

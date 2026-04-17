@@ -62,7 +62,10 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 export default function AttendanceGrid({ data: initialData, year, month, rangeStart, rangeEnd }: AttendanceGridProps) {
   const [data, setData] = useState(initialData)
   const [editCell, setEditCell] = useState<{ empId: string; date: string } | null>(null)
+  const [bulkMode, setBulkMode] = useState<'single' | 'range'>('single')
   const [bulkDate, setBulkDate] = useState<string>('')
+  const [bulkFromDate, setBulkFromDate] = useState<string>('')
+  const [bulkToDate, setBulkToDate] = useState<string>('')
   const [bulkStatus, setBulkStatus] = useState<AttendanceStatus>('present')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
@@ -117,7 +120,7 @@ export default function AttendanceGrid({ data: initialData, year, month, rangeSt
     })
   }
 
-  // --- Bulk mark ---
+  // --- Bulk mark (single date) ---
   const bulkMark = () => {
     if (!bulkDate) return
     startTransition(async () => {
@@ -142,6 +145,49 @@ export default function AttendanceGrid({ data: initialData, year, month, rangeSt
     })
   }
 
+  // --- Bulk mark (date range) ---
+  const bulkMarkRange = () => {
+    if (!bulkFromDate || !bulkToDate) return
+    const from = parseISO(bulkFromDate)
+    const to = parseISO(bulkToDate)
+    if (isAfter(from, to)) { toast.error('From date must be before To date'); return }
+
+    const dateRange = getDatesInRange(bulkFromDate, bulkToDate)
+    startTransition(async () => {
+      try {
+        const upserts: { employee_id: string; date: string; status: AttendanceStatus }[] = []
+        for (const emp of data) {
+          for (const d of dateRange) {
+            if (isInCycle(emp, d)) {
+              upserts.push({ employee_id: emp.employee_id, date: d, status: bulkStatus })
+            }
+          }
+        }
+        if (!upserts.length) { toast.error('No employees in date range'); return }
+        const { error } = await supabase.from('attendance').upsert(upserts as never, { onConflict: 'employee_id,date' })
+        if (error) throw error
+
+        setData((prev) =>
+          prev.map((e) => {
+            const newAttendance = { ...e.attendance }
+            for (const d of dateRange) {
+              if (isInCycle(e, d)) {
+                newAttendance[d] = bulkStatus
+              }
+            }
+            return { ...e, attendance: newAttendance }
+          })
+        )
+        toast.success(`Marked ${upserts.length} records as ${bulkStatus}`)
+        setBulkFromDate('')
+        setBulkToDate('')
+        setBulkMode('single')
+      } catch {
+        toast.error('Bulk range mark failed')
+      }
+    })
+  }
+
   return (
     <div className="space-y-4">
       {/* Header: navigation + cycle label */}
@@ -156,25 +202,70 @@ export default function AttendanceGrid({ data: initialData, year, month, rangeSt
 
         <div className="flex items-center gap-2 ml-auto flex-wrap">
           <span className="text-sm text-muted-foreground">Bulk mark:</span>
-          <input
-            type="date"
-            value={bulkDate}
-            min={rangeStart}
-            max={rangeEnd}
-            onChange={(e) => setBulkDate(e.target.value)}
-            className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
-          <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as AttendanceStatus)}>
-            <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+          <Select value={bulkMode} onValueChange={(v) => setBulkMode(v as 'single' | 'range')}>
+            <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {ALL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s} className="capitalize">{s.replace('_', ' ')}</SelectItem>
-              ))}
+              <SelectItem value="single">Single Date</SelectItem>
+              <SelectItem value="range">Date Range</SelectItem>
             </SelectContent>
           </Select>
-          <Button size="sm" onClick={bulkMark} disabled={!bulkDate || isPending} className="h-9">
-            Apply
-          </Button>
+
+          {bulkMode === 'single' ? (
+            <>
+              <input
+                type="date"
+                value={bulkDate}
+                min={rangeStart}
+                max={rangeEnd}
+                onChange={(e) => setBulkDate(e.target.value)}
+                className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+              <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as AttendanceStatus)}>
+                <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" onClick={bulkMark} disabled={!bulkDate || isPending} className="h-9">
+                Apply
+              </Button>
+            </>
+          ) : (
+            <>
+              <input
+                type="date"
+                value={bulkFromDate}
+                min={rangeStart}
+                max={rangeEnd}
+                onChange={(e) => setBulkFromDate(e.target.value)}
+                className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                placeholder="From"
+              />
+              <span className="text-xs text-gray-400">to</span>
+              <input
+                type="date"
+                value={bulkToDate}
+                min={rangeStart}
+                max={rangeEnd}
+                onChange={(e) => setBulkToDate(e.target.value)}
+                className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                placeholder="To"
+              />
+              <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as AttendanceStatus)}>
+                <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" onClick={bulkMarkRange} disabled={!bulkFromDate || !bulkToDate || isPending} className="h-9">
+                Apply
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

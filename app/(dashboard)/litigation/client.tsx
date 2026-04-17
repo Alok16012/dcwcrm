@@ -91,20 +91,21 @@ interface PayForm {
 }
 
 const LITIGATION_TYPES = [
-  { value: 'court_case', label: 'Court Case' },
-  { value: 'debt_recovery', label: 'Debt Recovery' },
-  { value: 'insurance', label: 'Insurance' },
-  { value: 'rti', label: 'RTI' },
-  { value: 'consumer_forum', label: 'Consumer Forum' },
-  { value: 'other', label: 'Other' },
+  { value: 'pre_process_cancellation', label: 'Pre-Process Cancellation' },
+  { value: 'post_process_cancellation', label: 'Post-Process Cancellation' },
+  { value: 'service_issue', label: 'Service Issue' },
+  { value: 'price_issue', label: 'Price Issue' },
+  { value: 'dropoff_no_interest', label: 'Drop-off / No Interest' },
+  { value: 'adjusted', label: 'Adjusted' },
 ]
 
 const DEBT_TYPES = [
-  { value: 'bank_loan', label: 'Bank Loan' },
-  { value: 'vendor_dues', label: 'Vendor Dues' },
-  { value: 'salary_dues', label: 'Salary Dues' },
-  { value: 'fee_refund', label: 'Fee Refund' },
-  { value: 'other', label: 'Other' },
+  { value: 'pre_process_cancellation', label: 'Pre-Process Cancellation' },
+  { value: 'post_process_cancellation', label: 'Post-Process Cancellation' },
+  { value: 'service_issue', label: 'Service Issue' },
+  { value: 'price_issue', label: 'Price Issue' },
+  { value: 'dropoff_no_interest', label: 'Drop-off / No Interest' },
+  { value: 'adjusted', label: 'Adjusted' },
 ]
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Demand Draft', 'Other']

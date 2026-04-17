@@ -142,7 +142,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
             <InfoRow label="Email" value={profile?.email ?? '—'} />
             <InfoRow label="Phone" value={profile?.phone ?? '—'} />
             <InfoRow label="Role" value={profile?.role ? (ROLE_LABELS[profile.role as import('@/types/app.types').UserRole] ?? profile.role) : '—'} />
-            <InfoRow label="Department and country" value={employee.department ?? '—'} />
+            <InfoRow label="Department" value={employee.department ?? '—'} />
             <InfoRow label="Designation" value={employee.designation ?? '—'} />
             <InfoRow label="Joining Date" value={employee.joining_date ? format(new Date(employee.joining_date), 'dd MMM yyyy') : '—'} />
             <InfoRow label="Status" value={employee.is_active ? 'Active' : 'Inactive'} className="capitalize" />

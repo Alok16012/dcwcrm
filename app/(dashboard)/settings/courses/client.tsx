@@ -146,7 +146,7 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
       if (error) { toast.error('Failed to update'); return }
       setCourses((prev) => prev.map((c) => c.id === id ? { ...c, name: name.trim() } : c))
       setEditingCourse(null)
-      toast.success('University- and courses updated')
+      toast.success('Course updated')
     })
   }
 
@@ -157,7 +157,7 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
       if (error) { toast.error(error.message); return }
       setCourses((prev) => [...prev, { ...(data as any), sub_courses: [] }])
       setAddingCourse(false)
-      toast.success('University- and courses added!')
+      toast.success('Course added!')
     })
   }
 
@@ -166,7 +166,7 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
       const { error } = await supabase.from('courses').delete().eq('id', id)
       if (error) { toast.error('Failed to delete'); return }
       setCourses((prev) => prev.filter((c) => c.id !== id))
-      toast.success('University- and courses deleted')
+      toast.success('Course deleted')
     })
     setDeleteTarget(null)
   }
@@ -218,11 +218,11 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">University- and courses & Standards</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage University- and courses and standards offered by your consultancy</p>
+          <h1 className="text-xl font-bold text-gray-900">Courses & Standards</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage courses and standards offered by your consultancy</p>
         </div>
         <Button onClick={() => setAddingCourse(true)} disabled={addingCourse} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add University- and courses
+          <Plus className="w-4 h-4" /> Add Course
         </Button>
       </div>
 
@@ -233,7 +233,7 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
           </div>
           <InlineEdit
             value=""
-            placeholder="University- and courses name e.g. IELTS, MBA, B.Tech..."
+            placeholder="Course name e.g. IELTS, MBA, B.Tech..."
             onSave={addCourse}
             onCancel={() => setAddingCourse(false)}
           />
@@ -244,9 +244,9 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
         <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-200">
           <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">No courses yet</p>
-          <p className="text-sm text-gray-400 mt-1">Add your first University- and courses to get started</p>
+          <p className="text-sm text-gray-400 mt-1">Add your first course to get started</p>
           <Button className="mt-4 gap-1.5" onClick={() => setAddingCourse(true)}>
-            <Plus className="w-4 h-4" /> Add University- and courses
+            <Plus className="w-4 h-4" /> Add Course
           </Button>
         </div>
       )}
@@ -376,7 +376,7 @@ export function CoursesClient({ courses: initial }: { courses: CourseRow[] }) {
       {deleteTarget && (
         <ConfirmDialog
           open={true}
-          title={`Delete ${deleteTarget.type === 'course' ? 'University- and courses' : 'Standard'}`}
+          title={`Delete ${deleteTarget.type === 'course' ? 'Course' : 'Standard'}`}
           description={`"${deleteTarget.name}" permanently delete ho jaayega. Kya aap sure hain?`}
           confirmLabel="Delete"
           destructive

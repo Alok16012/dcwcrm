@@ -180,7 +180,7 @@ ${payment.receipt_no ? `<div class="receipt-no">Receipt No: <strong>${payment.re
   <tr><td>Student Name</td><td>${litigation.student_name}</td></tr>
   ${litigation.father_name ? `<tr><td>Father's Name</td><td>${litigation.father_name}</td></tr>` : ''}
   ${litigation.phone ? `<tr><td>Phone</td><td>${litigation.phone}</td></tr>` : ''}
-  <tr><td>Department and country</td><td>${litigation.department?.name ?? '—'}</td></tr>
+  <tr><td>Department</td><td>${litigation.department?.name ?? '—'}</td></tr>
   ${litigation.sub_section ? `<tr><td>Board / University</td><td>${litigation.sub_section.name}</td></tr>` : ''}
   ${litigation.session ? `<tr><td>Session</td><td>${litigation.session.name}</td></tr>` : ''}
   <tr><td>Case Type</td><td>${litigation.litigation_type ?? '—'}</td></tr>
@@ -330,7 +330,7 @@ export function LitigationClient({
 
   function saveRecord() {
     if (!form.student_name.trim()) { toast.error('Student name is required'); return }
-    if (!form.department_id) { toast.error('Department and country is required'); return }
+    if (!form.department_id) { toast.error('Department is required'); return }
     const amt = parseFloat(form.litigation_amount) || 0
     const refund = parseFloat(form.amount_refunded) || 0
 
@@ -461,7 +461,7 @@ export function LitigationClient({
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Student</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department and country / Board</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department / Board</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Type / Session</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Reason</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Total</th>
@@ -545,7 +545,7 @@ export function LitigationClient({
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Scale className="w-5 h-5 text-indigo-600" /> Litigation & Debt Management
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track litigation cases, debts & payments department and country-wise</p>
+          <p className="text-sm text-gray-500 mt-0.5">Track litigation cases, debts & payments department-wise</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => openAdd('litigation')} className="gap-1.5">
@@ -581,10 +581,10 @@ export function LitigationClient({
         <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v ?? 'all')}>
           <SelectTrigger className="w-52 h-9">
             <Building2 className="w-4 h-4 mr-2 text-gray-400" />
-            <SelectValue placeholder="All Dept & country" />
+            <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Dept & country</SelectItem>
+            <SelectItem value="all">All Departments</SelectItem>
             {departments.map((d) => (
               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
@@ -628,7 +628,7 @@ export function LitigationClient({
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Student</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department and country</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Session</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Drop Reason</th>
                       <th className="text-center px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Actions</th>
@@ -701,11 +701,11 @@ export function LitigationClient({
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">Department and country *</label>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Department *</label>
               <Select value={form.department_id} onValueChange={handleDeptChange}>
                 <SelectTrigger>
                   <span className="text-sm truncate">
-                    {form.department_id ? departments.find((d) => d.id === form.department_id)?.name ?? 'Select department and country' : 'Select department and country'}
+                    {form.department_id ? departments.find((d) => d.id === form.department_id)?.name ?? 'Select department' : 'Select department'}
                   </span>
                 </SelectTrigger>
                 <SelectContent>

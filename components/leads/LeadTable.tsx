@@ -189,7 +189,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
 
     const headers = [
       'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source', 
-      'Mode', 'Department and country', 'University- and courses', 'Standard', 'Assigned To', 'Date Added'
+      'Mode', 'Department', 'Course', 'Sub-Course', 'Assigned To', 'Date Added'
     ]
 
     const csvRows = sorted.map(l => [
@@ -300,7 +300,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
           {courses.length > 0 && (
             <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); setPage(1) }}>
               <SelectTrigger className={`w-36 h-9 text-sm ${filters.course_id?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                <SelectValue placeholder="Univ & courses" />
+                <SelectValue placeholder="Course" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All courses</SelectItem>
@@ -432,8 +432,8 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dept & country</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Univ & courses</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dept</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Course</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Standard</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned To</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Date Added</th>

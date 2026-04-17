@@ -125,7 +125,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
             if (error) { toast.error('Failed to update'); return }
             setDepartments((prev) => prev.map((d) => d.id === id ? { ...d, name: name.trim() } : d))
             setEditingDept(null)
-            toast.success('Department and country updated')
+            toast.success('Department updated')
         })
     }
 
@@ -136,7 +136,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
             if (error) { toast.error(error.message); return }
             setDepartments((prev) => [...prev, { ...(data as any), department_sub_sections: [] }])
             setAddingDept(false)
-            toast.success('Department and country added!')
+            toast.success('Department added!')
         })
     }
 
@@ -145,7 +145,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
             const { error } = await supabase.from('departments').delete().eq('id', id)
             if (error) { toast.error('Failed to delete'); return }
             setDepartments((prev) => prev.filter((d) => d.id !== id))
-            toast.success('Department and country deleted')
+            toast.success('Department deleted')
         })
         setDeleteTarget(null)
     }
@@ -197,11 +197,11 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
         <div className="max-w-2xl">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-xl font-bold text-gray-900">Department and country & Universities/Boards</h1>
-                    <p className="text-sm text-gray-500 mt-0.5">Manage Department and country and their sub-sections</p>
+                    <h1 className="text-xl font-bold text-gray-900">Departments & Universities/Boards</h1>
+                    <p className="text-sm text-gray-500 mt-0.5">Manage departments and their sub-sections</p>
                 </div>
                 <Button onClick={() => setAddingDept(true)} disabled={addingDept} className="gap-1.5">
-                    <Plus className="w-4 h-4" /> Add Department and country
+                    <Plus className="w-4 h-4" /> Add Department
                 </Button>
             </div>
 
@@ -220,7 +220,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
                     <p className="text-gray-500 font-medium">No departments yet</p>
                     <p className="text-sm text-gray-400 mt-1">Add your first department to get started</p>
                     <Button className="mt-4 gap-1.5" onClick={() => setAddingDept(true)}>
-                        <Plus className="w-4 h-4" /> Add Department and country
+                        <Plus className="w-4 h-4" /> Add Department
                     </Button>
                 </div>
             )}
@@ -308,7 +308,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
             {deleteTarget && (
                 <ConfirmDialog
                     open={true}
-                    title={`Delete ${deleteTarget.type === 'dept' ? 'Department and country' : 'University/Board'}`}
+                    title={`Delete ${deleteTarget.type === 'dept' ? 'Department' : 'University/Board'}`}
                     description={`"${deleteTarget.name}" will be permanently deleted. Are you sure?`}
                     confirmLabel="Delete"
                     destructive

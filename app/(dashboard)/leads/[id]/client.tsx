@@ -136,7 +136,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                 <div><p className="text-gray-500">Email</p><p className="font-medium">{lead.email ?? '-'}</p></div>
                 <div><p className="text-gray-500">City</p><p className="font-medium">{lead.city ?? '-'}</p></div>
                 <div><p className="text-gray-500">State</p><p className="font-medium">{lead.state ?? '-'}</p></div>
-                <div><p className="text-gray-500">University- and courses</p><p className="font-medium">{lead.course?.name ?? '-'}</p></div>
+                <div><p className="text-gray-500">Course</p><p className="font-medium">{lead.course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Sub-course</p><p className="font-medium">{lead.sub_course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Source</p><p className="font-medium">{LEAD_SOURCE_LABELS[lead.source]}</p></div>
                 <div><p className="text-gray-500">Assigned To</p><p className="font-medium">{lead.assigned_user?.full_name ?? 'Unassigned'}</p></div>

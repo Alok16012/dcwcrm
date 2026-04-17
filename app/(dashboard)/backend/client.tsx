@@ -181,7 +181,7 @@ export function BackendListClient() {
         Mode: s.mode || '-',
         Session: s.session?.name || '-',
         Department: s.department?.name || '-',
-        'University- and courses': s.course?.name || '-',
+        Course: s.course?.name || '-',
         'Sub Course': s.sub_course?.name || '-',
         'Total Fee': s.total_fee || 0,
         'Amount Paid': s.amount_paid || 0,
@@ -244,9 +244,9 @@ export function BackendListClient() {
     { accessorKey: 'phone', header: 'Phone' },
     { id: 'mode', accessorFn: (row) => row.mode ?? '', header: 'Mode', cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.mode ?? '-'}</Badge> },
     { id: 'session', accessorFn: (row) => row.session?.name ?? '', header: 'Session', cell: ({ row }) => row.original.session?.name ?? '-' },
-    { id: 'department', accessorFn: (row) => row.department?.name ?? '', header: 'Dept & country', cell: ({ row }) => row.original.department?.name ?? '-' },
+    { id: 'department', accessorFn: (row) => row.department?.name ?? '', header: 'Dept', cell: ({ row }) => row.original.department?.name ?? '-' },
     { id: 'sub_section', accessorFn: (row) => row.sub_section?.name ?? '', header: 'Board', cell: ({ row }) => row.original.sub_section?.name ?? '-' },
-    { id: 'course', accessorFn: (row) => row.course?.name ?? '', header: 'Univ & courses', cell: ({ row }) => row.original.course?.name ?? '-' },
+    { id: 'course', accessorFn: (row) => row.course?.name ?? '', header: 'Course', cell: ({ row }) => row.original.course?.name ?? '-' },
     { id: 'counsellor', accessorFn: (row) => row.counsellor?.full_name ?? '', header: 'Counsellor', cell: ({ row }) => row.original.counsellor?.full_name ?? '-' },
     { accessorKey: 'total_fee', header: 'Total Fee', cell: ({ row }) => row.original.total_fee ? formatCurrency(row.original.total_fee) : '-' },
     { accessorKey: 'amount_paid', header: 'Paid', cell: ({ row }) => <span className="text-green-700">{formatCurrency(row.original.amount_paid ?? 0)}</span> },
@@ -356,15 +356,15 @@ export function BackendListClient() {
 
       {/* Layer 1: Department + Board */}
       <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border mb-2">
-        <span className="text-xs font-semibold text-gray-500 self-center w-full mb-1">Step 1 — Department and country & Board</span>
+        <span className="text-xs font-semibold text-gray-500 self-center w-full mb-1">Step 1 — Department &amp; Board</span>
         <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v ?? ''); setBoardFilter('') }}>
           <SelectTrigger className="w-44 h-9">
             <span className="text-sm truncate">
-              {departmentFilter ? departments.find(d => d.id === departmentFilter)?.name ?? 'All Dept & country' : 'All Dept & country'}
+              {departmentFilter ? departments.find(d => d.id === departmentFilter)?.name ?? 'All Departments' : 'All Departments'}
             </span>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Dept & country</SelectItem>
+            <SelectItem value="">All Departments</SelectItem>
             {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -419,9 +419,9 @@ export function BackendListClient() {
           </SelectContent>
         </Select>
         <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>
-          <SelectTrigger className="w-44 h-9"><SelectValue placeholder="University- and courses" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Course" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Univ & courses</SelectItem>
+            <SelectItem value="">All Courses</SelectItem>
             {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>

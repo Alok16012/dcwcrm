@@ -161,7 +161,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
         return <Badge variant="outline">{ROLE_LABELS[role] ?? role}</Badge>
       },
     },
-    { accessorKey: 'department', header: 'Department and country' },
+    { accessorKey: 'department', header: 'Department' },
     { accessorKey: 'designation', header: 'Designation' },
     {
       accessorKey: 'joining_date',
@@ -267,7 +267,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Department and country</Label>
+                <Label>Department</Label>
                 <Input {...register('department')} />
                 {errors.department && <p className="text-xs text-red-500">{errors.department.message}</p>}
               </div>

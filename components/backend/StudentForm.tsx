@@ -417,17 +417,17 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             </div>
 
             <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
-                <SectionHeader icon={Building2} title="Department and country & University" color="border-amber-200" />
+                <SectionHeader icon={Building2} title="Department & University" color="border-amber-200" />
                 <div className="grid grid-cols-2 gap-4">
-                    <FieldWrapper label="Department and country">
+                    <FieldWrapper label="Department">
                         <Select value={watch('department_id') || ''} onValueChange={(v) => { setValue('department_id', v || ''); setValue('sub_section_id', '') }}>
                             <SelectTrigger className="bg-white border-amber-200">
-                                <SelectValue placeholder="Select department and country">
+                                <SelectValue placeholder="Select department">
                                     {departments.find(d => d.id === watch('department_id'))?.name}
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">No department and country</SelectItem>
+                                <SelectItem value="">No department</SelectItem>
                                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
@@ -466,15 +466,15 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </Select>
                     </FieldWrapper>
 
-                    <FieldWrapper label="University- and courses">
+                    <FieldWrapper label="Course">
                         <Select value={watch('course_id') || ''} onValueChange={(v) => { setValue('course_id', v || ''); setValue('sub_course_id', '') }}>
                             <SelectTrigger className="bg-white border-emerald-200">
-                                <SelectValue placeholder="Select university- and courses">
+                                <SelectValue placeholder="Select course">
                                     {courses.find(c => c.id === watch('course_id'))?.name}
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">No university- and courses</SelectItem>
+                                <SelectItem value="">No course</SelectItem>
                                 {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                             </SelectContent>
                         </Select>

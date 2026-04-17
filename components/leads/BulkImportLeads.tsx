@@ -76,7 +76,7 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
         'Status': 'new',
         'Course': 'MBA',
         'Standard': 'Full Time',
-        'Department and country': 'Management',
+        'Department': 'Management',
         'University/Board': 'Delhi University',
         'Notes': 'Interested in autumn intake'
       },
@@ -90,7 +90,7 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
         'Status': 'interested',
         'Course': 'Class 10',
         'Standard': '10th',
-        'Department and country': 'Schooling',
+        'Department': 'Schooling',
         'University/Board': 'CBSE',
         'Notes': 'Looking for science stream'
       }
@@ -183,7 +183,7 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
               <FileSpreadsheet className="w-3.5 h-3.5" /> Sample Download Karo
             </button>
           </div>
-          <p className="font-mono text-[10px] sm:text-xs overflow-x-auto whitespace-nowrap bg-white/50 p-2 rounded-md border border-blue-100 w-full">Full Name | Phone | Email | City | State | Source | Status | University- and courses | Standard | Department and country | University/Board | Notes</p>
+          <p className="font-mono text-[10px] sm:text-xs overflow-x-auto whitespace-nowrap bg-white/50 p-2 rounded-md border border-blue-100 w-full">Full Name | Phone | Email | City | State | Source | Status | Course | Standard | Department | University/Board | Notes</p>
           <p className="text-xs mt-2 text-blue-600 font-medium bg-blue-100/50 p-2 rounded-md">Auto-mapping: <span className="font-normal text-blue-500 italic">Hamara system automatically columns ko recognize kr lega agar labels match krte hain.</span></p>
         </div>
       )}

@@ -413,7 +413,7 @@ export default function AnalyticsClient({ role }: { role?: string }) {
               )}
             </div>
             <div className="rounded-lg border p-4">
-              <h3 className="text-sm font-semibold mb-3">Revenue by University- and courses</h3>
+              <h3 className="text-sm font-semibold mb-3">Revenue by Course</h3>
               {loadingRevenue ? <ChartSkeleton /> : (
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={revByCourse}>

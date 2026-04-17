@@ -160,7 +160,7 @@ export default function DashboardClient({
             active={activeTab === 'departments'}
             onClick={() => setActiveTab('departments')}
             icon={TrendingUp}
-            label="Department and country"
+            label="Departments"
           />
         )}
       </div>
@@ -358,12 +358,12 @@ export default function DashboardClient({
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-green-600" />
-            <h2 className="font-semibold text-sm text-green-800">Department and country-wise Fees &amp; Students</h2>
+            <h2 className="font-semibold text-sm text-green-800">Department-wise Fees &amp; Students</h2>
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground border-b border-slate-100 bg-slate-50">
-                <th className="text-left px-5 py-3 font-semibold">Department and country</th>
+                <th className="text-left px-5 py-3 font-semibold">Department</th>
                 <th className="text-right px-5 py-3 font-semibold">Total Students</th>
                 <th className="text-right px-5 py-3 font-semibold">Fee Collected</th>
                 <th className="text-right px-5 py-3 font-semibold">Pending Fees</th>

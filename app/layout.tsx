@@ -6,8 +6,8 @@ import { Toaster } from 'sonner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Peace Career Consultancy - Education Consultancy CRM',
-  description: 'Manage leads, students, finance and HR for Peace Career Consultancy',
+  title: 'Distance Courses Wala - Education Consultancy CRM',
+  description: 'Manage leads, students, finance and HR for Distance Courses Wala consultancy',
 }
 
 export const viewport: Viewport = {

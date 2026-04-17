@@ -58,7 +58,7 @@ export function Sidebar({ role }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-green-700 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
               )}
               title={collapsed ? item.label : undefined}
@@ -84,10 +84,10 @@ export function Sidebar({ role }: SidebarProps) {
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-3">
-              <img src="/brand-logo.png" alt="Peace Career Consultancy" className="w-10 h-10 rounded-full" />
+              <img src="/brand-logo.png" alt="Distance Courses Wala" className="w-10 h-10 rounded" />
               <div className="flex flex-col justify-center">
-                <span className="font-bold text-xs leading-tight">Peace Career</span>
-                <span className="text-[10px] text-green-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Consultancy</span>
+                <span className="font-bold text-xs leading-tight">Distance Courses</span>
+                <span className="text-[10px] text-blue-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Wala</span>
               </div>
             </div>
           )}
@@ -113,10 +113,10 @@ export function Sidebar({ role }: SidebarProps) {
           <div className="absolute left-0 top-0 h-full w-72 flex flex-col bg-gray-900 text-white shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <div className="flex items-center gap-3">
-                <img src="/brand-logo.png" alt="Peace Career Consultancy" className="w-9 h-9 rounded-full" />
+                <img src="/brand-logo.png" alt="Distance Courses Wala" className="w-9 h-9 rounded" />
                 <div className="flex flex-col justify-center">
-                  <span className="font-bold text-sm leading-tight">Peace Career</span>
-                  <span className="text-[10px] text-green-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Consultancy</span>
+                  <span className="font-bold text-sm leading-tight">Distance Courses</span>
+                  <span className="text-[10px] text-blue-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Wala</span>
                 </div>
               </div>
               <button

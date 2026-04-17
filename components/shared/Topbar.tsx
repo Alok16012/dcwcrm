@@ -38,8 +38,8 @@ export function Topbar({ user }: TopbarProps) {
           <Menu className="w-5 h-5 text-gray-600" />
         </button>
         <div className="flex items-center gap-2">
-          <img src="/brand-logo.png" alt="" className="w-7 h-7 rounded-full" />
-          <span className="font-semibold text-sm text-gray-800 leading-tight">Peace Career</span>
+          <img src="/brand-logo.png" alt="" className="w-7 h-7 rounded" />
+          <span className="font-semibold text-sm text-gray-800 leading-tight">Distance Courses</span>
         </div>
       </div>
 
@@ -49,7 +49,7 @@ export function Topbar({ user }: TopbarProps) {
       <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 transition-colors">
-            <div className="w-7 h-7 rounded-full bg-green-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {user.full_name.charAt(0).toUpperCase()}
             </div>
             <span className="text-sm hidden md:block">{user.full_name}</span>

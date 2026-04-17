@@ -77,7 +77,7 @@ function TabBtn({
       onClick={onClick}
       className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
         active
-          ? 'bg-green-700 text-white shadow-md shadow-green-100'
+          ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
           : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
       }`}
     >
@@ -85,7 +85,7 @@ function TabBtn({
       {label}
       {badge !== undefined && badge > 0 && (
         <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-          active ? 'bg-green-600 text-white' : 'bg-red-100 text-red-600'
+          active ? 'bg-blue-500 text-white' : 'bg-red-100 text-red-600'
         }`}>
           {badge}
         </span>
@@ -255,19 +255,19 @@ export default function DashboardClient({
                 {interestedStats.map((stat) => (
                   <tr key={stat.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-slate-700 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                         {stat.full_name.charAt(0).toUpperCase()}
                       </div>
                       {stat.full_name}
                     </td>
-                    <td className="px-5 py-3 text-right font-bold text-green-700">{stat.interested_month}</td>
+                    <td className="px-5 py-3 text-right font-bold text-blue-600">{stat.interested_month}</td>
                     <td className="px-5 py-3 text-right font-bold text-slate-900">{stat.interested_total}</td>
                   </tr>
                 ))}
                 {/* Totals row */}
                 <tr className="bg-slate-50 border-t-2 border-slate-200">
                   <td className="px-5 py-3 font-bold text-slate-700">Total</td>
-                  <td className="px-5 py-3 text-right font-bold text-green-700">{monthInterested}</td>
+                  <td className="px-5 py-3 text-right font-bold text-blue-700">{monthInterested}</td>
                   <td className="px-5 py-3 text-right font-bold text-slate-900">{totalInterested}</td>
                 </tr>
               </tbody>
@@ -356,9 +356,9 @@ export default function DashboardClient({
       {/* ── Departments Tab (admin only) ───────────────────────── */}
       {activeTab === 'departments' && !isLead && departmentStats.length > 0 && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-green-600" />
-            <h2 className="font-semibold text-sm text-green-800">Department-wise Fees &amp; Students</h2>
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" />
+            <h2 className="font-semibold text-sm text-blue-800">Department-wise Fees &amp; Students</h2>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -372,7 +372,7 @@ export default function DashboardClient({
             <tbody className="divide-y divide-slate-100">
               {departmentStats.map((dept) => (
                 <tr key={dept.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3 font-medium text-green-700 hover:text-green-900 hover:underline">
+                  <td className="px-5 py-3 font-medium text-blue-600 hover:text-blue-800 hover:underline">
                     <Link href={`/backend?dept=${dept.id}`}>{dept.name}</Link>
                   </td>
                   <td className="px-5 py-3 text-right">{dept.total_students}</td>

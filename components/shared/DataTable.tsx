@@ -8,7 +8,6 @@ import {
   type ColumnFiltersState,
 } from '@tanstack/react-table'
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -56,7 +55,7 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
 
   return (
     <div className="rounded-md border bg-white overflow-x-auto">
-      <Table className="min-w-max">
+      <table className="min-w-max caption-bottom text-sm">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <Fragment key={headerGroup.id}>
@@ -112,7 +111,7 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
             </TableRow>
           )}
         </TableBody>
-      </Table>
+      </table>
     </div>
   )
 }

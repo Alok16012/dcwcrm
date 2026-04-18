@@ -80,9 +80,12 @@ export function LeadsClient() {
       // Apply other filters only if they are set
       if (filters.status?.length) query = query.in('status', filters.status)
       if (filters.source?.length) query = query.in('source', filters.source)
-      if (!isAdmin && !isTelecaller && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
+      if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
       if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
+      if (filters.mode) query = query.eq('mode', filters.mode)
+      if (filters.followup_from) query = query.gte('next_followup_date', filters.followup_from)
+      if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
 
       const { data, error } = await query
       if (error) {

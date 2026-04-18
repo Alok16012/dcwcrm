@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search, Trash2, Download } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -66,7 +66,14 @@ export function BackendListClient() {
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const tabScrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  function scrollTabs(dir: 'left' | 'right') {
+    if (tabScrollRef.current) {
+      tabScrollRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' })
+    }
+  }
 
   // Load filter options once
   useEffect(() => {
@@ -313,45 +320,57 @@ export function BackendListClient() {
       />
 
       {/* Premium Board Tabs */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => scrollTabs('left')}
+          className="flex-shrink-0 p-1.5 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        <div ref={tabScrollRef} className="flex items-center gap-2 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <button
+            onClick={() => setBoardFilter('')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+              boardFilter === ''
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-100'
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+            }`}
+          >
+            All Students
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              boardFilter === '' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {students.length}
+            </span>
+          </button>
+
+          {Object.entries(boardStats).map(([id, stat]) => (
             <button
-              onClick={() => setBoardFilter('')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                boardFilter === ''
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-100'
+              key={id}
+              onClick={() => setBoardFilter(id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                boardFilter === id
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-2 ring-indigo-100'
                   : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              All Students
+              {stat.name}
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                boardFilter === '' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'
+                boardFilter === id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
               }`}>
-                {students.length}
+                {stat.count}
               </span>
             </button>
-
-            {Object.entries(boardStats).map(([id, stat]) => (
-              <button
-                key={id}
-                onClick={() => setBoardFilter(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                  boardFilter === id
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-2 ring-indigo-100'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-                }`}
-              >
-                {stat.name}
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  boardFilter === id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {stat.count}
-                </span>
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
+
+        <button
+          onClick={() => scrollTabs('right')}
+          className="flex-shrink-0 p-1.5 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Layer 1: Department + Board */}

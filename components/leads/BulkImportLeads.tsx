@@ -210,7 +210,7 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
                   </label>
                   <Select
                     value={mapping[key] ?? '__none__'}
-                    onValueChange={(v) => setMapping(p => ({ ...p, [key]: v === '__none__' ? '' : v }))}
+                    onValueChange={(v) => setMapping(p => ({ ...p, [key]: v === '__none__' ? '' : v } as Record<string, string>))}
                   >
                     <SelectTrigger className="h-7 text-xs">
                       <SelectValue placeholder="Select column..." />

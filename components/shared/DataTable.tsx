@@ -54,8 +54,8 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
   }
 
   return (
-    <div className="rounded-md border bg-white overflow-x-auto">
-      <table className="min-w-max caption-bottom text-sm">
+    <div className="rounded-md border bg-white overflow-x-auto w-full">
+      <table className="caption-bottom text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <Fragment key={headerGroup.id}>

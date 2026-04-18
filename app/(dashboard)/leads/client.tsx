@@ -144,17 +144,17 @@ export function LeadsClient() {
 
       {/* Add Lead Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Add Lead</DialogTitle></DialogHeader>
           <Tabs defaultValue="single" className="w-full">
             <TabsList className="w-full mb-4">
               <TabsTrigger value="single" className="flex-1">Single Lead</TabsTrigger>
               <TabsTrigger value="bulk" className="flex-1">Bulk Import (Excel)</TabsTrigger>
             </TabsList>
-            <TabsContent value="single" className="mt-0 outline-none h-[600px] overflow-y-auto pr-2">
+            <TabsContent value="single" className="mt-0 outline-none">
               <LeadForm onSuccess={() => { setShowForm(false); fetchLeads() }} onCancel={() => setShowForm(false)} />
             </TabsContent>
-            <TabsContent value="bulk" className="mt-0 outline-none h-[600px] overflow-y-auto pr-2">
+            <TabsContent value="bulk" className="mt-0 outline-none">
               <BulkImportLeads onSuccess={() => { setShowForm(false); fetchLeads() }} onCancel={() => setShowForm(false)} />
             </TabsContent>
           </Tabs>

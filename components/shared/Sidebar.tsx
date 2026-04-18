@@ -5,7 +5,7 @@ import {
   Users, BookOpen, GraduationCap, DollarSign,
   UserCheck, BarChart3, Settings, ChevronLeft,
   ChevronRight, Building2, Home, ListTree,
-  Gift, TrendingUp, X, Scale,
+  Gift, TrendingUp, X, Scale, ClockIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
   { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
+  { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
   { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
   { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },

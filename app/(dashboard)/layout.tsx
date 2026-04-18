@@ -39,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex h-screen overflow-clip bg-gray-50">
       <Sidebar role={userProfile.role} />
-      <div className="flex-1 flex flex-col overflow-clip">
+      <div className="flex-1 min-w-0 flex flex-col overflow-clip">
         <Topbar user={userProfile} />
         <main className="flex-1 overflow-y-auto flex flex-col">
           <div className="flex-1 p-4 md:p-6">

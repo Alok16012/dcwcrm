@@ -56,7 +56,7 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
 
   return (
     <div className="rounded-md border bg-white overflow-x-auto">
-      <Table>
+      <Table className="min-w-max">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <Fragment key={headerGroup.id}>

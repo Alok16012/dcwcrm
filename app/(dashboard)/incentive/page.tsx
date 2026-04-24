@@ -16,7 +16,7 @@ export default async function IncentivePage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!rawProfile?.role || !['lead', 'admin', 'backend'].includes(rawProfile.role)) redirect('/')
+  if (!rawProfile?.role || !['lead', 'counselor', 'admin', 'backend'].includes(rawProfile.role)) redirect('/')
 
   // Find employee record for current user
   const { data: empRow } = await supabase
@@ -54,7 +54,7 @@ export default async function IncentivePage() {
 
   // For lead: fetch their students with incentive
   let studentIncentives: { id: string; full_name: string; course_name: string; enrollment_date: string | null; incentive_amount: number }[] = []
-  if (rawProfile.role === 'lead') {
+  if (rawProfile.role === 'lead' || rawProfile.role === 'counselor') {
     const { data: studs } = await supabase
       .from('students')
       .select('id, full_name, enrollment_date, incentive_amount, course:courses(name)')

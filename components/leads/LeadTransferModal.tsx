@@ -26,7 +26,7 @@ export function LeadTransferModal({ open, onClose, leadIds, currentAssignee, onS
 
   useEffect(() => {
     if (!open) return
-    supabase.from('profiles').select('*').in('role', ['lead', 'telecaller']).eq('is_active', true)
+    supabase.from('profiles').select('*').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true)
       .then(({ data }) => setTelecallers((data ?? []) as any[]))
   }, [open, currentAssignee])
 

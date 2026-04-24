@@ -4,7 +4,7 @@ export const employeeSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Valid phone required'),
-  role: z.enum(['admin', 'lead', 'backend', 'housekeeping']),
+  role: z.enum(['admin', 'lead', 'counselor', 'backend', 'housekeeping']),
   department: z.string().min(2, 'Department required'),
   designation: z.string().min(2, 'Designation required'),
   joining_date: z.string().min(1, 'Joining date required'),

@@ -1,8 +1,9 @@
-export type UserRole = 'admin' | 'lead' | 'backend' | 'housekeeping'
+export type UserRole = 'admin' | 'lead' | 'backend' | 'housekeeping' | 'counselor'
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   lead: 'Counselor',
+  counselor: 'Counselor',
   backend: 'Backend',
   housekeeping: 'Housekeeping',
 }

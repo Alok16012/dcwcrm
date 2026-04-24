@@ -46,7 +46,7 @@ export function LeadsClient() {
 
     Promise.all([
       supabase.from('courses').select('*').eq('is_active', true).order('name'),
-      supabase.from('profiles').select('*').in('role', ['lead', 'telecaller']).eq('is_active', true),
+      supabase.from('profiles').select('*').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
     ]).then(([{ data: c }, { data: t }]) => {
       setCourses(c ?? [])
       setTelecallers(t ?? [])
@@ -57,7 +57,7 @@ export function LeadsClient() {
     if (!currentProfile) return
     setLoading(true)
     try {
-      const isTelecaller = (currentProfile.role as string) === 'lead' || (currentProfile.role as string) === 'telecaller'
+      const isTelecaller = (currentProfile.role as string) === 'lead' || (currentProfile.role as string) === 'telecaller' || (currentProfile.role as string) === 'counselor'
       const isAdmin = (currentProfile.role as string) === 'admin'
 
       let query = supabase
@@ -141,8 +141,8 @@ export function LeadsClient() {
         isLoading={loading}
         onRefresh={fetchLeads}
         courses={courses}
-        telecallers={['lead', 'telecaller'].includes(currentProfile?.role ?? '') ? [] : telecallers}
-        isTelecaller={['lead', 'telecaller'].includes(currentProfile?.role ?? '')}
+        telecallers={['lead', 'telecaller', 'counselor'].includes(currentProfile?.role ?? '') ? [] : telecallers}
+        isTelecaller={['lead', 'telecaller', 'counselor'].includes(currentProfile?.role ?? '')}
       />
 
       {/* Add Lead Dialog */}

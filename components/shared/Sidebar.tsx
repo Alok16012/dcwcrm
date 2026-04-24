@@ -19,8 +19,8 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend'] },
-  { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend'] },
+  { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend', 'counselor'] },
+  { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend', 'counselor'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
   { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
@@ -32,8 +32,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end
-  { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead'] },
-  { label: 'Performance', href: '/performance', icon: TrendingUp, roles: ['lead'] },
+  { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },
+  { label: 'Performance', href: '/performance', icon: TrendingUp, roles: ['lead', 'counselor'] },
 ]
 
 interface SidebarProps {

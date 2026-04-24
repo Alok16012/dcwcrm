@@ -101,7 +101,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
   }
 
   // For lead: total from students, paid from payroll rows with status=paid
-  const totalIncentive = role === 'lead'
+  const totalIncentive = (role === 'lead' || role === 'counselor')
     ? studentIncentives.reduce((s, r) => s + (r.incentive_amount ?? 0), 0)
     : payrollRows.reduce((s, r) => s + (r.incentive ?? 0), 0)
   const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
@@ -194,7 +194,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
       </div>
 
       {/* Student-wise incentive detail — only for lead/telecaller */}
-      {role === 'lead' && (
+      {(role === 'lead' || role === 'counselor') && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-base">My Student Enrollments — Month-wise</h3>

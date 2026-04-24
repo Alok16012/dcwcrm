@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
   const todayDate = format(now, 'yyyy-MM-dd')
 
-  const isLead = profile?.role === 'lead' || profile?.role === 'telecaller'
+  const isLead = profile?.role === 'lead' || profile?.role === 'telecaller' || profile?.role === 'counselor'
 
   const applyScope = (q: any, table: string) => {
     if (isLead) {
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
     droppedStudentsQuery,
     applyScope(supabase.from('leads').select('id, full_name, status, created_at, courses ( name )'), 'leads').order('created_at', { ascending: false }).limit(10),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
-    supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller']).eq('is_active', true),
+    supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
     applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested'), 'leads'),
     supabase.from('departments').select('id, name, students(id, amount_paid, total_fee)'),
   ])

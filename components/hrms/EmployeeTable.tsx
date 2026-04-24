@@ -35,7 +35,7 @@ interface EmployeeTableProps {
   data: EmployeeRow[]
 }
 
-const ROLES: UserRole[] = ['admin', 'lead', 'backend', 'housekeeping']
+const ROLES: UserRole[] = ['admin', 'lead', 'counselor', 'backend', 'housekeeping']
 
 export default function EmployeeTable({ data: initialData }: EmployeeTableProps) {
   const [data, setData] = useState(initialData)
@@ -142,7 +142,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
         }
 
         setEditingEmployee(emp)
-        reset({ ...formData, role: formData.role as 'admin' | 'lead' | 'backend' })
+        reset({ ...formData, role: formData.role as 'admin' | 'lead' | 'counselor' | 'backend' | 'housekeeping' })
         setShowForm(true)
       } catch (e: unknown) {
         toast.error(e instanceof Error ? e.message : 'Failed to load employee details')

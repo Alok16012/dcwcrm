@@ -5,7 +5,7 @@ import {
   Users, BookOpen, GraduationCap, DollarSign,
   UserCheck, BarChart3, Settings, ChevronLeft,
   ChevronRight, Building2, Home, ListTree,
-  Gift, TrendingUp, X, Scale, ClockIcon,
+  Gift, TrendingUp, X, Scale, ClockIcon, ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
+  { label: 'Admin Panel', href: '/admin', icon: ShieldCheck, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end
   { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },

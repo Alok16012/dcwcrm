@@ -56,6 +56,7 @@ const STATUS_COLORS: Record<string, string> = {
   dnp: 'bg-slate-50 text-slate-600 border-slate-200',
   switch_off: 'bg-zinc-50 text-zinc-600 border-zinc-200',
   not_reachable: 'bg-gray-50 text-gray-600 border-gray-200',
+  not_interested: 'bg-rose-50 text-rose-600 border-rose-200',
   // Legacy values (still in DB)
   application_sent: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   cold: 'bg-gray-50 text-gray-600 border-gray-200',

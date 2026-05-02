@@ -39,7 +39,7 @@ const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'sour
 
 // Map old/legacy status values to new ones
 function sanitizeStatus(status: string): LeadFormData['status'] {
-  const valid = ['new', 'contacted', 'interested', 'counselled', 'document_received', 'converted', 'lost', 'dnp', 'switch_off', 'not_reachable']
+  const valid = ['new', 'contacted', 'interested', 'counselled', 'document_received', 'converted', 'lost', 'dnp', 'switch_off', 'not_reachable', 'not_interested']
   if (valid.includes(status)) return status as LeadFormData['status']
   if (status === 'application_sent') return 'document_received'
   if (status === 'cold') return 'dnp'
@@ -58,6 +58,7 @@ const STATUS_DOT: Record<string, string> = {
   dnp: 'bg-slate-400',
   switch_off: 'bg-zinc-400',
   not_reachable: 'bg-gray-400',
+  not_interested: 'bg-rose-500',
 }
 
 // Source icons as emoji/text

@@ -36,6 +36,32 @@ const STATUS_COLORS: Record<string, string> = {
   on_hold: 'bg-yellow-100 text-yellow-800',
 }
 
+const MODE_COLORS: Record<string, string> = {
+  attending: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'non-attending': 'bg-orange-100 text-orange-700 border-orange-200',
+}
+
+const COUNSELLOR_PALETTE = [
+  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
+  'bg-pink-100 text-pink-700',
+  'bg-teal-100 text-teal-700',
+  'bg-amber-100 text-amber-700',
+  'bg-indigo-100 text-indigo-700',
+  'bg-rose-100 text-rose-700',
+  'bg-cyan-100 text-cyan-700',
+]
+
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function counsellorColor(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
+  return COUNSELLOR_PALETTE[h % COUNSELLOR_PALETTE.length]
+}
+
 interface FilterOption { id: string; name: string }
 interface BoardOption { id: string; name: string; department_id: string }
 
@@ -250,12 +276,66 @@ export function BackendListClient() {
     { accessorKey: 'full_name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.full_name}</span> },
     { id: 'guardian_name', accessorFn: (row) => row.guardian_name ?? '', header: "Father's Name", cell: ({ row }) => row.original.guardian_name ?? '-' },
     { accessorKey: 'phone', header: 'Phone' },
-    { id: 'mode', accessorFn: (row) => row.mode ?? '', header: 'Mode', cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.mode ?? '-'}</Badge> },
-    { id: 'session', accessorFn: (row) => row.session?.name ?? '', header: 'Session', cell: ({ row }) => row.original.session?.name ?? '-' },
-    { id: 'department', accessorFn: (row) => row.department?.name ?? '', header: 'Dept', cell: ({ row }) => row.original.department?.name ?? '-' },
-    { id: 'sub_section', accessorFn: (row) => row.sub_section?.name ?? '', header: 'Board', cell: ({ row }) => row.original.sub_section?.name ?? '-' },
-    { id: 'course', accessorFn: (row) => row.course?.name ?? '', header: 'Course', cell: ({ row }) => row.original.course?.name ?? '-' },
-    { id: 'counsellor', accessorFn: (row) => row.counsellor?.full_name ?? '', header: 'Counsellor', cell: ({ row }) => row.original.counsellor?.full_name ?? '-' },
+    {
+      id: 'mode', accessorFn: (row) => row.mode ?? '', header: 'Mode',
+      cell: ({ row }) => {
+        const m = row.original.mode
+        if (!m) return <span className="text-gray-400 text-xs">-</span>
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${MODE_COLORS[m] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+            {m === 'attending' ? '● Attending' : '○ Non-Attending'}
+          </span>
+        )
+      }
+    },
+    {
+      id: 'session', accessorFn: (row) => row.session?.name ?? '', header: 'Session',
+      cell: ({ row }) => {
+        const s = row.original.session?.name
+        if (!s) return <span className="text-gray-400 text-xs">-</span>
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">{s}</span>
+      }
+    },
+    {
+      id: 'department', accessorFn: (row) => row.department?.name ?? '', header: 'Dept',
+      cell: ({ row }) => {
+        const d = row.original.department?.name
+        if (!d) return <span className="text-gray-400 text-xs">-</span>
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">{d}</span>
+      }
+    },
+    {
+      id: 'sub_section', accessorFn: (row) => row.sub_section?.name ?? '', header: 'Board',
+      cell: ({ row }) => {
+        const b = row.original.sub_section?.name
+        if (!b) return <span className="text-gray-400 text-xs">-</span>
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">{b}</span>
+      }
+    },
+    {
+      id: 'course', accessorFn: (row) => row.course?.name ?? '', header: 'Course',
+      cell: ({ row }) => {
+        const c = row.original.course?.name
+        if (!c) return <span className="text-gray-400 text-xs">-</span>
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">{c}</span>
+      }
+    },
+    {
+      id: 'counsellor', accessorFn: (row) => row.counsellor?.full_name ?? '', header: 'Counsellor',
+      cell: ({ row }) => {
+        const name = row.original.counsellor?.full_name
+        if (!name) return <span className="text-gray-400 text-xs">-</span>
+        const color = counsellorColor(name)
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${color}`}>
+              {initials(name)}
+            </span>
+            <span className="text-xs font-medium text-gray-700 truncate max-w-[90px]">{name}</span>
+          </span>
+        )
+      }
+    },
     { accessorKey: 'total_fee', header: 'Total Fee', cell: ({ row }) => row.original.total_fee ? formatCurrency(row.original.total_fee) : '-' },
     { accessorKey: 'amount_paid', header: 'Paid', cell: ({ row }) => <span className="text-green-700">{formatCurrency(row.original.amount_paid ?? 0)}</span> },
     {
@@ -433,9 +513,6 @@ export function BackendListClient() {
             <SelectItem value="">All Modes</SelectItem>
             <SelectItem value="attending">Attending</SelectItem>
             <SelectItem value="non-attending">Non-Attending</SelectItem>
-            <SelectItem value="regular">Regular</SelectItem>
-            <SelectItem value="distance">Distance</SelectItem>
-            <SelectItem value="online">Online</SelectItem>
           </SelectContent>
         </Select>
         <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>

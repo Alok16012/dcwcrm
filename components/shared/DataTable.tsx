@@ -94,7 +94,11 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
               <TableRow
                 key={row.id}
                 onClick={() => onRowClick?.(row.original)}
-                className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+                className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${
+                  row.getIsSelected()
+                    ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-50'
+                    : 'hover:bg-gray-50'
+                }`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>

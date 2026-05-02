@@ -38,6 +38,7 @@ interface Litigation {
   litigation_amount: number
   amount_paid: number
   amount_refunded: number
+  adjusted_with: string | null
   notes: string | null
   created_at: string
   department: { id: string; name: string } | null
@@ -79,6 +80,7 @@ interface FormState {
   reason: string
   litigation_amount: string
   amount_refunded: string
+  adjusted_with: string
   notes: string
 }
 
@@ -122,6 +124,7 @@ const EMPTY_FORM: FormState = {
   reason: '',
   litigation_amount: '',
   amount_refunded: '',
+  adjusted_with: '',
   notes: '',
 }
 
@@ -321,6 +324,7 @@ export function LitigationClient({
       reason: l.reason ?? '',
       litigation_amount: String(l.litigation_amount),
       amount_refunded: String(l.amount_refunded ?? 0),
+      adjusted_with: l.adjusted_with ?? '',
       notes: l.notes ?? '',
     })
     setFormBoards(subSections.filter((s) => s.department_id === l.department_id))
@@ -349,6 +353,7 @@ export function LitigationClient({
         reason: form.reason.trim() || null,
         litigation_amount: amt,
         amount_refunded: refund,
+        adjusted_with: form.litigation_type === 'adjusted' ? (form.adjusted_with.trim() || null) : null,
         notes: form.notes.trim() || null,
       }
 
@@ -439,7 +444,7 @@ export function LitigationClient({
 
 
   function statusBadge(l: Litigation) {
-    const pending = l.litigation_amount - l.amount_paid
+    const pending = (l.amount_refunded ?? 0) - (l.amount_paid ?? 0)
     if (pending <= 0) return <Badge className="bg-green-100 text-green-800 border-0 text-xs">Cleared</Badge>
     if (l.amount_paid > 0) return <Badge className="bg-amber-100 text-amber-800 border-0 text-xs">Partial</Badge>
     return <Badge className="bg-red-100 text-red-800 border-0 text-xs">Pending</Badge>
@@ -475,7 +480,7 @@ export function LitigationClient({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {list.map((l) => {
-              const pending = l.litigation_amount - l.amount_paid
+              const pendingRefund = (l.amount_refunded ?? 0) - (l.amount_paid ?? 0)
               const pCount = paymentsFor(l.id).length
               return (
                 <tr key={l.id} className="hover:bg-gray-50/50 transition-colors">
@@ -492,17 +497,20 @@ export function LitigationClient({
                     {l.litigation_type && (
                       <p className="text-xs font-medium text-blue-700">{litTypeLabel(l.litigation_type, type)}</p>
                     )}
+                    {l.litigation_type === 'adjusted' && l.adjusted_with && (
+                      <p className="text-xs text-orange-600 font-medium">↔ {l.adjusted_with}</p>
+                    )}
                     <p className="text-xs text-gray-500">{l.session?.name ?? '—'}</p>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600 max-w-[140px] truncate">{l.reason ?? '—'}</td>
                   <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(l.litigation_amount)}</td>
                   <td className="px-4 py-3 text-right font-medium text-green-700">{formatCurrency(l.amount_paid)}</td>
                   <td className="px-4 py-3 text-right font-medium text-blue-600">{formatCurrency(l.amount_refunded ?? 0)}</td>
-                  <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(pending)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-red-600">{pendingRefund > 0 ? formatCurrency(pendingRefund) : <span className="text-gray-400">—</span>}</td>
                   <td className="px-4 py-3 text-center">{statusBadge(l)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
-                      {pending > 0 && (
+                      {pendingRefund > 0 && (
                         <button
                           onClick={() => { setPayTarget(l); setPayForm(EMPTY_PAY) }}
                           className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium"
@@ -760,6 +768,18 @@ export function LitigationClient({
                 </SelectContent>
               </Select>
             </div>
+            {form.litigation_type === 'adjusted' && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <label className="text-xs font-semibold text-orange-700 mb-1 block">Adjusted With Student *</label>
+                <Input
+                  placeholder="Student name with whom amount is adjusted"
+                  value={form.adjusted_with}
+                  onChange={(e) => setForm((f) => ({ ...f, adjusted_with: e.target.value }))}
+                  className="bg-white border-orange-200 focus:border-orange-400"
+                />
+                <p className="text-xs text-orange-500 mt-1">Enter the name of the student with whom this amount has been adjusted</p>
+              </div>
+            )}
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Reason</label>
               <Input

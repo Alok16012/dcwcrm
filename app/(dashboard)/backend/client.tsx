@@ -152,16 +152,17 @@ export function BackendListClient() {
     }
   }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
 
-  // Calculate board-wise counts for tabs
-  const boardStats = students.reduce((acc, s) => {
-    const b = s.sub_section?.name
+  // Count students per board from current fetched data
+  const boardCounts = students.reduce((acc, s) => {
     const bid = s.sub_section?.id
-    if (b && bid) {
-      if (!acc[bid]) acc[bid] = { name: b, count: 0 }
-      acc[bid].count++
-    }
+    if (bid) acc[bid] = (acc[bid] ?? 0) + 1
     return acc
-  }, {} as Record<string, { name: string; count: number }>)
+  }, {} as Record<string, number>)
+
+  // Tabs always come from allBoards — never disappear when one is selected
+  const tabBoards = departmentFilter
+    ? allBoards.filter(b => b.department_id === departmentFilter)
+    : allBoards
 
   async function handleDeleteStudent(id: string) {
     try {
@@ -345,21 +346,21 @@ export function BackendListClient() {
             </span>
           </button>
 
-          {Object.entries(boardStats).map(([id, stat]) => (
+          {tabBoards.map((board) => (
             <button
-              key={id}
-              onClick={() => setBoardFilter(id)}
+              key={board.id}
+              onClick={() => setBoardFilter(board.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
-                boardFilter === id
+                boardFilter === board.id
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-2 ring-indigo-100'
                   : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              {stat.name}
+              {board.name}
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                boardFilter === id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
+                boardFilter === board.id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
               }`}>
-                {stat.count}
+                {boardCounts[board.id] ?? 0}
               </span>
             </button>
           ))}

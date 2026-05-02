@@ -107,7 +107,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             try {
                 const [{ data: c }, { data: p }, { data: d }, { data: s }] = await Promise.all([
                     supabase.from('courses').select('*').order('name'),
-                    supabase.from('profiles').select('*').eq('role', 'counselor').eq('is_active', true).order('full_name'),
+                    supabase.from('profiles').select('*').in('role', ['counselor', 'lead', 'admin']).eq('is_active', true).order('full_name'),
                     supabase.from('departments').select('*').order('name'),
                     supabase.from('sessions').select('*').order('name', { ascending: false }),
                 ])

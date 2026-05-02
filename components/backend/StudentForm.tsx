@@ -349,9 +349,6 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                 <SelectItem value="">Select mode</SelectItem>
                                 <SelectItem value="attending">Attending</SelectItem>
                                 <SelectItem value="non-attending">Non-Attending</SelectItem>
-                                <SelectItem value="regular">Regular</SelectItem>
-                                <SelectItem value="distance">Distance</SelectItem>
-                                <SelectItem value="online">Online</SelectItem>
                             </SelectContent>
                         </Select>
                     </FieldWrapper>

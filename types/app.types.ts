@@ -197,6 +197,7 @@ export interface Student {
   lead_id?: string
   enrollment_number: string
   full_name: string
+  father_name?: string
   guardian_name?: string
   guardian_phone?: string
   guardian_relationship?: string

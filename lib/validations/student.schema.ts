@@ -4,6 +4,7 @@ export const studentSchema = z.object({
     full_name: z.string().min(2, 'Name required'),
     phone: z.string().min(10, 'Valid phone required'),
     email: z.string().email().optional().or(z.literal('')),
+    father_name: z.string().optional().or(z.literal('')),
     guardian_name: z.string().optional().or(z.literal('')),
     guardian_phone: z.string().optional().or(z.literal('')),
     guardian_relationship: z.string().optional().or(z.literal('')),

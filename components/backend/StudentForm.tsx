@@ -74,6 +74,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         resolver: zodResolver(studentSchema),
         defaultValues: {
             full_name: student?.full_name ?? '',
+            father_name: (student as any)?.father_name ?? '',
             guardian_name: student?.guardian_name ?? '',
             guardian_phone: (student as any)?.guardian_phone ?? '',
             guardian_relationship: (student as any)?.guardian_relationship ?? '',
@@ -120,6 +121,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 if (student?.id) {
                     reset({
                         full_name: student?.full_name ?? '',
+                        father_name: (student as any)?.father_name ?? '',
                         guardian_name: student?.guardian_name ?? '',
                         guardian_phone: (student as any)?.guardian_phone ?? '',
                         guardian_relationship: (student as any)?.guardian_relationship ?? '',
@@ -228,7 +230,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     await supabase.from('department_litigations').insert({
                         student_id: student.id,
                         student_name: student.full_name,
-                        father_name: student.guardian_name || null,
+                        father_name: (student as any).father_name || student.guardian_name || null,
                         phone: student.phone || null,
                         department_id: data.department_id || student.department_id || null,
                         sub_section_id: data.sub_section_id || student.sub_section_id || null,
@@ -278,6 +280,12 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </div>
                     </FieldWrapper>
 
+                    <FieldWrapper label="Father Name">
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                            <Input {...register('father_name')} placeholder="e.g. Ramesh Kumar" className="pl-9 bg-white border-blue-200" />
+                        </div>
+                    </FieldWrapper>
 
                     <FieldWrapper label="Phone" required error={errors.phone?.message}>
                         <div className="relative">

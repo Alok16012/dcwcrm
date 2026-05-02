@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -88,6 +88,7 @@ export function BackendListClient() {
   const [departments, setDepartments] = useState<FilterOption[]>([])
   const [allBoards, setAllBoards] = useState<BoardOption[]>([])
   const [boards, setBoards] = useState<BoardOption[]>([])
+  const [allBoardCounts, setAllBoardCounts] = useState<Record<string, number>>({})
   const [editStudent, setEditStudent] = useState<Student | null>(null)
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -118,6 +119,17 @@ export function BackendListClient() {
       const allB = (boardRes.data ?? []) as BoardOption[]
       setAllBoards(allB)
       setBoards(allB)
+
+      // Fetch board-wise student counts (no filters — true count per board)
+      const { data: countData } = await supabase
+        .from('students')
+        .select('sub_section_id')
+        .neq('status', 'dropped')
+      const counts: Record<string, number> = {}
+      ;(countData ?? []).forEach((s: any) => {
+        if (s.sub_section_id) counts[s.sub_section_id] = (counts[s.sub_section_id] ?? 0) + 1
+      })
+      setAllBoardCounts(counts)
     }
     loadOptions()
   }, [])
@@ -178,17 +190,19 @@ export function BackendListClient() {
     }
   }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
 
-  // Count students per board from current fetched data
-  const boardCounts = students.reduce((acc, s) => {
-    const bid = s.sub_section?.id
-    if (bid) acc[bid] = (acc[bid] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  // Tabs always come from allBoards — never disappear when one is selected
-  const tabBoards = departmentFilter
-    ? allBoards.filter(b => b.department_id === departmentFilter)
-    : allBoards
+  // Tabs: filter by dept if selected, then deduplicate by name to avoid same-name boards from multiple depts
+  const tabBoards = useMemo(() => {
+    const source = departmentFilter
+      ? allBoards.filter(b => b.department_id === departmentFilter)
+      : allBoards
+    const seen = new Set<string>()
+    return source.filter(b => {
+      const key = b.name.toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [allBoards, departmentFilter])
 
   async function handleDeleteStudent(id: string) {
     try {
@@ -426,7 +440,7 @@ export function BackendListClient() {
             </span>
           </button>
 
-          {tabBoards.map((board) => (
+          {tabBoards.map((board: BoardOption) => (
             <button
               key={board.id}
               onClick={() => setBoardFilter(board.id)}
@@ -440,7 +454,7 @@ export function BackendListClient() {
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
                 boardFilter === board.id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
               }`}>
-                {boardCounts[board.id] ?? 0}
+                {allBoardCounts[board.id] ?? 0}
               </span>
             </button>
           ))}

@@ -9,7 +9,7 @@ export default async function CoursesPage() {
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: { role: string } | null }
-  if (profile?.role !== 'admin') redirect('/')
+  if (!profile || !['admin', 'accounts'].includes(profile.role)) redirect('/')
 
   const { data: courses } = await supabase.from('courses').select('*, sub_courses(*)').order('name')
 

@@ -20,17 +20,18 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend', 'counselor'] },
+  { label: 'Accounts', href: '/accounts', icon: DollarSign, roles: ['accounts'] },
   { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend', 'counselor'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
-  { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
+  { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend', 'accounts'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
   { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
-  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
-  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
+  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin', 'accounts'] },
+  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin', 'accounts'] },
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
-  { label: 'Admin Panel', href: '/admin', icon: ShieldCheck, roles: ['admin', 'backend', 'lead', 'counselor'] },
+  { label: 'Admin Panel', href: '/admin', icon: ShieldCheck, roles: ['admin', 'backend', 'lead', 'counselor', 'accounts'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end
   { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },

@@ -10,6 +10,8 @@ import { Card } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Image from 'next/image'
+import Link from 'next/link'
+import { ExternalLink } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email('Valid email required'),
@@ -155,6 +157,17 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
+
+            {/* Quick Access */}
+            <div className="border border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/60">
+              <p className="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wide">Quick Access</p>
+              <Link href="/associate">
+                <Button variant="outline" className="w-full h-10 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-100 hover:border-blue-400 font-medium gap-2">
+                  <ExternalLink className="w-4 h-4" />
+                  Associate Portal (Demo)
+                </Button>
+              </Link>
+            </div>
 
             <p className="text-center text-sm text-gray-500 mt-8">
               Developed by{' '}

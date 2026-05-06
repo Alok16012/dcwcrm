@@ -9,7 +9,7 @@ export default async function SessionsPage() {
     if (!user) redirect('/login')
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: { role: string } | null }
-    if (!profile || !['admin', 'accounts'].includes(profile.role)) redirect('/')
+    if (!profile || !['admin', 'associate'].includes(profile.role)) redirect('/')
 
     const { data: sessions } = await supabase.from('sessions').select('*').order('created_at', { ascending: false })
 

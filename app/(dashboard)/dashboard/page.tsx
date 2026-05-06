@@ -15,7 +15,7 @@ export default async function DashboardPage() {
 
   // Non-admin users get redirected to their module (excluding telecallers who now have access)
   if (profile?.role === 'backend') redirect('/backend')
-  if (profile?.role === 'accounts') redirect('/accounts')
+  if (profile?.role === 'associate') redirect('/associate')
 
   const now = new Date()
   const todayStart = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss")

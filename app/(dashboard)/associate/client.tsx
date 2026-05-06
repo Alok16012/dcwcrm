@@ -74,7 +74,7 @@ interface Props {
   courseStats: CourseStatRow[]
 }
 
-export default function AccountsClient({
+export default function AssociateClient({
   userName, month, incomeMonth, incomeTotal, expenseMonth,
   outstandingFees, pendingExpenseCount, students, recentPayments,
   courses, sessions, counsellors, courseStats,

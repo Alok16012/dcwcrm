@@ -23,7 +23,7 @@ const createUserSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(8, 'Min 8 characters'),
-  role: z.enum(['admin', 'lead', 'backend', 'housekeeping', 'counselor', 'accounts']),
+  role: z.enum(['admin', 'lead', 'backend', 'housekeeping', 'counselor', 'associate']),
   phone: z.string().optional(),
 })
 
@@ -172,7 +172,7 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
     <div>
       <PageHeader
         title="User Management"
-        description="Manage staff accounts and access"
+        description="Manage staff associate and access"
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -195,7 +195,7 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
                       <SelectItem value="counselor">Counselor</SelectItem>
                       <SelectItem value="backend">Backend</SelectItem>
                       <SelectItem value="housekeeping">Housekeeping</SelectItem>
-                      <SelectItem value="accounts">Associate</SelectItem>
+                      <SelectItem value="associate">Associate</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.role && <p className="text-xs text-red-500">{errors.role.message}</p>}

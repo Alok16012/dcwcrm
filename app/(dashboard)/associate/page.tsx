@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
-import AccountsClient from './client'
+import AssociateClient from './client'
 
-export default async function AccountsPage() {
+export default async function AssociatePage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -15,7 +15,7 @@ export default async function AccountsPage() {
     .eq('id', user.id)
     .single() as { data: { role: string; full_name: string } | null }
 
-  if (!profile || !['admin', 'accounts'].includes(profile.role)) redirect('/')
+  if (!profile || !['admin', 'associate'].includes(profile.role)) redirect('/')
 
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
@@ -96,7 +96,7 @@ export default async function AccountsPage() {
   }).filter(c => c.studentCount > 0).sort((a, b) => b.collectedFee - a.collectedFee)
 
   return (
-    <AccountsClient
+    <AssociateClient
       userName={profile.full_name}
       month={format(now, 'MMMM yyyy')}
       incomeMonth={incomeMonth}

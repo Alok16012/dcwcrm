@@ -37,7 +37,7 @@ export default async function AssociatePage() {
     supabase.from('expenses').select('amount').neq('status', 'rejected').gte('expense_date', monthStart).lte('expense_date', monthEnd),
     supabase.from('students').select('id, full_name, enrollment_number, total_fee, amount_paid, enrollment_date, status, courses(name)').order('enrollment_date', { ascending: false }).limit(50),
     supabase.from('expenses').select('id').eq('status', 'pending'),
-    supabase.from('payments').select('id, amount, payment_date, payment_mode, receipt_number, notes, student_id, lead_id, students(full_name), leads(full_name)').order('payment_date', { ascending: false }).limit(20),
+    supabase.from('payments').select('id, amount, payment_date, payment_mode, receipt_number, notes, student_id, lead_id, student:students(full_name), lead:leads(full_name)').order('payment_date', { ascending: false }).limit(20),
     supabase.from('courses').select('id, name, sub_courses(id, name)').order('name'),
     supabase.from('sessions').select('id, name, is_active').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, role').in('role', ['lead', 'counselor']).eq('is_active', true),
@@ -64,7 +64,7 @@ export default async function AssociatePage() {
     payment_mode: p.payment_mode,
     receipt_number: p.receipt_number,
     notes: p.notes,
-    student_name: p.students?.full_name || p.leads?.full_name || 'Manual Income',
+    student_name: p.student?.full_name || p.lead?.full_name || 'Manual Income',
   }))
 
   const courses = (coursesRes.data ?? []) as {

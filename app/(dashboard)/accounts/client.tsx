@@ -26,11 +26,10 @@ interface Student {
   full_name: string
   enrollment_number: string
   total_fee: number | null
-  amount_paid: number | null
+  amount_paid: number
   enrollment_date: string | null
   status: string
   courses: { name: string } | null
-  sessions: { name: string } | null
 }
 
 interface PaymentRow {
@@ -248,7 +247,6 @@ export default function AccountsClient({
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Student</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Enroll No.</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Course</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Session</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-600">Total Fee</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-600">Paid</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-600">Pending</th>
@@ -257,9 +255,9 @@ export default function AccountsClient({
               </thead>
               <tbody className="divide-y">
                 {filteredStudents.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No students found</td></tr>
+                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No students found</td></tr>
                 ) : filteredStudents.map(s => {
-                  const paid = s.amount_paid ?? 0
+                  const paid = s.amount_paid
                   const total = s.total_fee ?? 0
                   const pending = Math.max(0, total - paid)
                   const feeStatus = total === 0 ? 'no-fee' : paid >= total ? 'paid' : paid > 0 ? 'partial' : 'unpaid'
@@ -268,7 +266,6 @@ export default function AccountsClient({
                       <td className="px-4 py-3 font-medium text-gray-900">{s.full_name}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell font-mono">{s.enrollment_number}</td>
                       <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{(s.courses as any)?.name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{(s.sessions as any)?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-mono text-slate-700">{total > 0 ? fmt(total) : '—'}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-green-700">{paid > 0 ? fmt(paid) : '—'}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-red-600">{pending > 0 ? fmt(pending) : '—'}</td>

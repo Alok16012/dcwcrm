@@ -35,7 +35,7 @@ export default async function AccountsPage() {
     supabase.from('payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd),
     supabase.from('payments').select('amount'),
     supabase.from('expenses').select('amount').neq('status', 'rejected').gte('expense_date', monthStart).lte('expense_date', monthEnd),
-    supabase.from('students').select('id, full_name, enrollment_number, total_fee, amount_paid, enrollment_date, status, courses(name), sessions(name)').order('enrollment_date', { ascending: false }).limit(50),
+    supabase.from('students').select('id, full_name, enrollment_number, total_fee, amount_paid, enrollment_date, status, courses(name)').order('enrollment_date', { ascending: false }).limit(50),
     supabase.from('expenses').select('id').eq('status', 'pending'),
     supabase.from('payments').select('id, amount, payment_date, payment_mode, receipt_number, notes, student_id, lead_id, students(full_name), leads(full_name)').order('payment_date', { ascending: false }).limit(20),
     supabase.from('courses').select('id, name, sub_courses(id, name)').order('name'),
@@ -50,10 +50,9 @@ export default async function AccountsPage() {
 
   const students = (studentsRes.data ?? []) as {
     id: string; full_name: string; enrollment_number: string;
-    total_fee: number | null; amount_paid: number | null;
+    total_fee: number | null; amount_paid: number;
     enrollment_date: string | null; status: string;
     courses: { name: string } | null;
-    sessions: { name: string } | null;
   }[]
 
   const outstandingFees = students.reduce((s, r) => s + Math.max(0, (r.total_fee ?? 0) - (r.amount_paid ?? 0)), 0)
@@ -85,7 +84,7 @@ export default async function AccountsPage() {
   const courseStats = courses.map(course => {
     const courseStudents = students.filter(s => (s.courses as any)?.name === course.name)
     const totalFee = courseStudents.reduce((s, r) => s + (r.total_fee ?? 0), 0)
-    const collectedFee = courseStudents.reduce((s, r) => s + (r.amount_paid ?? 0), 0)
+    const collectedFee = courseStudents.reduce((s, r) => s + r.amount_paid, 0)
     return {
       id: course.id,
       name: course.name,

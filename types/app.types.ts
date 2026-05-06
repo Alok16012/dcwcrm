@@ -6,7 +6,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   counselor: 'Counselor',
   backend: 'Backend',
   housekeeping: 'Housekeeping',
-  accounts: 'Accounts',
+  accounts: 'Associate',
 }
 
 export type LeadStatus =

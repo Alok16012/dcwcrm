@@ -145,7 +145,7 @@ export default function AccountsClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Accounts Portal</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Associate Portal</h1>
           <p className="text-sm text-muted-foreground">Welcome, {userName} &middot; {month}</p>
         </div>
         <div className="flex gap-2">

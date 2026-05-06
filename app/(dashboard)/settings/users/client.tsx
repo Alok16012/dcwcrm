@@ -195,7 +195,7 @@ export function UsersSettingsClient({ users: initialUsers }: { users: Profile[] 
                       <SelectItem value="counselor">Counselor</SelectItem>
                       <SelectItem value="backend">Backend</SelectItem>
                       <SelectItem value="housekeeping">Housekeeping</SelectItem>
-                      <SelectItem value="accounts">Accounts</SelectItem>
+                      <SelectItem value="accounts">Associate</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.role && <p className="text-xs text-red-500">{errors.role.message}</p>}

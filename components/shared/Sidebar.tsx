@@ -6,7 +6,7 @@ import {
   UserCheck, BarChart3, Settings, ChevronLeft,
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
-  Wallet, Package, Bell, User,
+  Wallet, Package, Bell, User, IndianRupee,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -27,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Account', href: '/associate/account', icon: Wallet, roles: ['associate'] },
   { label: 'Dispatch', href: '/associate/dispatch', icon: Package, roles: ['associate'] },
   { label: 'Notifications', href: '/associate/notifications', icon: Bell, roles: ['associate'] },
+  { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['associate'] },
   { label: 'Profile', href: '/associate/profile', icon: User, roles: ['associate'] },
   { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend', 'counselor'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
   { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },
+  { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['admin', 'backend', 'lead', 'counselor', 'associate'] },
   { label: 'OPS', href: '/ops', icon: Briefcase, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end

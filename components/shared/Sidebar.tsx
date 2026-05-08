@@ -5,7 +5,8 @@ import {
   Users, BookOpen, GraduationCap, DollarSign,
   UserCheck, BarChart3, Settings, ChevronLeft,
   ChevronRight, Building2, Home, ListTree,
-  Gift, TrendingUp, X, Scale, ClockIcon, ShieldCheck,
+  Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
+  Wallet, Package, Bell, User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -20,18 +21,25 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend', 'counselor'] },
-  { label: 'Associate', href: '/associate', icon: DollarSign, roles: ['associate'] },
+  // Associate portal sub-nav (only visible to associate role)
+  { label: 'Dashboard', href: '/associate', icon: Home, roles: ['associate'] },
+  { label: 'Admissions', href: '/associate/admissions', icon: GraduationCap, roles: ['associate'] },
+  { label: 'Account', href: '/associate/account', icon: Wallet, roles: ['associate'] },
+  { label: 'Dispatch', href: '/associate/dispatch', icon: Package, roles: ['associate'] },
+  { label: 'Notifications', href: '/associate/notifications', icon: Bell, roles: ['associate'] },
+  { label: 'Profile', href: '/associate/profile', icon: User, roles: ['associate'] },
   { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend', 'counselor'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
-  { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend', 'associate'] },
+  { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
   { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
-  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin', 'associate'] },
-  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin', 'associate'] },
+  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
+  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
-  { label: 'Admin Panel', href: '/admin', icon: ShieldCheck, roles: ['admin', 'backend', 'lead', 'counselor', 'associate'] },
+  { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },
+  { label: 'OPS', href: '/ops', icon: Briefcase, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end
   { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },

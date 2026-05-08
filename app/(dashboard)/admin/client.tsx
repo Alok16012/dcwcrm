@@ -12,6 +12,7 @@ import { NotificationManager } from './tabs/NotificationManager'
 import { WalletManager } from './tabs/WalletManager'
 import { CrmSyncMonitor } from './tabs/CrmSyncMonitor'
 import { SystemSettings } from './tabs/SystemSettings'
+import { AssociateManager } from './tabs/AssociateManager'
 
 export function AdminPanelClient() {
   const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
@@ -54,6 +55,7 @@ export function AdminPanelClient() {
             <TabsTrigger value="notifications" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Notifications</TabsTrigger>
             <TabsTrigger value="wallet" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Wallet Manager</TabsTrigger>
             <TabsTrigger value="crm" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">CRM Sync</TabsTrigger>
+            <TabsTrigger value="associates" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Associates</TabsTrigger>
             <TabsTrigger value="settings" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">System Settings</TabsTrigger>
           </TabsList>
         </div>
@@ -81,6 +83,9 @@ export function AdminPanelClient() {
         </TabsContent>
         <TabsContent value="crm" className="mt-4">
           <CrmSyncMonitor students={students} />
+        </TabsContent>
+        <TabsContent value="associates" className="mt-4">
+          <AssociateManager />
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
           <SystemSettings />

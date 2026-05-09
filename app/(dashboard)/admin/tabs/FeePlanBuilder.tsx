@@ -15,6 +15,7 @@ interface PlanConfig {
 interface FeeState {
   title: string; subtitle: string; sessionTag: string; boardTag: string
   website: string; ctaTitle: string; ctaSubtitle: string
+  address: string; phone: string
   terms: string[]; plans: { basic: PlanConfig; standard: PlanConfig; premium: PlanConfig }
 }
 
@@ -43,6 +44,8 @@ const DEFAULT: FeeState = {
   website: 'distancecourseswala.in',
   ctaTitle: 'Admission Open Now',
   ctaSubtitle: 'Limited Time — Seats Filling Fast',
+  address: 'New Delhi, India',
+  phone: '+91 98765 43210',
   terms: [
     'Fees are non-refundable (except guaranteed refund cases)',
     'Admission confirmed after full payment',
@@ -73,7 +76,6 @@ const DEFAULT: FeeState = {
 
 const FeePlanDocument = dynamic(() => import('./FeePlanDocument'), { ssr: false })
 
-const PLAN_COLOR: Record<string, string> = { basic: '#60a5fa', standard: '#facc15', premium: '#c084fc' }
 const PLAN_TEXT: Record<string, string> = { basic: 'text-blue-700', standard: 'text-yellow-700', premium: 'text-purple-700' }
 const PLAN_BORDER: Record<string, string> = { basic: 'border-blue-200 bg-blue-50', standard: 'border-yellow-200 bg-yellow-50', premium: 'border-purple-200 bg-purple-50' }
 
@@ -192,6 +194,8 @@ export function FeePlanBuilder() {
               <div className="space-y-1"><Label className="text-xs text-slate-500">Session Tag</Label><Input value={state.sessionTag} onChange={e => set('sessionTag', e.target.value)} placeholder="July Session 2026" /></div>
               <div className="space-y-1"><Label className="text-xs text-slate-500">Board Tag</Label><Input value={state.boardTag} onChange={e => set('boardTag', e.target.value)} placeholder="BOSSE Board" /></div>
               <div className="space-y-1"><Label className="text-xs text-slate-500">Website</Label><Input value={state.website} onChange={e => set('website', e.target.value)} /></div>
+              <div className="space-y-1"><Label className="text-xs text-slate-500">Mobile Number</Label><Input value={state.phone} onChange={e => set('phone', e.target.value)} placeholder="+91 98765 43210" /></div>
+              <div className="col-span-2 space-y-1"><Label className="text-xs text-slate-500">Address (footer)</Label><Input value={state.address} onChange={e => set('address', e.target.value)} placeholder="New Delhi, India" /></div>
             </div>
           </div>
 
@@ -306,79 +310,83 @@ export function FeePlanBuilder() {
 
         {/* ── RIGHT: Preview ── */}
         <div className="sticky top-4 space-y-3">
-          <div className="rounded-xl overflow-hidden border border-slate-700 shadow-2xl"
-            style={{ background: '#0f172a', fontFamily: 'system-ui,sans-serif', padding: '20px' }}>
+          <div className="rounded-xl overflow-hidden border border-slate-200 shadow-xl"
+            style={{ background: '#ffffff', fontFamily: 'system-ui,sans-serif', padding: '18px' }}>
 
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            {/* Header — dark navy band */}
+            <div style={{ background: '#0f172a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <img src="/brand-logo.png" alt="DCW" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+                <img src="/brand-logo.png" alt="DCW" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
                 <div>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 12, lineHeight: 1.3 }}>
                     <span style={{ color: '#60a5fa' }}>Distance</span> Courses Wala
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: 10 }}>{state.website}</div>
+                  <div style={{ color: '#94a3b8', fontSize: 9 }}>{state.website}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {state.sessionTag && <span style={{ background: '#facc15', color: '#000', borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{state.sessionTag}</span>}
-                {state.boardTag && <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 20, padding: '3px 10px', fontSize: 10, whiteSpace: 'nowrap' }}>{state.boardTag}</span>}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {state.sessionTag && <span style={{ background: '#facc15', color: '#000', borderRadius: 20, padding: '2px 9px', fontSize: 9, fontWeight: 700 }}>{state.sessionTag}</span>}
+                {state.boardTag && <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 20, padding: '2px 9px', fontSize: 9 }}>{state.boardTag}</span>}
               </div>
             </div>
 
             {/* Title */}
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <h2 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, lineHeight: 1.3 }}>{state.title}</h2>
-              <p style={{ color: '#94a3b8', fontSize: 10, margin: '4px 0 0' }}>{state.subtitle}</p>
+            <div style={{ textAlign: 'center', marginBottom: 14 }}>
+              <div style={{ color: '#0f172a', fontSize: 16, fontWeight: 800 }}>{state.title}</div>
+              <div style={{ color: '#64748b', fontSize: 10, marginTop: 3 }}>{state.subtitle}</div>
             </div>
 
-            {/* Plans — NO absolute positioning, badge is in flow */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+            {/* Plans — invoice style with colored headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
               {planKeys.map(key => {
                 const plan = state.plans[key]
-                const isHighlighted = plan.highlighted
+                const hdrBg = { basic: '#1d4ed8', standard: '#b45309', premium: '#6d28d9' }[key]
+                const lightBg = { basic: '#eff6ff', standard: '#fffbeb', premium: '#f5f3ff' }[key]
+                const borderColor = { basic: '#bfdbfe', standard: '#fde68a', premium: '#ddd6fe' }[key]
+                const accentColor = { basic: '#1d4ed8', standard: '#b45309', premium: '#6d28d9' }[key]
+                const papers = plan.papers.filter(p => p.label)
+                const regular = papers.slice(0, papers.length - 1)
+                const full = papers[papers.length - 1]
                 return (
                   <div key={key} style={{
-                    border: isHighlighted ? '2px solid #2563eb' : '1px solid #334155',
-                    borderRadius: 8,
-                    background: isHighlighted ? '#0f1e3a' : '#1e293b',
-                    overflow: 'hidden',
+                    border: plan.highlighted ? `2px solid ${hdrBg}` : '1px solid #e2e8f0',
+                    borderRadius: 8, overflow: 'hidden',
                   }}>
-                    {/* Badge in flow — no absolute */}
-                    {isHighlighted && (
-                      <div style={{ background: '#facc15', color: '#000', fontSize: 8, fontWeight: 700, padding: '4px 0', textAlign: 'center' }}>
-                        ★ Most Popular
-                      </div>
-                    )}
-                    <div style={{ padding: '10px' }}>
-                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 2 }}>{plan.icon} {plan.name}</div>
-                      <div style={{ color: '#94a3b8', fontSize: 9, marginBottom: 8 }}>{plan.tagline}</div>
-                      {plan.papers.filter(p => p.label).map((p, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                          <span style={{ color: '#cbd5e1', fontSize: 9 }}>{p.label}</span>
-                          <span style={{ color: '#fff', fontWeight: 600, fontSize: 9 }}>{fmtPrice(p.price)}</span>
+                    {/* Solid color header bar */}
+                    <div style={{ background: hdrBg, padding: '8px 10px' }}>
+                      {plan.highlighted && (
+                        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '1px 6px', display: 'inline-block', marginBottom: 4 }}>
+                          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>MOST POPULAR</span>
+                        </div>
+                      )}
+                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>{plan.name}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 8, marginTop: 2 }}>{plan.tagline}</div>
+                    </div>
+                    {/* White body */}
+                    <div style={{ padding: '9px 10px', background: '#fff' }}>
+                      {regular.map((p, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 3, marginBottom: 3 }}>
+                          <span style={{ color: '#64748b', fontSize: 9 }}>{p.label}</span>
+                          <span style={{ color: '#1e293b', fontWeight: 600, fontSize: 9 }}>{fmtPrice(p.price)}</span>
                         </div>
                       ))}
+                      {full && (
+                        <div style={{ background: lightBg, border: `1px solid ${borderColor}`, borderRadius: 4, padding: '3px 6px', display: 'flex', justifyContent: 'space-between', marginTop: 3, marginBottom: 6 }}>
+                          <span style={{ color: '#1e293b', fontWeight: 700, fontSize: 9 }}>{full.label}</span>
+                          <span style={{ color: accentColor, fontWeight: 800, fontSize: 10 }}>{fmtPrice(full.price)}</span>
+                        </div>
+                      )}
                       {plan.features.length > 0 && (
                         <>
-                          <div style={{ color: PLAN_COLOR[key], fontSize: 7, fontWeight: 700, marginTop: 7, marginBottom: 3, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                            {plan.featuresLabel}
-                          </div>
+                          <div style={{ color: accentColor, fontSize: 7.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 3 }}>{plan.featuresLabel}</div>
                           {plan.features.slice(0, 5).map((f, i) => (
-                            <div key={i} style={{ color: '#94a3b8', fontSize: 8, marginBottom: 2 }}>✓ {f}</div>
+                            <div key={i} style={{ color: '#475569', fontSize: 8, marginBottom: 1.5 }}>- {f}</div>
                           ))}
-                          {plan.features.length > 5 && (
-                            <div style={{ color: '#64748b', fontSize: 7 }}>+{plan.features.length - 5} more…</div>
-                          )}
+                          {plan.features.length > 5 && <div style={{ color: '#94a3b8', fontSize: 7.5 }}>+{plan.features.length - 5} more…</div>}
                         </>
                       )}
                       {plan.guarantee && (
-                        <div style={{
-                          background: isHighlighted ? '#1e3a5f' : '#0f2027',
-                          border: `1px solid ${PLAN_COLOR[key]}55`,
-                          borderRadius: 5, padding: '4px 7px', marginTop: 7,
-                          color: PLAN_COLOR[key], fontSize: 8, fontWeight: 600,
-                        }}>
+                        <div style={{ background: lightBg, border: `1px solid ${borderColor}`, borderRadius: 4, padding: '4px 7px', marginTop: 6, color: accentColor, fontSize: 8, fontWeight: 600 }}>
                           {plan.guarantee}
                         </div>
                       )}
@@ -391,19 +399,23 @@ export function FeePlanBuilder() {
             {/* Bottom */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <div style={{ color: '#facc15', fontSize: 9, fontWeight: 700, marginBottom: 5 }}>Terms & Conditions</div>
-                {state.terms.map((t, i) => <div key={i} style={{ color: '#94a3b8', fontSize: 8, marginBottom: 3 }}>• {t}</div>)}
+                <div style={{ color: '#0f172a', fontSize: 9, fontWeight: 700, marginBottom: 5 }}>Terms & Conditions</div>
+                {state.terms.map((t, i) => <div key={i} style={{ color: '#64748b', fontSize: 8, marginBottom: 2.5 }}>- {t}</div>)}
               </div>
               <div style={{ background: '#facc15', borderRadius: 8, padding: '12px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontWeight: 800, fontSize: 13, color: '#000' }}>{state.ctaTitle}</div>
-                <div style={{ fontWeight: 700, fontSize: 10, color: '#000', margin: '2px 0' }}>{state.website}</div>
-                <div style={{ fontSize: 8, color: '#1a1a1a' }}>{state.ctaSubtitle}</div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: '#000' }}>{state.ctaTitle}</div>
+                <div style={{ fontWeight: 700, fontSize: 10, color: '#1e293b', margin: '2px 0' }}>{state.website}</div>
+                <div style={{ fontSize: 8, color: '#374151' }}>{state.ctaSubtitle}</div>
               </div>
             </div>
 
             {/* Footer */}
-            <div style={{ marginTop: 10, borderTop: '1px solid #1e293b', paddingTop: 7, textAlign: 'center', color: '#475569', fontSize: 7 }}>
-              Distance Courses Wala — {state.boardTag} | {state.subtitle} | {state.sessionTag}
+            <div style={{ marginTop: 10, borderTop: '1px solid #e2e8f0', paddingTop: 7, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: '#94a3b8', fontSize: 8 }}>Distance Courses Wala | {state.boardTag} | {state.sessionTag}</div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {state.address && <span style={{ color: '#64748b', fontSize: 8 }}>Addr: {state.address}</span>}
+                {state.phone && <span style={{ color: '#64748b', fontSize: 8 }}>Ph: {state.phone}</span>}
+              </div>
             </div>
           </div>
 

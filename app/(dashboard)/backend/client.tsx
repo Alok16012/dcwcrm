@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useTransition, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataTable } from '@/components/shared/DataTable'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { createClient } from '@/lib/supabase/client'
+import { Textarea } from '@/components/ui/textarea'
 import { StudentForm } from '@/components/backend/StudentForm'
 import { PrintInvoiceButton } from '@/components/backend/PrintInvoiceButton'
 import { toast } from 'sonner'
@@ -97,6 +98,9 @@ export function BackendListClient() {
   const [pendingStudents, setPendingStudents] = useState<any[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejecting, setRejecting] = useState(false)
   const tabScrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -213,7 +217,7 @@ export function BackendListClient() {
     setPendingLoading(true)
     const { data } = await (supabase as any)
       .from('students')
-      .select(`*, course:courses(name), department:departments(name), sub_section:department_sub_sections(name)`)
+      .select(`*, course:courses(name), department:departments(name), sub_section:department_sub_sections(name), counsellor:profiles!students_assigned_counsellor_fkey(full_name)`)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
     setPendingStudents(data ?? [])
@@ -231,6 +235,23 @@ export function BackendListClient() {
       toast.error('Failed to approve student')
     } finally {
       setApprovingId(null)
+    }
+  }
+
+  async function rejectStudent() {
+    if (!rejectTarget) return
+    setRejecting(true)
+    try {
+      const { error } = await supabase.from('students').update({ status: 'dropped' } as never).eq('id', rejectTarget.id)
+      if (error) throw error
+      toast.success('Student rejected')
+      setPendingStudents(prev => prev.filter(s => s.id !== rejectTarget.id))
+      setRejectTarget(null)
+      setRejectReason('')
+    } catch {
+      toast.error('Failed to reject student')
+    } finally {
+      setRejecting(false)
     }
   }
 
@@ -498,43 +519,54 @@ export function BackendListClient() {
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Course</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Department</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Counselor</th>
                     <th className="text-right px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Total Fee</th>
                     <th className="text-right px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Paid</th>
-                    <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                     <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {pendingStudents.map((s: any) => (
                     <tr key={s.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{s.full_name}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{s.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{s.department?.name ?? '—'}</p>
+                      </td>
                       <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{s.phone}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{s.course?.name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{s.department?.name ?? '—'}</td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                          {s.counsellor?.full_name ?? '—'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-right text-slate-700 font-mono text-xs hidden md:table-cell">
                         {s.total_fee ? `₹${Number(s.total_fee).toLocaleString('en-IN')}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-green-700 font-mono text-xs hidden md:table-cell">
                         {s.amount_paid ? `₹${Number(s.amount_paid).toLocaleString('en-IN')}` : '₹0'}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">
-                          <Clock className="w-3 h-3" /> Pending
-                        </span>
-                      </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
-                          disabled={approvingId === s.id}
-                          onClick={() => approveStudent(s.id)}
-                        >
-                          {approvingId === s.id
-                            ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve</>
-                          }
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
+                            disabled={approvingId === s.id}
+                            onClick={() => approveStudent(s.id)}
+                          >
+                            {approvingId === s.id
+                              ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve</>
+                            }
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => { setRejectTarget(s); setRejectReason('') }}
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -748,6 +780,43 @@ export function BackendListClient() {
       />
 
       </> /* end students tab */}
+
+      {/* Reject Student Dialog */}
+      <Dialog open={!!rejectTarget} onOpenChange={open => !open && setRejectTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" /> Reject Student
+            </DialogTitle>
+          </DialogHeader>
+          {rejectTarget && (
+            <div className="space-y-4 mt-1">
+              <p className="text-sm text-slate-700">
+                Rejecting <span className="font-semibold">{rejectTarget.full_name}</span>
+                {rejectTarget.counsellor?.full_name && (
+                  <span className="text-muted-foreground"> — referred by <span className="text-blue-700 font-medium">{rejectTarget.counsellor.full_name}</span></span>
+                )}
+              </p>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">Reason (optional)</label>
+                <Textarea
+                  placeholder="e.g. Incomplete documents, duplicate entry…"
+                  rows={3}
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  className="resize-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setRejectTarget(null)}>Cancel</Button>
+                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={rejectStudent} disabled={rejecting}>
+                  {rejecting ? 'Rejecting…' : 'Confirm Reject'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

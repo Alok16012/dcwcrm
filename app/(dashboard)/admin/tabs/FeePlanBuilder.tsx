@@ -110,9 +110,9 @@ export function FeePlanBuilder() {
       ...prev,
       plans: {
         ...prev.plans,
-        basic: { ...prev.plans.basic, papers: prev.plans.basic.papers.map((p, i) => i === prev.plans.basic.papers.length - 1 ? { ...p, price: String(calc(data.basic_percent)) } : p) },
-        standard: { ...prev.plans.standard, papers: prev.plans.standard.papers.map((p, i) => i === prev.plans.standard.papers.length - 1 ? { ...p, price: String(calc(data.standard_percent)) } : p) },
-        premium: { ...prev.plans.premium, papers: prev.plans.premium.papers.map((p, i) => i === prev.plans.premium.papers.length - 1 ? { ...p, price: String(calc(data.premium_percent)) } : p) },
+        basic: { ...prev.plans.basic, papers: prev.plans.basic.papers.map(p => ({ ...p, price: String(calc(data.basic_percent)) })) },
+        standard: { ...prev.plans.standard, papers: prev.plans.standard.papers.map(p => ({ ...p, price: String(calc(data.standard_percent)) })) },
+        premium: { ...prev.plans.premium, papers: prev.plans.premium.papers.map(p => ({ ...p, price: String(calc(data.premium_percent)) })) },
       },
     }))
   }, [db])
@@ -180,7 +180,7 @@ export function FeePlanBuilder() {
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-blue-500">Select all 3 → auto-fills "3 Papers" price for each tier. Other rows enter manually.</p>
+            <p className="text-[10px] text-blue-500">Select all 3 → auto-fills price for all rows in each plan. Edit individual rows manually if needed.</p>
           </div>
 
           {/* Header */}

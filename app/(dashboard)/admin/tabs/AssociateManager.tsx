@@ -67,6 +67,7 @@ export function AssociateManager() {
   const [selected, setSelected] = useState<Associate | null>(null)
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
+  const [resettingPass, setResettingPass] = useState(false)
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false)
@@ -502,9 +503,38 @@ export function AssociateManager() {
               </div>
               {!credAssoc.temp_password && (
                 <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  Password not stored — this associate was approved before password storage was added, or password was reset externally.
+                  Password not stored — use Reset Password below to generate a new one.
                 </p>
               )}
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                disabled={resettingPass}
+                onClick={async () => {
+                  if (!confirm(`Reset password for ${credAssoc.name}? They will receive a notification with the new password.`)) return
+                  setResettingPass(true)
+                  try {
+                    const res = await fetch('/api/associates/reset-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ associate_id: credAssoc.id }),
+                    })
+                    const json = await res.json()
+                    if (!res.ok) throw new Error(json.error ?? 'Reset failed')
+                    const updated = { ...credAssoc, temp_password: json.password }
+                    setCredAssoc(updated)
+                    setAssociates(prev => prev.map(a => a.id === credAssoc.id ? updated : a))
+                    toast.success('Password reset! New password is now visible above.')
+                  } catch (e: any) {
+                    toast.error(e.message ?? 'Reset failed')
+                  } finally {
+                    setResettingPass(false)
+                  }
+                }}
+              >
+                <RefreshCw className={`w-4 h-4 ${resettingPass ? 'animate-spin' : ''}`} />
+                {resettingPass ? 'Resetting…' : 'Reset Password'}
+              </Button>
               <Button className="w-full" onClick={() => setCredOpen(false)}>Close</Button>
             </div>
           )}

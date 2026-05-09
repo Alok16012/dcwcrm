@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { IndianRupee, CheckCircle, Tag, Building2, BookOpen } from 'lucide-react'
+import { IndianRupee, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import type { Lead, LeadStatus } from '@/types/app.types'
+import type { Lead } from '@/types/app.types'
 
 interface ConvertLeadModalProps {
   open: boolean
@@ -51,43 +51,29 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
       const fee = totalFee ? parseFloat(totalFee) : null
       const paid = amountPaid ? parseFloat(amountPaid) : 0
 
-      const { error } = await supabase.from('leads').update({
-        status: 'converted' as LeadStatus,
-        total_fee: fee,
-        amount_paid: paid,
-        mode: mode || null,
-        department_id: departmentId || null,
-        sub_section_id: subSectionId || null,
-      } as never).eq('id', lead.id)
-
-      if (error) throw error
-
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // Record the payment in the payments table so it shows in Income
-      if (paid > 0) {
-        await supabase.from('payments').insert({
+      const res = await fetch('/api/leads/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           lead_id: lead.id,
-          amount: paid,
-          payment_mode: 'cash', // Default for conversion
-          payment_date: new Date().toISOString().split('T')[0],
-          notes: 'Initial payment during conversion',
-          recorded_by: user?.id,
-        } as never)
+          total_fee: fee,
+          amount_paid: paid,
+          mode: mode || null,
+          department_id: departmentId || null,
+          sub_section_id: subSectionId || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? 'Failed to convert')
       }
 
-      await supabase.from('lead_activities').insert({
-        lead_id: lead.id,
-        activity_type: 'converted',
-        performed_by: user?.id,
-        new_value: `Fee: ${fee}, Paid: ${paid}, Mode: ${mode}`
-      } as never)
-
-      toast.success('Lead converted to student!')
+      toast.success('Lead converted! Awaiting admin approval in New Students.')
       onSuccess()
-      router.push(`/backend`)
-    } catch (err) {
-      toast.error('Failed to convert lead')
+      router.push('/backend')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to convert lead')
     } finally {
       setLoading(false)
     }

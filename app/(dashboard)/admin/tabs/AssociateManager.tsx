@@ -284,10 +284,10 @@ export function AssociateManager() {
                   <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {a.status === 'approved' && a.temp_password && (
+                      {a.status === 'approved' && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={() => { setCredAssoc(a); setCredOpen(true) }}>
-                          <KeyRound className="w-3.5 h-3.5" /> Credentials
+                          <KeyRound className="w-3.5 h-3.5" /> ID & Pass
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
@@ -495,13 +495,17 @@ export function AssociateManager() {
           </DialogHeader>
           {credAssoc && (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Share these credentials with the associate so they can log in.</p>
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-                <CredRow label="Associate Code" value={credAssoc.associate_code ?? ''} />
+                <CredRow label="Associate Code (ID)" value={credAssoc.associate_code ?? '—'} />
                 <CredRow label="Login Email" value={credAssoc.email} />
-                <CredRow label="Password" value={credAssoc.temp_password ?? ''} />
+                <CredRow label="Password" value={credAssoc.temp_password ?? '—'} />
               </div>
-              <Button className="w-full" onClick={() => setCredOpen(false)}>Done</Button>
+              {!credAssoc.temp_password && (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  Password not stored — this associate was approved before password storage was added, or password was reset externally.
+                </p>
+              )}
+              <Button className="w-full" onClick={() => setCredOpen(false)}>Close</Button>
             </div>
           )}
         </DialogContent>

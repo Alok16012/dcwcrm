@@ -13,6 +13,7 @@ import { WalletManager } from './tabs/WalletManager'
 import { CrmSyncMonitor } from './tabs/CrmSyncMonitor'
 import { SystemSettings } from './tabs/SystemSettings'
 import { AssociateManager } from './tabs/AssociateManager'
+import { FeePlanBuilder } from './tabs/FeePlanBuilder'
 
 export function AdminPanelClient() {
   const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
@@ -56,6 +57,7 @@ export function AdminPanelClient() {
             <TabsTrigger value="wallet" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Wallet Manager</TabsTrigger>
             <TabsTrigger value="crm" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">CRM Sync</TabsTrigger>
             <TabsTrigger value="associates" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Associates</TabsTrigger>
+            <TabsTrigger value="feeplan" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Fee Plan PDF</TabsTrigger>
             <TabsTrigger value="settings" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">System Settings</TabsTrigger>
           </TabsList>
         </div>
@@ -83,6 +85,9 @@ export function AdminPanelClient() {
         </TabsContent>
         <TabsContent value="crm" className="mt-4">
           <CrmSyncMonitor students={students} />
+        </TabsContent>
+        <TabsContent value="feeplan" className="mt-4">
+          <FeePlanBuilder />
         </TabsContent>
         <TabsContent value="associates" className="mt-4">
           <AssociateManager />

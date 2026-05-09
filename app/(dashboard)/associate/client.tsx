@@ -41,6 +41,7 @@ export default function AssociateClient() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [txns, setTxns] = useState<WalletTxn[]>([])
   const [unread, setUnread] = useState(0)
+  const [pendingTasks, setPendingTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -52,15 +53,17 @@ export default function AssociateClient() {
     if (!assoc) { setLoading(false); return }
     setAssociate(assoc)
 
-    const [leadRes, txnRes, notifRes] = await Promise.all([
+    const [leadRes, txnRes, notifRes, taskRes] = await Promise.all([
       supabase.from('leads').select('id, full_name, status, created_at, course:courses(name), referred_by_associate').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }).limit(5),
       db.from('associate_wallet_txns').select('*').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
       db.from('associate_notifications').select('id').eq('associate_id', assoc.id).eq('is_read', false),
+      db.from('tasks').select('id,title,urgency,due_date,status').eq('assigned_to', user.id).neq('status', 'done').order('due_date').limit(4),
     ])
 
     setLeads((leadRes.data ?? []) as Lead[])
     setTxns((txnRes.data ?? []) as WalletTxn[])
     setUnread((notifRes.data ?? []).length)
+    setPendingTasks(taskRes.data ?? [])
     setLoading(false)
   }, [supabase, db])
 
@@ -174,6 +177,38 @@ export default function AssociateClient() {
           )}
         </div>
       </div>
+
+      {/* Pending Tasks widget */}
+      {pendingTasks.length > 0 && (
+        <div className="rounded-xl border bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gradient-to-r from-violet-50 to-blue-50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-violet-600" />
+              <p className="font-semibold text-slate-800 text-sm">Pending Tasks</p>
+              <span className="bg-violet-600 text-white text-[10px] rounded-full px-1.5 py-0.5">{pendingTasks.length}</span>
+            </div>
+            <Link href="/associate/tasks" className="text-xs text-violet-600 hover:underline">View all →</Link>
+          </div>
+          <div className="divide-y">
+            {pendingTasks.map((t: any) => {
+              const todayStr = new Date().toISOString().slice(0, 10)
+              const isToday = t.due_date === todayStr
+              const isOverdue = t.due_date < todayStr
+              return (
+                <div key={t.id} className={`px-4 py-2.5 flex items-center gap-3 ${isToday ? 'bg-amber-50' : isOverdue ? 'bg-red-50' : ''}`}>
+                  <div className={`w-1 h-5 rounded-full flex-shrink-0 ${t.urgency === 'urgent' ? 'bg-red-500' : t.urgency === 'high' ? 'bg-orange-400' : 'bg-blue-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
+                    <p className={`text-xs ${isToday ? 'text-amber-600 font-medium' : isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                      {isToday ? 'Due Today!' : isOverdue ? 'Overdue' : new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

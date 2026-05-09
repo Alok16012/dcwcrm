@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
+  ClipboardList, Clock, AlertTriangle, Zap, CheckCircle2, ChevronRight,
 } from 'lucide-react'
 
 interface FollowupLead {
@@ -112,6 +114,18 @@ export default function DashboardClient({
   departmentStats = [],
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'interested' | 'followups' | 'incentives' | 'departments'>('overview')
+  const [myTasks, setMyTasks] = useState<any[]>([])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      ;(supabase as any).from('tasks').select('id,title,urgency,due_date,status')
+        .eq('assigned_to', user.id).neq('status', 'done')
+        .order('due_date').limit(5)
+        .then(({ data }: any) => setMyTasks(data ?? []))
+    })
+  }, [])
 
   // Total interested count for badge
   const totalInterested = interestedStats.reduce((s, r) => s + r.interested_total, 0)
@@ -382,6 +396,48 @@ export default function DashboardClient({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── MY TASKS WIDGET ── */}
+      {myTasks.length > 0 && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b bg-gradient-to-r from-violet-50 to-blue-50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-violet-600" />
+              <h3 className="font-semibold text-slate-800">My Pending Tasks</h3>
+              <span className="bg-violet-600 text-white text-[10px] rounded-full px-2 py-0.5 font-medium">{myTasks.length}</span>
+            </div>
+            <Link href="/tasks" className="text-xs text-violet-600 hover:underline flex items-center gap-0.5">
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="divide-y">
+            {myTasks.map((t: any) => {
+              const todayStr = new Date().toISOString().slice(0, 10)
+              const isToday = t.due_date === todayStr
+              const isOverdue = t.due_date < todayStr
+              const urgColor = t.urgency === 'urgent' ? 'bg-red-500' : t.urgency === 'high' ? 'bg-orange-400' : t.urgency === 'medium' ? 'bg-blue-400' : 'bg-slate-300'
+              const urgIcon = t.urgency === 'urgent' ? <Zap className="w-3 h-3 text-red-600" /> : t.urgency === 'high' ? <AlertTriangle className="w-3 h-3 text-orange-500" /> : <Clock className="w-3 h-3 text-blue-500" />
+              return (
+                <div key={t.id} className={`px-5 py-3 flex items-center gap-3 ${isToday ? 'bg-amber-50' : isOverdue ? 'bg-red-50' : ''}`}>
+                  <div className={`w-1.5 h-6 rounded-full flex-shrink-0 ${urgColor}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
+                    <p className={`text-xs ${isToday ? 'text-amber-600 font-medium' : isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                      {isToday ? 'Due Today' : isOverdue ? `Overdue: ${new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-400">{urgIcon}</div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="px-5 py-2.5 border-t bg-slate-50">
+            <Link href="/tasks" className="text-xs text-violet-600 hover:underline font-medium flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Go to Tasks page to mark done
+            </Link>
+          </div>
         </div>
       )}
     </div>

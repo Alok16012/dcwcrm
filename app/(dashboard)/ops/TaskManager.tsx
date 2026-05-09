@@ -153,6 +153,16 @@ export default function TaskManager() {
     }
     const { data, error } = await db.from('tasks').insert(payload).select().single()
     if (error) { toast.error('Failed to create task'); setSaving(false); return }
+
+    // Notify associate if task assigned to one
+    if (assignee.type === 'associate') {
+      await db.from('associate_notifications').insert({
+        associate_id: assignee.id,
+        title: `New Task: ${form.title.trim()}`,
+        message: `Due: ${new Date(form.due_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}. Assigned by ${meName}.`,
+      })
+    }
+
     toast.success('Task created')
     setTasks(prev => [data as Task, ...prev].sort((a, b) => a.due_date.localeCompare(b.due_date)))
     setForm({ title: '', description: '', urgency: 'medium', assigned_to: '', due_date: '', reminder_date: '' })

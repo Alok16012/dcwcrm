@@ -215,7 +215,14 @@ export default function FeePlanDocument({ state, onDone }: { state: FeeState; on
   async function download() {
     setLoading(true)
     try {
-      const logoUrl = window.location.origin + '/brand-logo.png'
+      // Convert logo to base64 so react-pdf doesn't need to fetch a URL
+      const imgRes = await fetch('/brand-logo.png')
+      const imgBlob = await imgRes.blob()
+      const logoUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(imgBlob)
+      })
       const blob = await pdf(<FeePDF state={state} logoUrl={logoUrl} />).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

@@ -44,7 +44,7 @@ const DEFAULT: FeeState = {
   website: 'distancecourseswala.in',
   ctaTitle: 'Admission Open Now',
   ctaSubtitle: 'Limited Time — Seats Filling Fast',
-  address: 'New Delhi, India',
+  address: 'Patna, Bihar',
   phone: '+91 98765 43210',
   terms: [
     'Fees are non-refundable (except guaranteed refund cases)',

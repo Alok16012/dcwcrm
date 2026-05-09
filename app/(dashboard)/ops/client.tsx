@@ -10,8 +10,9 @@ import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, Clock, Eye, RefreshCw,
   Copy, UserCheck, Wallet, Bell, Send, IndianRupee,
-  Plus, Pencil, Trash2, Download,
+  Plus, Pencil, Trash2, Download, FileText,
 } from 'lucide-react'
+import { FeePlanBuilder } from '../admin/tabs/FeePlanBuilder'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -374,6 +375,9 @@ export default function OpsClient() {
           <TabsTrigger value="fees" className="gap-1.5 text-xs sm:text-sm" onClick={loadFees}>
             <IndianRupee className="w-4 h-4" /> Fee Management
           </TabsTrigger>
+          <TabsTrigger value="feeplan" className="gap-1.5 text-xs sm:text-sm">
+            <FileText className="w-4 h-4" /> Fee Plan PDF
+          </TabsTrigger>
         </TabsList>
 
         {/* ══ ASSOCIATE APPROVALS ══ */}
@@ -572,6 +576,11 @@ export default function OpsClient() {
             )}
           </div>
         </TabsContent>
+        {/* ══ FEE PLAN PDF ══ */}
+        <TabsContent value="feeplan" className="space-y-4">
+          <FeePlanBuilder />
+        </TabsContent>
+
         {/* ══ FEE MANAGEMENT ══ */}
         <TabsContent value="fees" className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">

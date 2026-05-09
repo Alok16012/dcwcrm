@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileDown, Loader2 } from 'lucide-react'
 import {
-  Document, Page, Text, View, StyleSheet, pdf, Font,
+  Document, Page, Text, View, StyleSheet, pdf, Font, Image,
 } from '@react-pdf/renderer'
 
 // ── Shared type (keep in sync with FeePlanBuilder) ──────────────
@@ -23,8 +23,7 @@ const s = StyleSheet.create({
   page: { backgroundColor: '#0f172a', padding: 28, fontFamily: 'Helvetica' },
   row: { flexDirection: 'row' },
   // Header
-  logo: { width: 32, height: 32, backgroundColor: '#2563eb', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#fff', fontSize: 10, fontFamily: 'Helvetica-Bold' },
+  logo: { width: 36, height: 36, borderRadius: 6 },
   brandName: { color: '#ffffff', fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 1 },
   brandBlue: { color: '#60a5fa' },
   brandSub: { color: '#94a3b8', fontSize: 7 },
@@ -95,14 +94,14 @@ function PlanCard({ planKey, plan }: { planKey: string; plan: PlanConfig }) {
   )
 }
 
-function FeePDF({ state }: { state: FeeState }) {
+function FeePDF({ state, logoUrl }: { state: FeeState; logoUrl: string }) {
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={s.page}>
         {/* Header */}
         <View style={[s.row, { alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }]}>
           <View style={[s.row, { alignItems: 'center', gap: 10 }]}>
-            <View style={s.logo}><Text style={s.logoText}>DCW</Text></View>
+            <Image src={logoUrl} style={s.logo} />
             <View>
               <Text style={s.brandName}>
                 <Text style={s.brandBlue}>Distance</Text> Courses Wala
@@ -158,7 +157,8 @@ export default function FeePlanDocument({ state, onDone }: { state: FeeState; on
   async function download() {
     setLoading(true)
     try {
-      const blob = await pdf(<FeePDF state={state} />).toBlob()
+      const logoUrl = window.location.origin + '/brand-logo.png'
+      const blob = await pdf(<FeePDF state={state} logoUrl={logoUrl} />).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

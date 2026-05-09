@@ -280,7 +280,7 @@ export function FeePlanBuilder() {
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 8, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 14 }}>DCW</div>
+                <img src="/brand-logo.png" alt="DCW" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
                 <div>
                   <div style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>
                     <span style={{ color: '#60a5fa' }}>Distance</span> Courses Wala

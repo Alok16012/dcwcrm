@@ -6,7 +6,7 @@ import {
   UserCheck, BarChart3, Settings, ChevronLeft,
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
-  Wallet, Package, Bell, User, IndianRupee, ShieldCheck,
+  Wallet, Package, Bell, User, IndianRupee,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -42,7 +42,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['admin', 'backend', 'lead', 'counselor', 'associate'] },
   { label: 'OPS', href: '/ops', icon: Briefcase, roles: ['admin', 'backend'] },
-  { label: 'Admin Panel', href: '/admin', icon: ShieldCheck, roles: ['admin'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items kept at the end
   { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },

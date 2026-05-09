@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
-  ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2,
+  ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
@@ -26,6 +26,10 @@ interface Associate {
   aadhar_doc_url: string | null
   pan_doc_url: string | null
   cheque_doc_url: string | null
+  state: string | null
+  district: string | null
+  institution_name: string | null
+  institution_address: string | null
   current_address: string | null
   current_city: string | null
   current_state: string | null
@@ -54,6 +58,10 @@ export function AssociateManager() {
   const [createOpen, setCreateOpen] = useState(false)
   const [associates, setAssociates] = useState<Associate[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filterState, setFilterState] = useState('')
+  const [filterDistrict, setFilterDistrict] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [detailOpen, setDetailOpen] = useState(false)
   const [selected, setSelected] = useState<Associate | null>(null)
   const [credOpen, setCredOpen] = useState(false)
@@ -95,6 +103,8 @@ export function AssociateManager() {
     setEditForm({
       name: a.name, phone: a.phone, father_phone: a.father_phone ?? '',
       email: a.email, aadhar_number: a.aadhar_number ?? '', pan_number: a.pan_number ?? '',
+      state: a.state ?? '', district: a.district ?? '',
+      institution_name: a.institution_name ?? '', institution_address: a.institution_address ?? '',
       current_address: a.current_address ?? '', current_city: a.current_city ?? '',
       current_state: a.current_state ?? '', current_pincode: a.current_pincode ?? '',
       same_as_current: a.same_as_current,
@@ -133,6 +143,25 @@ export function AssociateManager() {
     } finally { setDeleting(false) }
   }
 
+  const allStates = [...new Set(associates.map(a => a.state).filter(Boolean))].sort() as string[]
+  const allDistricts = [...new Set(
+    associates.filter(a => !filterState || a.state === filterState).map(a => a.district).filter(Boolean)
+  )].sort() as string[]
+
+  const filtered = associates.filter(a => {
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      a.name.toLowerCase().includes(q) ||
+      a.phone.includes(q) ||
+      a.email.toLowerCase().includes(q) ||
+      (a.institution_name ?? '').toLowerCase().includes(q) ||
+      (a.district ?? '').toLowerCase().includes(q)
+    return matchSearch &&
+      (!filterState || a.state === filterState) &&
+      (!filterDistrict || a.district === filterDistrict) &&
+      (!filterStatus || a.status === filterStatus)
+  })
+
   const statusBadge = (s: AssociateStatus) => {
     if (s === 'approved') return <Badge className="bg-green-100 text-green-800 border-0 gap-1"><CheckCircle2 className="w-3 h-3" />Approved</Badge>
     if (s === 'rejected') return <Badge className="bg-red-100 text-red-800 border-0 gap-1"><XCircle className="w-3 h-3" />Rejected</Badge>
@@ -144,6 +173,16 @@ export function AssociateManager() {
 
   const ef = (k: keyof typeof editForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setEditForm(p => ({ ...p, [k]: e.target.value }))
+
+  const INDIA_STATES = [
+    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
+    'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
+    'Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab',
+    'Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
+    'Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh',
+    'Dadra & Nagar Haveli and Daman & Diu','Delhi','Jammu and Kashmir',
+    'Ladakh','Lakshadweep','Puducherry',
+  ]
 
   return (
     <div className="space-y-4">
@@ -172,6 +211,36 @@ export function AssociateManager() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white border rounded-xl p-3 flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-44">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, phone, institution…"
+            className="w-full pl-8 pr-3 h-8 text-xs border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="border rounded-lg px-2 h-8 text-xs bg-white min-w-28">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select value={filterState} onChange={e => { setFilterState(e.target.value); setFilterDistrict('') }}
+          className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32">
+          <option value="">All States</option>
+          {allStates.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterDistrict} onChange={e => setFilterDistrict(e.target.value)}
+          className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32">
+          <option value="">All Districts</option>
+          {allDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        {(search || filterState || filterDistrict || filterStatus) && (
+          <button onClick={() => { setSearch(''); setFilterState(''); setFilterDistrict(''); setFilterStatus('') }}
+            className="text-xs text-blue-600 hover:underline px-1">Clear</button>
+        )}
+      </div>
+
       {loading ? (
         <div className="text-center py-16 text-muted-foreground text-sm">Loading…</div>
       ) : associates.length === 0 ? (
@@ -187,20 +256,29 @@ export function AssociateManager() {
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Email</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Code</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">State / District</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Institution</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {associates.map(a => (
+              {filtered.map(a => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{a.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {a.name}
+                    {a.associate_code && <span className="ml-1.5 text-[10px] font-mono text-slate-400">{a.associate_code}</span>}
+                  </td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{a.phone}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{a.email}</td>
-                  <td className="px-4 py-3 text-slate-500 font-mono text-xs hidden lg:table-cell">
-                    {a.associate_code ?? '—'}
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {a.state ? <p className="text-xs font-medium text-slate-700">{a.state}</p> : null}
+                    {a.district ? <p className="text-[11px] text-slate-400">{a.district}</p> : null}
+                    {!a.state && !a.district && <span className="text-slate-400 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    {a.institution_name
+                      ? <p className="text-xs text-slate-700 truncate max-w-36">{a.institution_name}</p>
+                      : <span className="text-slate-400 text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
                   <td className="px-4 py-3 text-right">
@@ -233,6 +311,9 @@ export function AssociateManager() {
               ))}
             </tbody>
           </table>
+          <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">
+            Showing {filtered.length} of {associates.length} associates
+          </div>
         </div>
       )}
 
@@ -253,6 +334,15 @@ export function AssociateManager() {
               <Detail label="Email" value={selected.email} />
               <Detail label="Aadhaar Number" value={selected.aadhar_number} />
               <Detail label="PAN Number" value={selected.pan_number} />
+              <Detail label="State" value={selected.state} />
+              <Detail label="District" value={selected.district} />
+              {(selected.institution_name || selected.institution_address) && (
+                <>
+                  <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Institution</div>
+                  <Detail label="Institution Name" value={selected.institution_name} />
+                  <Detail label="Institution Address" value={selected.institution_address} />
+                </>
+              )}
               <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Current Address</div>
               <Detail label="Address" value={selected.current_address} />
               <Detail label="City" value={selected.current_city} />
@@ -307,6 +397,20 @@ export function AssociateManager() {
                 <F label="Email"><Input type="email" value={editForm.email ?? ''} onChange={ef('email')} /></F>
                 <F label="Aadhaar Number"><Input value={editForm.aadhar_number ?? ''} onChange={ef('aadhar_number')} /></F>
                 <F label="PAN Number"><Input value={editForm.pan_number ?? ''} onChange={ef('pan_number')} className="uppercase" /></F>
+                <F label="State">
+                  <select value={editForm.state ?? ''} onChange={e => setEditForm(p => ({ ...p, state: e.target.value }))}
+                    className="w-full border rounded-md px-3 h-10 text-sm bg-white focus:ring-2 focus:ring-ring focus:outline-none">
+                    <option value="">Select state…</option>
+                    {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </F>
+                <F label="District"><Input value={editForm.district ?? ''} onChange={ef('district')} placeholder="e.g. Jaipur" /></F>
+              </div>
+            </Sec>
+            <Sec title="Institution Details">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <F label="Institution Name"><Input value={editForm.institution_name ?? ''} onChange={ef('institution_name')} /></F>
+                <F label="Institution Address"><Input value={editForm.institution_address ?? ''} onChange={ef('institution_address')} /></F>
               </div>
             </Sec>
             <Sec title="Current Address">

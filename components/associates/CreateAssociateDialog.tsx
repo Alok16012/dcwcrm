@@ -8,9 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import { UserPlus, Upload, FileCheck2, X } from 'lucide-react'
 
+const INDIA_STATES = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
+  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
+  'Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab',
+  'Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
+  'Uttarakhand','West Bengal',
+  'Andaman and Nicobar Islands','Chandigarh','Dadra & Nagar Haveli and Daman & Diu',
+  'Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry',
+]
+
 const EMPTY = {
   name: '', phone: '', father_phone: '', email: '',
   aadhar_number: '', pan_number: '',
+  state: '', district: '',
+  institution_name: '', institution_address: '',
   current_address: '', current_city: '', current_state: '', current_pincode: '',
   same_as_current: false,
   permanent_address: '', permanent_city: '', permanent_state: '', permanent_pincode: '',
@@ -127,6 +139,22 @@ export function CreateAssociateDialog({ open, onOpenChange, onSuccess }: Props) 
               <F label="Email *"><Input type="email" placeholder="email@example.com" value={form.email} onChange={e => set('email', e.target.value)} required /></F>
               <F label="Aadhaar Number"><Input placeholder="XXXX XXXX XXXX" value={form.aadhar_number} onChange={e => set('aadhar_number', e.target.value)} /></F>
               <F label="PAN Number"><Input placeholder="ABCDE1234F" value={form.pan_number} onChange={e => set('pan_number', e.target.value)} className="uppercase" /></F>
+              <F label="State">
+                <select value={form.state} onChange={e => set('state', e.target.value)}
+                  className="w-full border rounded-md px-3 h-10 text-sm bg-white text-gray-900 focus:ring-2 focus:ring-ring focus:outline-none">
+                  <option value="">Select state…</option>
+                  {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </F>
+              <F label="District"><Input placeholder="e.g. Jaipur" value={form.district} onChange={e => set('district', e.target.value)} /></F>
+            </div>
+          </Sec>
+
+          {/* Institution */}
+          <Sec title="Institution Details">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <F label="Institution Name"><Input placeholder="e.g. ABC College" value={form.institution_name} onChange={e => set('institution_name', e.target.value)} /></F>
+              <F label="Institution Address"><Input placeholder="Full address of institution" value={form.institution_address} onChange={e => set('institution_address', e.target.value)} /></F>
             </div>
           </Sec>
 
@@ -171,24 +199,15 @@ export function CreateAssociateDialog({ open, onOpenChange, onSuccess }: Props) 
           <Sec title="Documents">
             <p className="text-xs text-slate-500 -mt-1 mb-1">Upload scanned copies or photos (JPG, PNG, PDF)</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <DocUpload
-                label="Aadhaar Card"
-                file={docs.aadhar}
+              <DocUpload label="Aadhaar Card" file={docs.aadhar}
                 onSelect={f => setDocs(d => ({ ...d, aadhar: f }))}
-                onClear={() => setDocs(d => ({ ...d, aadhar: null }))}
-              />
-              <DocUpload
-                label="PAN Card"
-                file={docs.pan}
+                onClear={() => setDocs(d => ({ ...d, aadhar: null }))} />
+              <DocUpload label="PAN Card" file={docs.pan}
                 onSelect={f => setDocs(d => ({ ...d, pan: f }))}
-                onClear={() => setDocs(d => ({ ...d, pan: null }))}
-              />
-              <DocUpload
-                label="Cancelled Cheque"
-                file={docs.cheque}
+                onClear={() => setDocs(d => ({ ...d, pan: null }))} />
+              <DocUpload label="Cancelled Cheque" file={docs.cheque}
                 onSelect={f => setDocs(d => ({ ...d, cheque: f }))}
-                onClear={() => setDocs(d => ({ ...d, cheque: null }))}
-              />
+                onClear={() => setDocs(d => ({ ...d, cheque: null }))} />
             </div>
           </Sec>
 
@@ -208,22 +227,14 @@ export function CreateAssociateDialog({ open, onOpenChange, onSuccess }: Props) 
 }
 
 function DocUpload({ label, file, onSelect, onClear }: {
-  label: string
-  file: File | null
-  onSelect: (f: File) => void
-  onClear: () => void
+  label: string; file: File | null; onSelect: (f: File) => void; onClear: () => void
 }) {
   const ref = useRef<HTMLInputElement>(null)
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-slate-600">{label}</Label>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onSelect(f) }}
-      />
+      <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) onSelect(f) }} />
       {file ? (
         <div className="flex items-center gap-2 border border-green-300 bg-green-50 rounded-lg px-3 py-2.5 text-sm">
           <FileCheck2 className="w-4 h-4 text-green-600 flex-shrink-0" />
@@ -233,11 +244,8 @@ function DocUpload({ label, file, onSelect, onClear }: {
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          className="w-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 rounded-lg py-4 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-        >
+        <button type="button" onClick={() => ref.current?.click()}
+          className="w-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 rounded-lg py-4 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
           <Upload className="w-5 h-5" />
           <span className="text-xs font-medium">Click to upload</span>
         </button>

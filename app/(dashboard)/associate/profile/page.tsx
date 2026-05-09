@@ -27,6 +27,10 @@ interface Associate {
   account_holder_name: string | null
   coordinator_name: string | null
   coordinator_id: string | null
+  state: string | null
+  district: string | null
+  institution_name: string | null
+  institution_address: string | null
 }
 
 export default function AssociateProfilePage() {
@@ -71,8 +75,17 @@ export default function AssociateProfilePage() {
         <Row label="Associate Code" value={associate.associate_code} copyable />
         <Row label="Aadhaar Number" value={associate.aadhar_number} masked />
         <Row label="PAN Number" value={associate.pan_number} />
+        <Row label="State" value={associate.state} />
+        <Row label="District" value={associate.district} />
         <Row label="Coordinator Name" value={associate.coordinator_name} />
       </Section>
+
+      {(associate.institution_name || associate.institution_address) && (
+        <Section title="Institution">
+          <Row label="Institution Name" value={associate.institution_name} />
+          <Row label="Institution Address" value={associate.institution_address} />
+        </Section>
+      )}
 
       <Section title="Current Address">
         <Row label="Address" value={associate.current_address} />

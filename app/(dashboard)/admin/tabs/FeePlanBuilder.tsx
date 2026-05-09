@@ -53,19 +53,19 @@ const DEFAULT: FeeState = {
     basic: {
       name: 'Basic Plan', icon: '📋', tagline: 'Best for budget students — pass focus',
       featuresLabel: 'INCLUDED', highlighted: false, guarantee: '',
-      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }],
+      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }, { label: 'Full Subject', price: '' }],
       features: ['Confirm Admission', 'WhatsApp Updates', 'Call Updates'],
     },
     standard: {
       name: 'Standard Plan', icon: '🎯', tagline: 'Best for proper guidance & safe results',
       featuresLabel: 'INCLUDED', highlighted: true, guarantee: '3 chance guarantee — else full refund',
-      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }],
+      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }, { label: 'Full Subject', price: '' }],
       features: ['Confirm Admission', 'WhatsApp Updates', 'Call Updates by Mentor', 'Dedicated Mentor Support', 'Practical Support', 'Assignment Support', 'Exam Support', 'College Admission Support', 'Assured Result', 'Document Dispatch'],
     },
     premium: {
       name: 'Premium Plan', icon: '👑', tagline: 'Complete support — everything by DCW',
       featuresLabel: 'EVERYTHING IN STANDARD, PLUS', highlighted: false, guarantee: '3 chance guarantee — else full refund',
-      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }],
+      papers: [{ label: '1 Paper', price: '' }, { label: '2 Papers', price: '' }, { label: '3 Papers', price: '' }, { label: 'Full Subject', price: '' }],
       features: ['Confirm Admission', 'WhatsApp Updates', 'Call Updates by Mentor', 'Dedicated Mentor Support', 'Practical Support by DCW', 'Assignment Support by DCW', 'Exam Support by DCW', 'College Admission Support', 'Assured Result', 'Document Dispatch'],
     },
   },
@@ -110,9 +110,9 @@ export function FeePlanBuilder() {
       ...prev,
       plans: {
         ...prev.plans,
-        basic: { ...prev.plans.basic, papers: prev.plans.basic.papers.map(p => ({ ...p, price: String(calc(data.basic_percent)) })) },
-        standard: { ...prev.plans.standard, papers: prev.plans.standard.papers.map(p => ({ ...p, price: String(calc(data.standard_percent)) })) },
-        premium: { ...prev.plans.premium, papers: prev.plans.premium.papers.map(p => ({ ...p, price: String(calc(data.premium_percent)) })) },
+        basic: { ...prev.plans.basic, papers: prev.plans.basic.papers.map((p, i, arr) => i === arr.length - 1 ? { ...p, price: String(calc(data.basic_percent)) } : p) },
+        standard: { ...prev.plans.standard, papers: prev.plans.standard.papers.map((p, i, arr) => i === arr.length - 1 ? { ...p, price: String(calc(data.standard_percent)) } : p) },
+        premium: { ...prev.plans.premium, papers: prev.plans.premium.papers.map((p, i, arr) => i === arr.length - 1 ? { ...p, price: String(calc(data.premium_percent)) } : p) },
       },
     }))
   }, [db])
@@ -180,7 +180,7 @@ export function FeePlanBuilder() {
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-blue-500">Select all 3 → auto-fills price for all rows in each plan. Edit individual rows manually if needed.</p>
+            <p className="text-[10px] text-blue-500">Select all 3 → auto-fills "Full Subject" price per tier. 1/2/3 Paper rows stay manual.</p>
           </div>
 
           {/* Header */}

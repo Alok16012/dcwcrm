@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useTransition, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -93,6 +93,10 @@ export function BackendListClient() {
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [activeTab, setActiveTab] = useState<'students' | 'pending'>('students')
+  const [pendingStudents, setPendingStudents] = useState<any[]>([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
   const tabScrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -125,6 +129,7 @@ export function BackendListClient() {
         .from('students')
         .select('sub_section_id')
         .neq('status', 'dropped')
+        .neq('status', 'pending')
       const counts: Record<string, number> = {}
       ;(countData ?? []).forEach((s: any) => {
         if (s.sub_section_id) counts[s.sub_section_id] = (counts[s.sub_section_id] ?? 0) + 1
@@ -166,7 +171,7 @@ export function BackendListClient() {
 
       if (search) query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
       if (statusFilter) query = query.eq('status', statusFilter)
-      else query = query.neq('status', 'dropped')
+      else query = query.neq('status', 'dropped').neq('status', 'pending')
       if (courseFilter) query = query.eq('course_id', courseFilter)
       if (sessionFilter) query = query.eq('session_id', sessionFilter)
       if (counsellorFilter) query = query.eq('assigned_counsellor', counsellorFilter)
@@ -203,6 +208,31 @@ export function BackendListClient() {
       return true
     })
   }, [allBoards, departmentFilter])
+
+  const loadPending = useCallback(async () => {
+    setPendingLoading(true)
+    const { data } = await (supabase as any)
+      .from('students')
+      .select(`*, course:courses(name), department:departments(name), sub_section:department_sub_sections(name)`)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    setPendingStudents(data ?? [])
+    setPendingLoading(false)
+  }, [supabase])
+
+  async function approveStudent(id: string) {
+    setApprovingId(id)
+    try {
+      const { error } = await supabase.from('students').update({ status: 'active' } as never).eq('id', id)
+      if (error) throw error
+      toast.success('Student approved and activated')
+      setPendingStudents(prev => prev.filter(s => s.id !== id))
+    } catch {
+      toast.error('Failed to approve student')
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   async function handleDeleteStudent(id: string) {
     try {
@@ -254,6 +284,12 @@ export function BackendListClient() {
     const timer = setTimeout(fetchStudents, 300)
     return () => clearTimeout(timer)
   }, [fetchStudents])
+
+  // Always load pending count on mount for badge; reload when switching to tab
+  useEffect(() => { loadPending() }, [loadPending])
+  useEffect(() => {
+    if (activeTab === 'pending') loadPending()
+  }, [activeTab, loadPending])
 
   const columns: ColumnDef<Student>[] = [
     {
@@ -413,6 +449,107 @@ export function BackendListClient() {
           </div>
         )}
       />
+
+      {/* Main tab switcher: Students vs Pending Approvals */}
+      <div className="flex gap-2 border-b border-slate-200 pb-0">
+        <button
+          onClick={() => setActiveTab('students')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === 'students'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <FileText className="w-4 h-4" /> All Students
+        </button>
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === 'pending'
+              ? 'border-amber-500 text-amber-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <UserPlus className="w-4 h-4" /> New Students
+          {pendingStudents.length > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {pendingStudents.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── PENDING APPROVALS TAB ── */}
+      {activeTab === 'pending' && (
+        <div className="space-y-3">
+          {pendingLoading ? (
+            <div className="text-center py-16 text-muted-foreground text-sm">Loading…</div>
+          ) : pendingStudents.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <UserPlus className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No pending students</p>
+              <p className="text-xs mt-1">Converted leads will appear here for approval</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-amber-50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Course</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Department</th>
+                    <th className="text-right px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Total Fee</th>
+                    <th className="text-right px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Paid</th>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
+                    <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pendingStudents.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{s.full_name}</td>
+                      <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{s.phone}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{s.course?.name ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{s.department?.name ?? '—'}</td>
+                      <td className="px-4 py-3 text-right text-slate-700 font-mono text-xs hidden md:table-cell">
+                        {s.total_fee ? `₹${Number(s.total_fee).toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-700 font-mono text-xs hidden md:table-cell">
+                        {s.amount_paid ? `₹${Number(s.amount_paid).toLocaleString('en-IN')}` : '₹0'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                          <Clock className="w-3 h-3" /> Pending
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
+                          disabled={approvingId === s.id}
+                          onClick={() => approveStudent(s.id)}
+                        >
+                          {approvingId === s.id
+                            ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve</>
+                          }
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="px-4 py-2 border-t bg-amber-50/50 text-xs text-amber-700">
+                {pendingStudents.length} student{pendingStudents.length !== 1 ? 's' : ''} awaiting approval
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── STUDENTS TAB ── */}
+      {activeTab === 'students' && <>
 
       {/* Premium Board Tabs */}
       <div className="flex items-center gap-2">
@@ -609,6 +746,8 @@ export function BackendListClient() {
         onConfirm={() => deleteStudent && handleDeleteStudent(deleteStudent.id)}
         destructive
       />
+
+      </> /* end students tab */}
     </div>
   )
 }

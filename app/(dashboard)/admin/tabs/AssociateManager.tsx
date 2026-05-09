@@ -496,9 +496,9 @@ export function AssociateManager() {
           {credAssoc && (
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-                <CredRow label="Associate Code (ID)" value={credAssoc.associate_code ?? '—'} />
+                <CredRow label="Associate Code (ID)" value={credAssoc.associate_code ?? ''} />
                 <CredRow label="Login Email" value={credAssoc.email} />
-                <CredRow label="Password" value={credAssoc.temp_password ?? '—'} />
+                <CredRow label="Password" value={credAssoc.temp_password ?? ''} />
               </div>
               {!credAssoc.temp_password && (
                 <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">

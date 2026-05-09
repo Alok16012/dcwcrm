@@ -58,9 +58,9 @@ interface FeeRow {
 }
 const EMPTY_FEE = {
   department_id: '', course_id: '', session_id: '',
-  actual_fee: '', basic_percent: '70', standard_percent: '85', premium_percent: '100', notes: '',
+  actual_fee: '', basic_percent: '10', standard_percent: '20', premium_percent: '30', notes: '',
 }
-const calcFee = (actual: number, pct: number) => Math.round(actual * pct / 100)
+const calcFee = (actual: number, pct: number) => Math.round(actual + (actual * pct / 100))
 const fmtINR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
 export default function OpsClient() {
@@ -843,7 +843,7 @@ export default function OpsClient() {
 
             {/* Tier percentages */}
             <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tier Percentages (% of actual fee)</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tier Markup (% added on top of actual fee)</p>
               <div className="grid grid-cols-3 gap-3">
                 {(['basic', 'standard', 'premium'] as const).map(tier => {
                   const key = `${tier}_percent` as keyof typeof feeForm

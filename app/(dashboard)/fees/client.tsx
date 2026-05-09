@@ -21,7 +21,7 @@ interface FeeRow {
 }
 
 function calcFee(actual: number, pct: number) {
-  return Math.round(actual * pct / 100)
+  return Math.round(actual + (actual * pct / 100))
 }
 
 const fmt = (n: number) =>

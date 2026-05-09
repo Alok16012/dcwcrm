@@ -12,7 +12,12 @@ import {
   Copy, UserCheck, Wallet, Bell, Send, IndianRupee,
   Plus, Pencil, Trash2, Download, FileText,
 } from 'lucide-react'
-import { FeePlanBuilder } from '../admin/tabs/FeePlanBuilder'
+import dynamic from 'next/dynamic'
+
+const FeePlanBuilder = dynamic(
+  () => import('../admin/tabs/FeePlanBuilder').then(m => ({ default: m.FeePlanBuilder })),
+  { ssr: false }
+)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/shared/PageHeader'

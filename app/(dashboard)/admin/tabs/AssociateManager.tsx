@@ -28,6 +28,7 @@ interface Associate {
   cheque_doc_url: string | null
   state: string | null
   district: string | null
+  city: string | null
   institution_name: string | null
   institution_address: string | null
   current_address: string | null
@@ -103,7 +104,7 @@ export function AssociateManager() {
     setEditForm({
       name: a.name, phone: a.phone, father_phone: a.father_phone ?? '',
       email: a.email, aadhar_number: a.aadhar_number ?? '', pan_number: a.pan_number ?? '',
-      state: a.state ?? '', district: a.district ?? '',
+      state: a.state ?? '', district: a.district ?? '', city: a.city ?? '',
       institution_name: a.institution_name ?? '', institution_address: a.institution_address ?? '',
       current_address: a.current_address ?? '', current_city: a.current_city ?? '',
       current_state: a.current_state ?? '', current_pincode: a.current_pincode ?? '',
@@ -336,6 +337,7 @@ export function AssociateManager() {
               <Detail label="PAN Number" value={selected.pan_number} />
               <Detail label="State" value={selected.state} />
               <Detail label="District" value={selected.district} />
+              <Detail label="City" value={selected.city} />
               {(selected.institution_name || selected.institution_address) && (
                 <>
                   <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Institution</div>
@@ -405,6 +407,7 @@ export function AssociateManager() {
                   </select>
                 </F>
                 <F label="District"><Input value={editForm.district ?? ''} onChange={ef('district')} placeholder="e.g. Jaipur" /></F>
+                <F label="City"><Input value={editForm.city ?? ''} onChange={ef('city')} placeholder="e.g. Jaipur" /></F>
               </div>
             </Sec>
             <Sec title="Institution Details">

@@ -21,7 +21,7 @@ const INDIA_STATES = [
 const EMPTY = {
   name: '', phone: '', father_phone: '', email: '',
   aadhar_number: '', pan_number: '',
-  state: '', district: '',
+  state: '', district: '', city: '',
   institution_name: '', institution_address: '',
   current_address: '', current_city: '', current_state: '', current_pincode: '',
   same_as_current: false,
@@ -147,6 +147,7 @@ export function CreateAssociateDialog({ open, onOpenChange, onSuccess }: Props) 
                 </select>
               </F>
               <F label="District"><Input placeholder="e.g. Jaipur" value={form.district} onChange={e => set('district', e.target.value)} /></F>
+              <F label="City"><Input placeholder="e.g. Jaipur" value={form.city} onChange={e => set('city', e.target.value)} /></F>
             </div>
           </Sec>
 

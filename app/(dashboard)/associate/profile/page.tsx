@@ -29,6 +29,7 @@ interface Associate {
   coordinator_id: string | null
   state: string | null
   district: string | null
+  city: string | null
   institution_name: string | null
   institution_address: string | null
 }
@@ -77,6 +78,7 @@ export default function AssociateProfilePage() {
         <Row label="PAN Number" value={associate.pan_number} />
         <Row label="State" value={associate.state} />
         <Row label="District" value={associate.district} />
+        <Row label="City" value={associate.city} />
         <Row label="Coordinator Name" value={associate.coordinator_name} />
       </Section>
 

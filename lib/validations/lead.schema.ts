@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const leadSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
-  phone: z.string().min(10, 'Valid phone required'),
+  phone: z.string().regex(/^\d{10}$/, 'Enter exactly 10-digit mobile number'),
   email: z.string().email().optional().or(z.literal('')),
   city: z.string().optional(),
   state: z.string().optional(),

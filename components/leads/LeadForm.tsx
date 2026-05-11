@@ -114,7 +114,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
     resolver: zodResolver(leadSchema),
     defaultValues: lead ? {
       full_name: lead.full_name,
-      phone: lead.phone,
+      phone: lead.phone.replace(/^\+91/, ''),
       email: lead.email ?? '',
       city: lead.city ?? '',
       state: lead.state ?? '',
@@ -161,7 +161,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                 if (lead?.id) {
                     reset({
                         full_name: lead.full_name,
-                        phone: lead.phone,
+                        phone: lead.phone.replace(/^\+91/, ''),
                         email: lead.email ?? '',
                         city: lead.city ?? '',
                         state: lead.state ?? '',
@@ -230,9 +230,13 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
     }, [selectedDeptId, lead?.id, setValue])
 
   async function checkDuplicate(phone: string) {
-    if (!phone || phone.length < 7) { setDuplicateLead(null); return }
-    const q = supabase.from('leads').select('id, full_name, phone').eq('phone', phone.trim()).limit(1)
-    if (lead?.id) q.neq('id', lead.id)
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 10) { setDuplicateLead(null); return }
+    // Search both formats: raw 10-digit and +91 prefixed
+    let q = supabase.from('leads').select('id, full_name, phone')
+      .or(`phone.eq.${digits},phone.eq.+91${digits}`)
+      .limit(1)
+    if (lead?.id) q = q.neq('id', lead.id)
     const { data } = await q.maybeSingle()
     setDuplicateLead(data as any ?? null)
   }
@@ -373,12 +377,21 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           </FieldWrapper>
 
           <FieldWrapper label="Phone" required error={errors.phone?.message}>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+            <div className="relative flex">
+              <span className="flex items-center gap-1 px-3 bg-blue-50 border border-r-0 border-blue-200 rounded-l-md text-sm font-semibold text-blue-700 select-none whitespace-nowrap">
+                <Phone className="w-3.5 h-3.5" /> +91
+              </span>
               <Input
                 {...register('phone')}
-                placeholder="e.g. 9876543210"
-                className={`pl-9 bg-white focus:border-blue-400 ${duplicateLead ? 'border-orange-400 bg-orange-50' : 'border-blue-200'}`}
+                placeholder="10-digit mobile number"
+                maxLength={10}
+                inputMode="numeric"
+                className={`rounded-l-none bg-white focus:border-blue-400 ${duplicateLead ? 'border-orange-400 bg-orange-50' : 'border-blue-200'}`}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                  e.target.value = digits
+                  setValue('phone', digits)
+                }}
                 onBlur={(e) => checkDuplicate(e.target.value)}
               />
             </div>

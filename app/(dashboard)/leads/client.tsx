@@ -1,9 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Users, TrendingUp, CheckCircle, Clock, UserPlus } from 'lucide-react'
+import { Plus, Users, TrendingUp, CheckCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
 import { LeadTable } from '@/components/leads/LeadTable'
 import { LeadForm } from '@/components/leads/LeadForm'
 import { BulkImportLeads } from '@/components/leads/BulkImportLeads'
@@ -32,7 +31,7 @@ export function LeadsClient() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, newToday: 0, converted: 0, followupDue: 0 })
   const [showForm, setShowForm] = useState(false)
-  const [showAssociate, setShowAssociate] = useState(false)
+
   const [courses, setCourses] = useState<Course[]>([])
   const [telecallers, setTelecallers] = useState<Profile[]>([])
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
@@ -125,9 +124,6 @@ export function LeadsClient() {
           <p className="text-sm text-gray-500 mt-0.5">Manage and track all your leads</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowAssociate(true)} className="gap-1.5">
-            <UserPlus className="w-4 h-4" /> Create Associate
-          </Button>
           <Button onClick={() => setShowForm(true)} className="gap-1.5">
             <Plus className="w-4 h-4" /> Add Lead
           </Button>
@@ -171,10 +167,6 @@ export function LeadsClient() {
         </DialogContent>
       </Dialog>
 
-      <CreateAssociateDialog
-        open={showAssociate}
-        onOpenChange={setShowAssociate}
-      />
     </div>
   )
 }

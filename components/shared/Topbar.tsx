@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useUIStore } from '@/store/useUIStore'
 import type { Profile } from '@/types/app.types'
+import { NotificationBell } from './NotificationBell'
 
 interface TopbarProps {
   user: Profile
@@ -47,6 +48,7 @@ export function Topbar({ user }: TopbarProps) {
       <div className="hidden md:block" />
 
       <div className="flex items-center gap-2">
+        <NotificationBell userId={user.id} role={user.role} />
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 transition-colors">
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">

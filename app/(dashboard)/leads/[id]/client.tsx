@@ -1,8 +1,8 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { ArrowLeft, Edit, ArrowRightLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Edit, ArrowRightLeft, ExternalLink, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +37,14 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
   const [, startTransition] = useTransition()
   const supabase = createClient()
+  const followupRef = useRef<HTMLInputElement>(null)
+
+  async function handleFollowupChange(date: string) {
+    const { error } = await supabase.from('leads').update({ next_followup_date: date || null } as never).eq('id', lead.id)
+    if (error) { toast.error('Failed to update followup'); return }
+    setLead(prev => ({ ...prev, next_followup_date: date || undefined }))
+    toast.success(date ? `Followup set for ${format(new Date(date), 'dd MMM yyyy')}` : 'Followup cleared')
+  }
 
   async function handleStatusChange(newStatus: LeadStatus) {
     if (newStatus === 'converted') {
@@ -76,16 +84,16 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      <div className="flex items-center gap-2 mb-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="px-2">
+          <ArrowLeft className="w-4 h-4" />
         </Button>
-        <h1 className="text-xl font-bold flex-1">{lead.full_name}</h1>
-        <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)}>
-          <ArrowRightLeft className="w-4 h-4 mr-1" /> Transfer
+        <h1 className="text-lg font-bold flex-1 truncate">{lead.full_name}</h1>
+        <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)} className="px-2 sm:px-3">
+          <ArrowRightLeft className="w-4 h-4" /><span className="hidden sm:inline ml-1">Transfer</span>
         </Button>
-        <Button size="sm" onClick={() => setShowEdit(true)}>
-          <Edit className="w-4 h-4 mr-1" /> Edit
+        <Button size="sm" onClick={() => setShowEdit(true)} className="px-2 sm:px-3">
+          <Edit className="w-4 h-4" /><span className="hidden sm:inline ml-1">Edit</span>
         </Button>
       </div>
 
@@ -94,9 +102,9 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle className="text-base">Lead Information</CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge className={`${LEAD_STATUS_COLORS[lead.status]} border-0`}>
                     {LEAD_STATUS_LABELS[lead.status]}
                   </Badge>
@@ -106,7 +114,6 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                       size="sm"
                       className="h-7 text-xs gap-1"
                       onClick={() => {
-                        // Find student by lead_id
                         supabase.from('students').select('id').eq('lead_id', lead.id).then(({ data }) => {
                           if (data && data.length > 0) {
                             router.push(`/backend/${(data[0] as any).id}`)
@@ -120,7 +127,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                     </Button>
                   )}
                   <Select value={lead.status} onValueChange={(v) => handleStatusChange(v as LeadStatus)}>
-                    <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-full sm:w-36 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(LEAD_STATUS_LABELS).map(([k, v]) => (
                         <SelectItem key={k} value={k}>{v}</SelectItem>
@@ -140,7 +147,22 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                 <div><p className="text-gray-500">Sub-course</p><p className="font-medium">{lead.sub_course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Source</p><p className="font-medium">{LEAD_SOURCE_LABELS[lead.source]}</p></div>
                 <div><p className="text-gray-500">Assigned To</p><p className="font-medium">{lead.assigned_user?.full_name ?? 'Unassigned'}</p></div>
-                <div><p className="text-gray-500">Next Followup</p><p className="font-medium">{lead.next_followup_date ? format(new Date(lead.next_followup_date), 'dd MMM yyyy') : '-'}</p></div>
+                <div>
+                  <p className="text-gray-500 flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Next Followup</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <input
+                      ref={followupRef}
+                      type="date"
+                      defaultValue={lead.next_followup_date ?? ''}
+                      onChange={(e) => handleFollowupChange(e.target.value)}
+                      className="text-sm font-medium border border-gray-200 rounded-md px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white w-full max-w-[160px]"
+                    />
+                    {lead.next_followup_date && (
+                      <button onClick={() => { handleFollowupChange(''); if (followupRef.current) followupRef.current.value = '' }}
+                        className="text-gray-400 hover:text-red-500 text-xs">✕</button>
+                    )}
+                  </div>
+                </div>
                 <div><p className="text-gray-500">Created On</p><p className="font-medium">{format(new Date(lead.created_at), 'dd MMM yyyy')}</p></div>
               </div>
             </CardContent>

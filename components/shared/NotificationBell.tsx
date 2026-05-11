@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, CheckCircle2, Clock, AlertTriangle, Zap, Info, CheckCheck, X } from 'lucide-react'
+import { Bell, CheckCircle2, Clock, AlertTriangle, Zap, Info, CheckCheck, X, PhoneCall } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -12,6 +12,14 @@ interface TaskNotif {
   urgency: 'low' | 'medium' | 'high' | 'urgent'
   status: 'pending' | 'in_progress' | 'done'
   created_by_name: string
+}
+
+interface FollowupNotif {
+  id: string
+  full_name: string
+  phone: string
+  status: string
+  next_followup_date: string
 }
 
 interface GeneralNotif {
@@ -52,8 +60,9 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
   const db = supabase as any
 
   const [open, setOpen] = useState(false)
-  const [tasks, setTasks]   = useState<TaskNotif[]>([])
-  const [notifs, setNotifs] = useState<GeneralNotif[]>([])
+  const [tasks, setTasks]       = useState<TaskNotif[]>([])
+  const [followups, setFollowups] = useState<FollowupNotif[]>([])
+  const [notifs, setNotifs]     = useState<GeneralNotif[]>([])
 
   const load = useCallback(async () => {
     if (!userId) return
@@ -69,6 +78,18 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
       .limit(15)
 
     setTasks(taskData ?? [])
+
+    // Followups due today assigned to me
+    const { data: followupData } = await db
+      .from('leads')
+      .select('id, full_name, phone, status, next_followup_date')
+      .eq('assigned_to', userId)
+      .eq('next_followup_date', today)
+      .not('status', 'in', '("converted","lost")')
+      .order('full_name')
+      .limit(20)
+
+    setFollowups(followupData ?? [])
 
     // General notifications — broadcast or targeted to my role
     const { data: notifData } = await db
@@ -97,6 +118,7 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
     const channel = supabase
       .channel(`notif-tasks-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `assigned_to=eq.${userId}` }, () => load())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -118,10 +140,8 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const overdueTasks  = tasks.filter(t => t.due_date < today)
-  const urgentTasks   = tasks.filter(t => t.urgency === 'urgent')
   const unreadNotifs  = notifs.filter(n => !n.read).length
-  const totalBadge    = tasks.length + unreadNotifs
+  const totalBadge    = tasks.length + followups.length + unreadNotifs
 
   return (
     <div className="relative">
@@ -205,6 +225,32 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
                 </div>
               )}
 
+              {/* ── FOLLOWUP TODAY ── */}
+              {followups.length > 0 && (
+                <div>
+                  <div className="px-4 pt-3 pb-1.5 flex items-center justify-between border-t">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Followups Today</p>
+                    <span className="text-[11px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{followups.length} due</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {followups.map(f => (
+                      <a key={f.id} href={`/leads/${f.id}`} onClick={() => setOpen(false)}
+                        className="px-4 py-3 hover:bg-orange-50/50 transition-colors flex items-start gap-2.5 block">
+                        <div className="mt-1 w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{f.full_name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <PhoneCall className="w-3 h-3 text-orange-500 flex-shrink-0" />
+                            <span className="text-xs text-gray-500 font-mono">{f.phone}</span>
+                            <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full capitalize">{f.status.replace(/_/g, ' ')}</span>
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ── GENERAL NOTIFICATIONS ── */}
               {notifs.length > 0 && (
                 <div>
@@ -242,7 +288,7 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
               )}
 
               {/* Empty state */}
-              {tasks.length === 0 && notifs.length === 0 && (
+              {tasks.length === 0 && followups.length === 0 && notifs.length === 0 && (
                 <div className="py-12 text-center">
                   <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
                   <p className="text-sm font-medium text-gray-600">All caught up!</p>

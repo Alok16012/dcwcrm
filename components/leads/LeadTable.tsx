@@ -225,10 +225,10 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* Top toolbar */}
-      <div className="px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
+      <div className="px-3 py-3 border-b border-gray-100 space-y-2">
+        {/* Row 1: Search + sort + export */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -243,144 +243,137 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
               </button>
             )}
           </div>
-
-          {/* Status filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${filters.status?.length ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                Status {filters.status?.length ? `(${filters.status.length})` : ''}
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
-                <DropdownMenuItem key={k} onClick={() => toggleStatus(k)} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.status?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
-                    {filters.status?.includes(k) && <span className="text-white text-[10px]">✓</span>}
-                  </div>
-                  {v}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Source filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${filters.source?.length ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                Source {filters.source?.length ? `(${filters.source.length})` : ''}
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
-              {(Object.entries(LEAD_SOURCE_LABELS) as [LeadSource, string][]).map(([k, v]) => (
-                <DropdownMenuItem key={k} onClick={() => toggleSource(k)} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.source?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
-                    {filters.source?.includes(k) && <span className="text-white text-[10px]">✓</span>}
-                  </div>
-                  {v}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Assigned to filter */}
-          {telecallers.length > 0 && (
-            <Select value={filters.assigned_to?.[0] ?? ''} onValueChange={(v) => { setFilters({ assigned_to: v ? [v] : undefined }); setPage(1) }}>
-              <SelectTrigger className={`w-36 h-9 text-sm ${filters.assigned_to?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                <SelectValue placeholder="Assigned to" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All assignees</SelectItem>
-                {telecallers.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Course filter */}
-          {courses.length > 0 && (
-            <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); setPage(1) }}>
-              <SelectTrigger className={`w-36 h-9 text-sm ${filters.course_id?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                <SelectValue placeholder="Course" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All courses</SelectItem>
-                {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Mode filter */}
-          <Select
-            value={filters.mode ?? ''}
-            onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); setPage(1) }}
+          <span className="text-sm text-gray-500 font-medium whitespace-nowrap hidden sm:block">{filtered.length} Leads</span>
+          <button
+            onClick={() => setSortDir((d) => d === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-1 px-2 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 whitespace-nowrap"
           >
-            <SelectTrigger className={`w-36 h-9 text-sm ${filters.mode ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-              <SelectValue placeholder="Mode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All modes</SelectItem>
-              <SelectItem value="attending">Attending</SelectItem>
-              <SelectItem value="non-attending">Non-Attending</SelectItem>
-            </SelectContent>
-          </Select>
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{sortDir === 'desc' ? 'Newest' : 'Oldest'}</span>
+          </button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={sorted.length === 0} className="gap-1 h-9 px-2 sm:px-3">
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+        </div>
 
-          {/* Followup date filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-400 whitespace-nowrap">Followup:</span>
+        {/* Row 2: Filters — horizontally scrollable on mobile */}
+        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex items-center gap-2 w-max">
+            {/* Status filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${filters.status?.length ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                  Status {filters.status?.length ? `(${filters.status.length})` : ''}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
+                  <DropdownMenuItem key={k} onClick={() => toggleStatus(k)} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.status?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                      {filters.status?.includes(k) && <span className="text-white text-[10px]">✓</span>}
+                    </div>
+                    {v}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Source filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${filters.source?.length ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                  Source {filters.source?.length ? `(${filters.source.length})` : ''}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {(Object.entries(LEAD_SOURCE_LABELS) as [LeadSource, string][]).map(([k, v]) => (
+                  <DropdownMenuItem key={k} onClick={() => toggleSource(k)} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.source?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                      {filters.source?.includes(k) && <span className="text-white text-[10px]">✓</span>}
+                    </div>
+                    {v}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Assigned to filter */}
+            {telecallers.length > 0 && (
+              <Select value={filters.assigned_to?.[0] ?? ''} onValueChange={(v) => { setFilters({ assigned_to: v ? [v] : undefined }); setPage(1) }}>
+                <SelectTrigger className={`w-32 h-8 text-xs whitespace-nowrap ${filters.assigned_to?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
+                  <SelectValue placeholder="Assigned to" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All assignees</SelectItem>
+                  {telecallers.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Course filter */}
+            {courses.length > 0 && (
+              <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); setPage(1) }}>
+                <SelectTrigger className={`w-28 h-8 text-xs ${filters.course_id?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
+                  <SelectValue placeholder="Course" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All courses</SelectItem>
+                  {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Mode filter */}
+            <Select value={filters.mode ?? ''} onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); setPage(1) }}>
+              <SelectTrigger className={`w-28 h-8 text-xs ${filters.mode ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
+                <SelectValue placeholder="Mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All modes</SelectItem>
+                <SelectItem value="attending">Attending</SelectItem>
+                <SelectItem value="non-attending">Non-Attending</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Followup date filter */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+              <span className="text-[11px] text-gray-400 whitespace-nowrap">Followup:</span>
+              <input
+                type="date"
+                value={filters.followup_from ?? ''}
+                onChange={(e) => { setFilters({ followup_from: e.target.value || undefined }); setPage(1) }}
+                className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
+              />
+              <span className="text-xs text-gray-400">–</span>
+              <input
+                type="date"
+                value={filters.followup_to ?? ''}
+                onChange={(e) => { setFilters({ followup_to: e.target.value || undefined }); setPage(1) }}
+                className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
+              />
+            </div>
+
+            {/* City filter */}
             <input
-              type="date"
-              value={filters.followup_from ?? ''}
-              onChange={(e) => { setFilters({ followup_from: e.target.value || undefined }); setPage(1) }}
-              className="h-9 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-              placeholder="From"
+              type="text"
+              placeholder="City..."
+              value={filters.city ?? ''}
+              onChange={(e) => { setFilters({ city: e.target.value || undefined }); setPage(1) }}
+              className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-24"
             />
-            <span className="text-xs text-gray-400">–</span>
-            <input
-              type="date"
-              value={filters.followup_to ?? ''}
-              onChange={(e) => { setFilters({ followup_to: e.target.value || undefined }); setPage(1) }}
-              className="h-9 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-              placeholder="To"
-            />
-          </div>
 
-          {/* City filter */}
-          <input
-            type="text"
-            placeholder="City..."
-            value={filters.city ?? ''}
-            onChange={(e) => { setFilters({ city: e.target.value || undefined }); setPage(1) }}
-            className="h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-28"
-          />
+            {/* Clear filters */}
+            {activeFilters ? (
+              <button onClick={() => { clearFilters(); setPage(1) }} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1.5 whitespace-nowrap">
+                <X className="w-3 h-3" /> Clear
+              </button>
+            ) : null}
 
-          {/* Clear filters */}
-          {activeFilters ? (
-            <button onClick={() => { clearFilters(); setPage(1) }} className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 px-2 py-2">
-              <X className="w-3.5 h-3.5" /> Clear
-            </button>
-          ) : null}
-
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-sm text-gray-500 font-medium">{filtered.length} Leads</span>
-            <button
-              onClick={() => setSortDir((d) => d === 'desc' ? 'asc' : 'desc')}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
-            </button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              disabled={sorted.length === 0}
-              className="gap-1.5 h-9"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
-            </Button>
+            {/* Mobile: leads count */}
+            <span className="text-xs text-gray-400 whitespace-nowrap sm:hidden">{filtered.length} leads</span>
           </div>
         </div>
       </div>

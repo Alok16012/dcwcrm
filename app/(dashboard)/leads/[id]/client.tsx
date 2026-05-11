@@ -36,8 +36,10 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
   const [confirmConvert, setConfirmConvert] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
   const [, startTransition] = useTransition()
+  const [showFollowupPicker, setShowFollowupPicker] = useState(false)
   const supabase = createClient()
   const followupRef = useRef<HTMLInputElement>(null)
+  const headerFollowupRef = useRef<HTMLInputElement>(null)
 
   async function handleFollowupChange(date: string) {
     const { error } = await supabase.from('leads').update({ next_followup_date: date || null } as never).eq('id', lead.id)
@@ -134,6 +136,38 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Followup quick-set */}
+                  {!showFollowupPicker ? (
+                    <button
+                      onClick={() => { setShowFollowupPicker(true); setTimeout(() => headerFollowupRef.current?.showPicker?.(), 50) }}
+                      className={`flex items-center gap-1 h-8 px-2.5 rounded-md border text-xs font-medium transition-colors whitespace-nowrap
+                        ${lead.next_followup_date
+                          ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      {lead.next_followup_date
+                        ? format(new Date(lead.next_followup_date), 'dd MMM')
+                        : 'Followup'}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        ref={headerFollowupRef}
+                        type="date"
+                        defaultValue={lead.next_followup_date ?? ''}
+                        autoFocus
+                        onChange={(e) => {
+                          handleFollowupChange(e.target.value)
+                          setShowFollowupPicker(false)
+                        }}
+                        onBlur={() => setShowFollowupPicker(false)}
+                        className="h-8 px-2 text-xs border border-orange-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50 w-36"
+                      />
+                      <button onClick={() => setShowFollowupPicker(false)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardHeader>

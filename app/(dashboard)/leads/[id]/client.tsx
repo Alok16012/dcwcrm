@@ -37,9 +37,35 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
   const [, startTransition] = useTransition()
   const [showFollowupPicker, setShowFollowupPicker] = useState(false)
+  const [followupDate, setFollowupDate] = useState(lead.next_followup_date ?? '')
+  const [followupTime, setFollowupTime] = useState((lead as any).extra_data?.followup_time ?? '')
   const supabase = createClient()
   const followupRef = useRef<HTMLInputElement>(null)
-  const headerFollowupRef = useRef<HTMLInputElement>(null)
+
+  async function saveFollowup(date: string, time: string) {
+    if (!date) return
+    const existingExtra = (lead as any).extra_data ?? {}
+    const newExtra = time ? { ...existingExtra, followup_time: time } : { ...existingExtra, followup_time: null }
+    const { error } = await supabase.from('leads').update({
+      next_followup_date: date,
+      extra_data: newExtra,
+    } as never).eq('id', lead.id)
+    if (error) { toast.error('Failed to update followup'); return }
+    setLead(prev => ({ ...prev, next_followup_date: date, extra_data: newExtra }))
+    const label = time ? `${format(new Date(date), 'dd MMM yyyy')} at ${time}` : format(new Date(date), 'dd MMM yyyy')
+    toast.success(`Followup set for ${label}`)
+    setShowFollowupPicker(false)
+  }
+
+  async function clearFollowup() {
+    const { error } = await supabase.from('leads').update({ next_followup_date: null } as never).eq('id', lead.id)
+    if (error) { toast.error('Failed to clear followup'); return }
+    setLead(prev => ({ ...prev, next_followup_date: undefined }))
+    setFollowupDate('')
+    setFollowupTime('')
+    setShowFollowupPicker(false)
+    toast.success('Followup cleared')
+  }
 
   async function handleFollowupChange(date: string) {
     const { error } = await supabase.from('leads').update({ next_followup_date: date || null } as never).eq('id', lead.id)
@@ -140,7 +166,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                   {/* Followup quick-set */}
                   {!showFollowupPicker ? (
                     <button
-                      onClick={() => { setShowFollowupPicker(true); setTimeout(() => headerFollowupRef.current?.showPicker?.(), 50) }}
+                      onClick={() => setShowFollowupPicker(true)}
                       className={`flex items-center gap-1 h-8 px-2.5 rounded-md border text-xs font-medium transition-colors whitespace-nowrap
                         ${lead.next_followup_date
                           ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
@@ -148,24 +174,46 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                     >
                       <CalendarClock className="w-3.5 h-3.5" />
                       {lead.next_followup_date
-                        ? format(new Date(lead.next_followup_date), 'dd MMM')
-                        : 'Followup'}
+                        ? `${format(new Date(lead.next_followup_date), 'dd MMM')}${(lead as any).extra_data?.followup_time ? ` ${(lead as any).extra_data.followup_time}` : ''}`
+                        : 'Set Followup'}
                     </button>
                   ) : (
-                    <div className="flex items-center gap-1">
-                      <input
-                        ref={headerFollowupRef}
-                        type="date"
-                        defaultValue={lead.next_followup_date ?? ''}
-                        autoFocus
-                        onChange={(e) => {
-                          handleFollowupChange(e.target.value)
-                          setShowFollowupPicker(false)
-                        }}
-                        onBlur={() => setShowFollowupPicker(false)}
-                        className="h-8 px-2 text-xs border border-orange-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50 w-36"
-                      />
-                      <button onClick={() => setShowFollowupPicker(false)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                    <div className="flex flex-col gap-1.5 bg-orange-50 border border-orange-200 rounded-lg p-2.5 min-w-[220px]">
+                      <p className="text-[11px] font-semibold text-orange-700 flex items-center gap-1">
+                        <CalendarClock className="w-3 h-3" /> Set Followup
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="date"
+                          value={followupDate}
+                          autoFocus
+                          onChange={(e) => setFollowupDate(e.target.value)}
+                          className="h-7 px-2 text-xs border border-orange-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-400 bg-white flex-1"
+                        />
+                        <input
+                          type="time"
+                          value={followupTime}
+                          onChange={(e) => setFollowupTime(e.target.value)}
+                          className="h-7 px-2 text-xs border border-orange-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-400 bg-white w-24"
+                        />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => saveFollowup(followupDate, followupTime)}
+                          disabled={!followupDate}
+                          className="flex-1 h-7 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-xs rounded-md font-medium transition-colors"
+                        >
+                          Save
+                        </button>
+                        {lead.next_followup_date && (
+                          <button onClick={clearFollowup} className="h-7 px-2 text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-md">
+                            Clear
+                          </button>
+                        )}
+                        <button onClick={() => setShowFollowupPicker(false)} className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-md">
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

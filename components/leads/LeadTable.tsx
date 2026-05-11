@@ -459,7 +459,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline underline-offset-2 transition-colors">
-                          {lead.phone}
+                          {lead.phone.startsWith('+') ? lead.phone : `+91 ${lead.phone}`}
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-44">

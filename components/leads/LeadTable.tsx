@@ -420,13 +420,120 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        {isLoading ? (
-          <div className="py-16 text-center text-gray-400 text-sm">Loading leads...</div>
-        ) : paginated.length === 0 ? (
-          <div className="py-16 text-center text-gray-400 text-sm">No leads found</div>
-        ) : (
+      {/* Loading / Empty */}
+      {isLoading && <div className="py-16 text-center text-gray-400 text-sm">Loading leads...</div>}
+      {!isLoading && paginated.length === 0 && <div className="py-16 text-center text-gray-400 text-sm">No leads found</div>}
+
+      {/* ── MOBILE CARD LIST (< md) ── */}
+      {!isLoading && paginated.length > 0 && (
+        <div className="md:hidden divide-y divide-gray-100">
+          {paginated.map((lead) => (
+            <div key={lead.id} className="px-4 py-4 hover:bg-gray-50/60 transition-colors">
+              {/* Row 1: checkbox + avatar + name + date + menu */}
+              <div className="flex items-start gap-3">
+                <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={selected.has(lead.id)} onCheckedChange={() => toggleOne(lead.id)} />
+                </div>
+                <div
+                  className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold ${getAvatarColor(lead.full_name)}`}
+                  onClick={() => router.push(`/leads/${lead.id}`)}
+                >
+                  {getInitials(lead.full_name)}
+                </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-gray-900 leading-tight truncate">{lead.full_name}</p>
+                    <span className="text-[11px] text-gray-400 whitespace-nowrap flex-shrink-0">
+                      {format(new Date(lead.created_at), 'dd MMM')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{lead.city ?? ''}</p>
+                </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)}>View Details</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setEditLead(lead)}>Update Details</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
+                        Delete Lead
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              {/* Row 2: phone + status */}
+              <div className="mt-2.5 ml-[52px] flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-2.5 py-1 text-xs font-mono hover:bg-blue-100 transition-colors">
+                      <Phone className="w-3 h-3 flex-shrink-0" />
+                      {lead.phone.startsWith('+') ? lead.phone : `+91 ${lead.phone}`}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-44">
+                    <DropdownMenuItem className="flex items-center gap-2" onClick={() => window.location.href = `tel:${lead.phone}`}>
+                      <Phone className="w-4 h-4 text-blue-600" /> Call
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="flex items-center gap-2" onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}>
+                      <MessageCircle className="w-4 h-4 text-green-600" /> WhatsApp
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80 ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {LEAD_STATUS_LABELS[lead.status]}
+                      <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
+                      <DropdownMenuItem key={k} onClick={() => handleStatusChange(lead, k)} className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[k] ?? 'bg-gray-400'}`} />
+                        <span className={lead.status === k ? 'font-semibold' : ''}>{v}</span>
+                        {lead.status === k && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Row 3: course + assigned + followup */}
+              <div className="mt-2 ml-[52px] flex items-center gap-3 flex-wrap">
+                {lead.course && (
+                  <span className="text-[11px] text-gray-500 bg-gray-100 rounded-md px-2 py-0.5 truncate max-w-[130px]">{lead.course.name}</span>
+                )}
+                {lead.assigned_user && (
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${getAvatarColor(lead.assigned_user.full_name)}`}>
+                      {getInitials(lead.assigned_user.full_name)}
+                    </div>
+                    <span className="text-[11px] text-gray-500 truncate max-w-[100px]">{lead.assigned_user.full_name}</span>
+                  </div>
+                )}
+                {lead.next_followup_date && (
+                  <span className="text-[11px] text-orange-600 bg-orange-50 border border-orange-200 rounded-md px-2 py-0.5">
+                    📅 {format(new Date(lead.next_followup_date + 'T00:00:00'), 'dd MMM')}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── DESKTOP TABLE (≥ md) ── */}
+      {!isLoading && paginated.length > 0 && (
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -475,19 +582,11 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-44">
-                        <DropdownMenuItem
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={() => window.location.href = `tel:${lead.phone}`}
-                        >
-                          <Phone className="w-4 h-4 text-blue-600" />
-                          <span>Call</span>
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = `tel:${lead.phone}`}>
+                          <Phone className="w-4 h-4 text-blue-600" /> <span>Call</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
-                        >
-                          <MessageCircle className="w-4 h-4 text-green-600" />
-                          <span>WhatsApp</span>
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}>
+                          <MessageCircle className="w-4 h-4 text-green-600" /> <span>WhatsApp</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -503,11 +602,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-48">
                         {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
-                          <DropdownMenuItem
-                            key={k}
-                            onClick={() => handleStatusChange(lead, k)}
-                            className="flex items-center gap-2"
-                          >
+                          <DropdownMenuItem key={k} onClick={() => handleStatusChange(lead, k)} className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[k] ?? 'bg-gray-400'}`} />
                             <span className={lead.status === k ? 'font-semibold' : ''}>{v}</span>
                             {lead.status === k && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
@@ -518,12 +613,8 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                   </td>
                   <td className="px-3 py-3">
                     {lead.mode ? (
-                      <Badge variant="outline" className="capitalize text-[10px] font-normal border-gray-200 text-gray-500">
-                        {lead.mode}
-                      </Badge>
-                    ) : (
-                      <span className="text-gray-300">—</span>
-                    )}
+                      <Badge variant="outline" className="capitalize text-[10px] font-normal border-gray-200 text-gray-500">{lead.mode}</Badge>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-[10px]">{lead.department?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.course?.name ?? <span className="text-gray-300">—</span>}</td>
@@ -536,9 +627,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                         </div>
                         <span className="text-xs text-gray-600">{lead.assigned_user.full_name}</span>
                       </div>
-                    ) : (
-                      <span className="text-xs text-gray-300">Unassigned</span>
-                    )}
+                    ) : <span className="text-xs text-gray-300">Unassigned</span>}
                   </td>
                   <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">
                     {format(new Date(lead.created_at), 'dd MMM yyyy')}
@@ -555,10 +644,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                         <DropdownMenuItem onClick={() => setEditLead(lead)}>Update Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                          onClick={() => setDeleteLead(lead)}
-                        >
+                        <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
                           Delete Lead
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -568,8 +654,8 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Pagination footer */}
       {!isLoading && sorted.length > 0 && (

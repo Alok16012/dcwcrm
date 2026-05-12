@@ -116,22 +116,22 @@ export function LeadsClient() {
   useEffect(() => { if (currentProfile) fetchLeads() }, [fetchLeads, currentProfile])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage and track all your leads</p>
+          <p className="text-xs text-gray-400 mt-0.5">Manage and track all your leads</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowForm(true)} className="gap-1.5">
-            <Plus className="w-4 h-4" /> Add Lead
-          </Button>
-        </div>
+        <Button onClick={() => setShowForm(true)} size="sm" className="gap-1.5 h-9">
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Add Lead</span>
+          <span className="sm:hidden">Add</span>
+        </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         <StatCard label="Total Leads" value={stats.total} icon={Users} color="bg-blue-100 text-blue-600" />
         <StatCard label="New Today" value={stats.newToday} icon={TrendingUp} color="bg-violet-100 text-violet-600" />
         <StatCard label="Converted" value={stats.converted} icon={CheckCircle} color="bg-emerald-100 text-emerald-600" />

@@ -25,10 +25,10 @@ const valueColorMap = {
 
 export function StatCard({ label, value, sub, color = 'default' }: StatCardProps) {
   return (
-    <div className={cn('rounded-lg p-4 shadow-sm', colorMap[color])}>
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className={cn('mt-1 text-2xl font-bold', valueColorMap[color])}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+    <div className={cn('rounded-xl p-3.5 shadow-sm', colorMap[color])}>
+      <p className="text-xs font-medium text-gray-500 leading-tight">{label}</p>
+      <p className={cn('mt-1 text-xl sm:text-2xl font-bold leading-tight', valueColorMap[color])}>{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-gray-400">{sub}</p>}
     </div>
   )
 }

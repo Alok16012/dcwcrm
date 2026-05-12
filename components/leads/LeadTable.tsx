@@ -62,10 +62,19 @@ const STATUS_COLORS: Record<string, string> = {
   cold: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
+const STATUS_DOT: Record<string, string> = {
+  new: 'bg-blue-500', contacted: 'bg-yellow-500', interested: 'bg-purple-500',
+  counselled: 'bg-orange-500', document_received: 'bg-cyan-500', converted: 'bg-green-500',
+  lost: 'bg-red-500', dnp: 'bg-slate-400', switch_off: 'bg-zinc-400',
+  not_reachable: 'bg-gray-400', not_interested: 'bg-rose-500',
+  application_sent: 'bg-cyan-500', cold: 'bg-gray-400',
+}
+
 interface LeadTableProps {
   leads: Lead[]
   isLoading?: boolean
   onRefresh: () => void
+  onLeadUpdate?: (id: string, update: Partial<Lead>) => void
   courses?: Course[]
   telecallers?: Profile[]
   isTelecaller?: boolean
@@ -73,7 +82,7 @@ interface LeadTableProps {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50]
 
-export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecallers = [], isTelecaller = false }: LeadTableProps) {
+export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses = [], telecallers = [], isTelecaller = false }: LeadTableProps) {
   const router = useRouter()
   const { filters, setFilters, clearFilters } = useLeadStore()
   const [search, setSearch] = useState(filters.search ?? '')
@@ -145,6 +154,7 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
 
   async function handleStatusChange(lead: Lead, newStatus: LeadStatus) {
     if (newStatus === 'converted') { setStatusLead(lead); return }
+    if (lead.status === newStatus) return
     startTransition(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase.from('leads').update({ status: newStatus, updated_at: new Date().toISOString() } as never).eq('id', lead.id)
@@ -159,7 +169,9 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
       } as never)
 
       toast.success('Status updated')
-      onRefresh()
+      // Update locally to preserve current page position
+      if (onLeadUpdate) onLeadUpdate(lead.id, { status: newStatus })
+      else onRefresh()
     })
   }
 
@@ -481,10 +493,28 @@ export function LeadTable({ leads, isLoading, onRefresh, courses = [], telecalle
                     </DropdownMenu>
                   </td>
                   <td className="px-3 py-3 text-gray-500 text-xs max-w-[160px] truncate">{lead.email ?? <span className="text-gray-300">—</span>}</td>
-                  <td className="px-3 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {LEAD_STATUS_LABELS[lead.status]}
-                    </span>
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors hover:opacity-80 ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                          {LEAD_STATUS_LABELS[lead.status]}
+                          <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
+                          <DropdownMenuItem
+                            key={k}
+                            onClick={() => handleStatusChange(lead, k)}
+                            className="flex items-center gap-2"
+                          >
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[k] ?? 'bg-gray-400'}`} />
+                            <span className={lead.status === k ? 'font-semibold' : ''}>{v}</span>
+                            {lead.status === k && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                   <td className="px-3 py-3">
                     {lead.mode ? (

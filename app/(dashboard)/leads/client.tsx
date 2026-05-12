@@ -143,6 +143,7 @@ export function LeadsClient() {
         leads={leads}
         isLoading={loading}
         onRefresh={fetchLeads}
+        onLeadUpdate={(id, update) => setLeads(prev => prev.map(l => l.id === id ? { ...l, ...update } : l))}
         courses={courses}
         telecallers={['lead', 'telecaller', 'counselor'].includes(currentProfile?.role ?? '') ? [] : telecallers}
         isTelecaller={['lead', 'telecaller', 'counselor'].includes(currentProfile?.role ?? '')}

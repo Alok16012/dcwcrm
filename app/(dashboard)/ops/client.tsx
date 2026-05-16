@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, Clock, Eye, RefreshCw,
   Copy, UserCheck, Wallet, Bell, Send, IndianRupee,
-  Plus, Pencil, Trash2, Download, FileText, ClipboardList,
+  Plus, Pencil, Trash2, Download, FileText, ClipboardList, Truck,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -19,6 +19,7 @@ const FeePlanBuilder = dynamic(
   { ssr: false }
 )
 const TaskManager = dynamic(() => import('./TaskManager'), { ssr: false })
+const DispatchManager = dynamic(() => import('@/components/ops/DispatchManager').then(m => ({ default: m.DispatchManager })), { ssr: false })
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -384,6 +385,9 @@ export default function OpsClient() {
           <TabsTrigger value="feeplan" className="gap-1.5 text-xs sm:text-sm">
             <FileText className="w-4 h-4" /> Fee Plan PDF
           </TabsTrigger>
+          <TabsTrigger value="dispatch" className="gap-1.5 text-xs sm:text-sm">
+            <Truck className="w-4 h-4" /> Dispatch
+          </TabsTrigger>
           <TabsTrigger value="tasks" className="gap-1.5 text-xs sm:text-sm">
             <ClipboardList className="w-4 h-4" /> Tasks
           </TabsTrigger>
@@ -588,6 +592,11 @@ export default function OpsClient() {
         {/* ══ FEE PLAN PDF ══ */}
         <TabsContent value="feeplan" className="space-y-4">
           <FeePlanBuilder />
+        </TabsContent>
+
+        {/* ══ DISPATCH MANAGEMENT ══ */}
+        <TabsContent value="dispatch" className="space-y-4">
+          <DispatchManager />
         </TabsContent>
 
         {/* ══ TASK MANAGEMENT ══ */}

@@ -1,8 +1,7 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -10,26 +9,25 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
-  Truck, Plus, Search, RefreshCw, ChevronDown, Pencil, Trash2,
-  Package, PackageCheck, X, ArrowDownToLine, Send,
+  Truck, Search, RefreshCw, ChevronDown, Pencil, Trash2,
+  Package, X, ArrowDownToLine, Send, ChevronRight,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = [
-  { value: 'marksheet',        label: 'Marksheet' },
-  { value: 'certificate',      label: 'Certificate' },
-  { value: 'id_card',          label: 'ID Card' },
-  { value: 'enrollment_letter',label: 'Enrollment Letter' },
-  { value: 'admit_card',       label: 'Admit Card' },
-  { value: 'degree',           label: 'Degree / Diploma' },
-  { value: 'other',            label: 'Other' },
+  { value: 'marksheet',         label: 'Marksheet' },
+  { value: 'certificate',       label: 'Certificate' },
+  { value: 'id_card',           label: 'ID Card' },
+  { value: 'enrollment_letter', label: 'Enrollment Letter' },
+  { value: 'admit_card',        label: 'Admit Card' },
+  { value: 'degree',            label: 'Degree / Diploma' },
+  { value: 'other',             label: 'Other' },
 ]
 
 const COURIERS = ['Speed Post', 'DTDC', 'Blue Dart', 'Delhivery', 'India Post', 'Ekart', 'Xpressbees', 'Other']
 
-// Statuses for inbound (document coming TO DCW from university)
 const INBOUND_STATUSES = [
   { value: 'pending',    label: 'Awaiting',   color: 'bg-slate-100 text-slate-700 border-slate-200' },
   { value: 'dispatched', label: 'In Transit',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -37,14 +35,13 @@ const INBOUND_STATUSES = [
   { value: 'returned',   label: 'Returned',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
 ]
 
-// Statuses for outbound (document going FROM DCW to student/associate)
 const OUTBOUND_STATUSES = [
-  { value: 'pending',    label: 'Pending',     color: 'bg-slate-100 text-slate-700 border-slate-200' },
-  { value: 'dispatched', label: 'Dispatched',  color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'in_transit', label: 'In Transit',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { value: 'delivered',  label: 'Delivered',   color: 'bg-green-100 text-green-700 border-green-200' },
-  { value: 'returned',   label: 'Returned',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { value: 'failed',     label: 'Failed',      color: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'pending',    label: 'Pending',    color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { value: 'dispatched', label: 'Dispatched', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { value: 'in_transit', label: 'In Transit', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { value: 'delivered',  label: 'Delivered',  color: 'bg-green-100 text-green-700 border-green-200' },
+  { value: 'returned',   label: 'Returned',   color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { value: 'failed',     label: 'Failed',     color: 'bg-red-100 text-red-700 border-red-200' },
 ]
 
 function statusMeta(status: string, type: string) {
@@ -53,6 +50,17 @@ function statusMeta(status: string, type: string) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface StudentOption {
+  id: string
+  full_name: string
+  enrollment_number: string
+  phone: string
+  lead_id: string | null
+  referred_by_associate: string | null
+  associate_name: string | null
+  associate_id: string | null
+}
 
 interface Associate { id: string; name: string; associate_code: string | null }
 
@@ -75,6 +83,7 @@ interface Dispatch {
 
 const EMPTY_FORM = {
   dispatch_type: 'outbound' as 'inbound' | 'outbound',
+  student_id: '',        // internal, not saved to DB
   student_name: '',
   enrollment_number: '',
   associate_id: '',
@@ -87,6 +96,102 @@ const EMPTY_FORM = {
   remarks: '',
 }
 
+// ── Student Search Combobox ───────────────────────────────────────────────────
+
+function StudentCombobox({
+  students,
+  value,
+  onChange,
+}: {
+  students: StudentOption[]
+  value: string
+  onChange: (s: StudentOption | null) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const selected = students.find(s => s.id === value)
+
+  useEffect(() => {
+    function close(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  const filtered = query.length < 1
+    ? students.slice(0, 50)
+    : students.filter(s =>
+        s.full_name.toLowerCase().includes(query.toLowerCase()) ||
+        s.enrollment_number.toLowerCase().includes(query.toLowerCase()) ||
+        s.phone.includes(query)
+      ).slice(0, 30)
+
+  function handleSelect(s: StudentOption) {
+    onChange(s)
+    setOpen(false)
+    setQuery('')
+  }
+
+  function handleClear() {
+    onChange(null)
+    setQuery('')
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      {selected ? (
+        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 bg-white">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{selected.full_name}</p>
+            <p className="text-[11px] text-gray-400 font-mono">{selected.enrollment_number} · {selected.phone}</p>
+          </div>
+          <button onClick={handleClear} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search by name, enrollment no. or phone…"
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={e => { setQuery(e.target.value); setOpen(true) }}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+      )}
+
+      {open && !selected && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="text-center py-6 text-xs text-gray-400">No students found</p>
+          ) : filtered.map(s => (
+            <button
+              key={s.id}
+              onMouseDown={e => { e.preventDefault(); handleSelect(s) }}
+              className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
+            >
+              <p className="text-sm font-medium text-gray-900">{s.full_name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] text-gray-400 font-mono">{s.enrollment_number}</span>
+                <span className="text-[11px] text-gray-400">{s.phone}</span>
+                {s.associate_name && (
+                  <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{s.associate_name}</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function DispatchManager() {
@@ -94,6 +199,7 @@ export function DispatchManager() {
   const db = supabase as any
 
   const [dispatches, setDispatches] = useState<Dispatch[]>([])
+  const [students, setStudents] = useState<StudentOption[]>([])
   const [associates, setAssociates] = useState<Associate[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'all' | 'inbound' | 'outbound'>('all')
@@ -103,6 +209,7 @@ export function DispatchManager() {
   const [formOpen, setFormOpen] = useState(false)
   const [editItem, setEditItem] = useState<Dispatch | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [showOptional, setShowOptional] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -115,16 +222,35 @@ export function DispatchManager() {
     setLoading(false)
   }, [db])
 
-  const loadAssociates = useCallback(async () => {
-    const { data } = await db.from('associates').select('id, name, associate_code').eq('status', 'approved').order('name')
-    setAssociates((data ?? []) as Associate[])
+  const loadMeta = useCallback(async () => {
+    // Load students with their associate info via lead
+    const { data: studs } = await db
+      .from('students')
+      .select('id, full_name, enrollment_number, phone, lead_id, leads(referred_by_associate, associates:referred_by_associate(id, name, associate_code))')
+      .order('full_name')
+
+    const mapped: StudentOption[] = (studs ?? []).map((s: any) => ({
+      id: s.id,
+      full_name: s.full_name,
+      enrollment_number: s.enrollment_number ?? '',
+      phone: s.phone ?? '',
+      lead_id: s.lead_id ?? null,
+      referred_by_associate: s.leads?.referred_by_associate ?? null,
+      associate_id: s.leads?.associates?.id ?? null,
+      associate_name: s.leads?.associates?.name ?? null,
+    }))
+    setStudents(mapped)
+
+    const { data: assocs } = await db.from('associates').select('id, name, associate_code').eq('status', 'approved').order('name')
+    setAssociates((assocs ?? []) as Associate[])
   }, [db])
 
-  useEffect(() => { load(); loadAssociates() }, [load, loadAssociates])
+  useEffect(() => { load(); loadMeta() }, [load, loadMeta])
 
   function openAdd(type: 'inbound' | 'outbound') {
     setEditItem(null)
-    setForm({ ...EMPTY_FORM, dispatch_type: type, status: 'pending' })
+    setForm({ ...EMPTY_FORM, dispatch_type: type })
+    setShowOptional(false)
     setFormOpen(true)
   }
 
@@ -132,6 +258,7 @@ export function DispatchManager() {
     setEditItem(d)
     setForm({
       dispatch_type: d.dispatch_type,
+      student_id: '',
       student_name: d.student_name,
       enrollment_number: d.enrollment_number ?? '',
       associate_id: d.associate_id ?? '',
@@ -143,11 +270,26 @@ export function DispatchManager() {
       status: d.status,
       remarks: d.remarks ?? '',
     })
+    setShowOptional(!!(d.courier || d.tracking_number || d.expected_delivery || d.remarks))
     setFormOpen(true)
   }
 
+  function handleStudentSelect(s: StudentOption | null) {
+    if (!s) {
+      setForm(p => ({ ...p, student_id: '', student_name: '', enrollment_number: '', associate_id: '' }))
+      return
+    }
+    setForm(p => ({
+      ...p,
+      student_id: s.id,
+      student_name: s.full_name,
+      enrollment_number: s.enrollment_number,
+      associate_id: s.associate_id ?? p.associate_id,
+    }))
+  }
+
   async function handleSave() {
-    if (!form.student_name.trim()) { toast.error('Student name is required'); return }
+    if (!form.student_name.trim()) { toast.error('Please select a student'); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
@@ -173,7 +315,7 @@ export function DispatchManager() {
       } else {
         const { error } = await db.from('student_dispatches').insert(payload)
         if (error) { toast.error(error.message); return }
-        toast.success(form.dispatch_type === 'inbound' ? 'Receive entry created' : 'Dispatch entry created')
+        toast.success(form.dispatch_type === 'inbound' ? 'Receive entry added' : 'Dispatch entry added')
       }
       setFormOpen(false)
       load()
@@ -195,7 +337,6 @@ export function DispatchManager() {
     setDispatches(prev => prev.filter(d => d.id !== id))
   }
 
-  // Filter
   const tabFiltered = dispatches.filter(d => activeTab === 'all' || d.dispatch_type === activeTab)
   const filtered = tabFiltered.filter(d => {
     const q = search.toLowerCase()
@@ -207,8 +348,10 @@ export function DispatchManager() {
 
   const inboundCount  = dispatches.filter(d => d.dispatch_type === 'inbound').length
   const outboundCount = dispatches.filter(d => d.dispatch_type === 'outbound').length
-
   const currentStatuses = activeTab === 'inbound' ? INBOUND_STATUSES : activeTab === 'outbound' ? OUTBOUND_STATUSES : [...new Map([...INBOUND_STATUSES, ...OUTBOUND_STATUSES].map(s => [s.value, s])).values()]
+
+  // Student selected in form
+  const formStudentObj = students.find(s => s.id === form.student_id) ?? null
 
   return (
     <div className="space-y-4">
@@ -230,7 +373,7 @@ export function DispatchManager() {
         ))}
       </div>
 
-      {/* ── Summary cards (per active tab) ── */}
+      {/* ── Summary cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {currentStatuses.slice(0, 4).map(s => {
           const count = tabFiltered.filter(d => d.status === s.value).length
@@ -253,7 +396,7 @@ export function DispatchManager() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search student, tracking, associate…"
+            placeholder="Search student, tracking…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -268,7 +411,7 @@ export function DispatchManager() {
             className="h-9 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none"
           >
             <option value="">All Associates</option>
-            {associates.map(a => <option key={a.id} value={a.id}>{a.name} ({a.associate_code ?? '—'})</option>)}
+            {associates.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         )}
 
@@ -276,7 +419,6 @@ export function DispatchManager() {
           <RefreshCw className="w-3.5 h-3.5" />
         </Button>
 
-        {/* Two action buttons */}
         <Button size="sm" onClick={() => openAdd('inbound')} className="gap-1.5 h-9 bg-teal-600 hover:bg-teal-700">
           <ArrowDownToLine className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Add Received</span>
@@ -300,7 +442,9 @@ export function DispatchManager() {
 
       {/* ── List ── */}
       {loading ? (
-        <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
+        <div className="flex items-center justify-center py-16">
+          <div className="w-7 h-7 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 border rounded-xl bg-white">
           <Truck className="w-10 h-10 mx-auto mb-3 text-gray-300" />
@@ -318,18 +462,14 @@ export function DispatchManager() {
               const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
               return (
                 <div key={d.id} className={`bg-white border rounded-xl p-4 space-y-3 ${isInbound ? 'border-teal-200' : 'border-blue-200'}`}>
-                  {/* Header */}
                   <div className="flex items-start gap-2">
-                    {/* Type icon */}
                     <div className={`mt-0.5 p-1.5 rounded-lg flex-shrink-0 ${isInbound ? 'bg-teal-50 text-teal-600' : 'bg-blue-50 text-blue-600'}`}>
                       {isInbound ? <ArrowDownToLine className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] font-bold uppercase tracking-wide ${isInbound ? 'text-teal-600' : 'text-blue-600'}`}>
-                          {isInbound ? 'Received' : 'Dispatched'}
-                        </span>
-                      </div>
+                      <p className={`text-[10px] font-bold uppercase tracking-wide ${isInbound ? 'text-teal-600' : 'text-blue-600'}`}>
+                        {isInbound ? 'Received' : 'Dispatched'}
+                      </p>
                       <p className="font-semibold text-gray-900 leading-tight">{d.student_name}</p>
                       {d.enrollment_number && <p className="text-xs text-gray-400 font-mono">{d.enrollment_number}</p>}
                     </div>
@@ -342,8 +482,8 @@ export function DispatchManager() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
                           {statuses.map(s => (
-                            <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)} className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]}`} />
+                            <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)}>
+                              <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]} mr-2`} />
                               <span className={d.status === s.value ? 'font-semibold' : ''}>{s.label}</span>
                               {d.status === s.value && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
                             </DropdownMenuItem>
@@ -359,18 +499,14 @@ export function DispatchManager() {
                     </div>
                   </div>
 
-                  {/* Tags row */}
                   <div className="flex flex-wrap gap-2">
                     <span className="text-[11px] bg-purple-50 text-purple-700 border border-purple-100 rounded-md px-2 py-0.5">{docLabel}</span>
                     {d.courier && <span className="text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md px-2 py-0.5">{d.courier}</span>}
                     {d.associate && (
-                      <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">
-                        {d.associate.name}
-                      </span>
+                      <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{d.associate.name}</span>
                     )}
                   </div>
 
-                  {/* Tracking */}
                   {d.tracking_number && (
                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                       <Package className="w-3.5 h-3.5 text-slate-500" />
@@ -378,7 +514,6 @@ export function DispatchManager() {
                     </div>
                   )}
 
-                  {/* Dates */}
                   <div className="flex gap-4 text-xs text-gray-500">
                     {d.dispatch_date && (
                       <div>
@@ -459,8 +594,8 @@ export function DispatchManager() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="center" className="w-40">
                               {statuses.map(s => (
-                                <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)} className="flex items-center gap-2">
-                                  <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]}`} />
+                                <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)}>
+                                  <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]} mr-2`} />
                                   <span className={d.status === s.value ? 'font-semibold' : ''}>{s.label}</span>
                                   {d.status === s.value && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
                                 </DropdownMenuItem>
@@ -487,7 +622,7 @@ export function DispatchManager() {
 
       {/* ── Form Dialog ── */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {form.dispatch_type === 'inbound'
@@ -497,65 +632,78 @@ export function DispatchManager() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 pt-1">
             {/* Type toggle — only on new entry */}
             {!editItem && (
-              <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+              <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
                 <button
                   onClick={() => setForm(p => ({ ...p, dispatch_type: 'inbound', status: 'pending' }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${form.dispatch_type === 'inbound' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${form.dispatch_type === 'inbound' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                  <ArrowDownToLine className="w-4 h-4" /> Received (Inbound)
+                  <ArrowDownToLine className="w-3.5 h-3.5" /> Received
                 </button>
                 <button
                   onClick={() => setForm(p => ({ ...p, dispatch_type: 'outbound', status: 'pending' }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${form.dispatch_type === 'outbound' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${form.dispatch_type === 'outbound' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                  <Send className="w-4 h-4" /> Dispatch (Outbound)
+                  <Send className="w-3.5 h-3.5" /> Dispatch
                 </button>
               </div>
             )}
 
-            {/* Context label */}
-            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              {form.dispatch_type === 'inbound'
-                ? '📥 Document received at DCW office from university / institute'
-                : '📤 Document being sent from DCW to student / associate'}
-            </p>
-
-            {/* Student info */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Student Name *</Label>
-                <Input placeholder="Enter student full name" value={form.student_name} onChange={e => setForm(p => ({ ...p, student_name: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Enrollment No.</Label>
-                <Input placeholder="Optional" value={form.enrollment_number} onChange={e => setForm(p => ({ ...p, enrollment_number: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Associate</Label>
-                <select value={form.associate_id} onChange={e => setForm(p => ({ ...p, associate_id: e.target.value }))}
-                  className="w-full border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">None / Direct</option>
-                  {associates.map(a => <option key={a.id} value={a.id}>{a.name} ({a.associate_code ?? '—'})</option>)}
-                </select>
-              </div>
+            {/* ── Student picker ── */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Student *</Label>
+              {editItem ? (
+                // In edit mode show static info
+                <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                  <p className="text-sm font-semibold text-gray-900">{form.student_name}</p>
+                  {form.enrollment_number && <p className="text-xs text-gray-400 font-mono">{form.enrollment_number}</p>}
+                </div>
+              ) : (
+                <StudentCombobox
+                  students={students}
+                  value={form.student_id}
+                  onChange={handleStudentSelect}
+                />
+              )}
             </div>
 
-            {/* Document + Status */}
+            {/* Associate — auto-filled, but can override */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Associate</Label>
+              <select
+                value={form.associate_id}
+                onChange={e => setForm(p => ({ ...p, associate_id: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">None / Direct</option>
+                {associates.map(a => <option key={a.id} value={a.id}>{a.name} {a.associate_code ? `(${a.associate_code})` : ''}</option>)}
+              </select>
+              {form.associate_id && !editItem && (
+                <p className="text-[11px] text-teal-600 mt-0.5">Auto-filled from student's referral</p>
+              )}
+            </div>
+
+            {/* Document type + Status */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Document Type *</Label>
-                <select value={form.document_type} onChange={e => setForm(p => ({ ...p, document_type: e.target.value }))}
-                  className="w-full border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <Label className="text-xs font-semibold text-slate-700">Document *</Label>
+                <select
+                  value={form.document_type}
+                  onChange={e => setForm(p => ({ ...p, document_type: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   {DOCUMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Status</Label>
-                <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-                  className="w-full border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <Label className="text-xs font-semibold text-slate-700">Status</Label>
+                <select
+                  value={form.status}
+                  onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   {(form.dispatch_type === 'inbound' ? INBOUND_STATUSES : OUTBOUND_STATUSES).map(s => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
@@ -563,47 +711,81 @@ export function DispatchManager() {
               </div>
             </div>
 
-            {/* Courier */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Courier</Label>
-                <select value={form.courier} onChange={e => setForm(p => ({ ...p, courier: e.target.value }))}
-                  className="w-full border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Select courier…</option>
-                  {COURIERS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Tracking Number</Label>
-                <Input placeholder="e.g. EE123456789IN" value={form.tracking_number} onChange={e => setForm(p => ({ ...p, tracking_number: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">
-                  {form.dispatch_type === 'inbound' ? 'Received Date' : 'Dispatch Date'}
-                </Label>
-                <Input type="date" value={form.dispatch_date} onChange={e => setForm(p => ({ ...p, dispatch_date: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Expected Delivery</Label>
-                <Input type="date" value={form.expected_delivery} onChange={e => setForm(p => ({ ...p, expected_delivery: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Remarks */}
+            {/* Date */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Remarks</Label>
-              <Input placeholder="Any notes…" value={form.remarks} onChange={e => setForm(p => ({ ...p, remarks: e.target.value }))} />
+              <Label className="text-xs font-semibold text-slate-700">
+                {form.dispatch_type === 'inbound' ? 'Received Date' : 'Dispatch Date'}
+              </Label>
+              <input
+                type="date"
+                value={form.dispatch_date}
+                onChange={e => setForm(p => ({ ...p, dispatch_date: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
-            <div className="flex gap-3 justify-end pt-1">
+            {/* Optional fields toggle */}
+            <button
+              type="button"
+              onClick={() => setShowOptional(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showOptional ? 'rotate-90' : ''}`} />
+              {showOptional ? 'Hide' : 'Add'} courier, tracking & remarks
+            </button>
+
+            {showOptional && (
+              <div className="space-y-3 pt-1 border-t border-dashed border-gray-200">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Courier</Label>
+                    <select
+                      value={form.courier}
+                      onChange={e => setForm(p => ({ ...p, courier: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select…</option>
+                      {COURIERS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Tracking No.</Label>
+                    <input
+                      type="text"
+                      placeholder="EE123456IN"
+                      value={form.tracking_number}
+                      onChange={e => setForm(p => ({ ...p, tracking_number: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Expected Delivery</Label>
+                  <input
+                    type="date"
+                    value={form.expected_delivery}
+                    onChange={e => setForm(p => ({ ...p, expected_delivery: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Remarks</Label>
+                  <input
+                    type="text"
+                    placeholder="Any notes…"
+                    value={form.remarks}
+                    onChange={e => setForm(p => ({ ...p, remarks: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end pt-2">
               <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
               <Button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || (!editItem && !form.student_name)}
                 className={`min-w-24 ${form.dispatch_type === 'inbound' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
               >
                 {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : editItem ? 'Update' : 'Save'}

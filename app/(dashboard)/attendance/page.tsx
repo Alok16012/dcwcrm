@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import { AttendancePunchClient } from '@/components/attendance/AttendancePunchClient'
+import { SelfPunchClient } from '@/components/attendance/SelfPunchClient'
 import { PageHeader } from '@/components/shared/PageHeader'
 
 export const dynamic = 'force-dynamic'
@@ -17,17 +18,45 @@ export default async function AttendancePage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
-    .single() as { data: { role: string } | null }
+    .single() as { data: { role: string; full_name: string } | null }
 
-  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
+  if (!profile) redirect('/login')
 
+  const isAdmin = ['admin', 'backend'].includes(profile.role)
+
+  // ── Employee self-service view ─────────────────────────────────────────────
+  if (!isAdmin) {
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { id: string } | null }
+
+    if (!emp) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-gray-500 font-medium">No employee record found for your account.</p>
+          <p className="text-xs text-gray-400 mt-1">Contact admin to set up your employee profile.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Attendance" description="Mark your daily attendance" />
+        <SelfPunchClient employeeId={emp.id} employeeName={profile.full_name} />
+      </div>
+    )
+  }
+
+  // ── Admin table view ───────────────────────────────────────────────────────
   const params = await searchParams
   const today  = format(new Date(), 'yyyy-MM-dd')
   const date   = params.date ?? today
 
-  // Fetch active employees
   const { data: employees } = await supabase
     .from('employees')
     .select('id, profile_id')
@@ -44,7 +73,6 @@ export default async function AttendancePage({
     ((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name])
   )
 
-  // Fetch attendance for selected date
   const { data: attData } = await supabase
     .from('attendance')
     .select('employee_id, status, clock_in, clock_out')

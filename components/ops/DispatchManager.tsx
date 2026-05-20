@@ -56,6 +56,7 @@ interface StudentOption {
   full_name: string
   enrollment_number: string
   phone: string
+  father_name: string | null
   lead_id: string | null
   referred_by_associate: string | null
   associate_name: string | null
@@ -68,6 +69,8 @@ interface Dispatch {
   id: string
   dispatch_type: 'inbound' | 'outbound'
   student_name: string
+  student_phone: string | null
+  father_name: string | null
   enrollment_number: string | null
   associate_id: string | null
   associate?: { name: string; associate_code: string | null } | null
@@ -83,8 +86,10 @@ interface Dispatch {
 
 const EMPTY_FORM = {
   dispatch_type: 'outbound' as 'inbound' | 'outbound',
-  student_id: '',        // internal, not saved to DB
+  student_id: '',
   student_name: '',
+  student_phone: '',
+  father_name: '',
   enrollment_number: '',
   associate_id: '',
   document_type: 'marksheet',
@@ -227,7 +232,7 @@ export function DispatchManager() {
     // Load students with their associate info via lead
     const { data: studs } = await db
       .from('students')
-      .select('id, full_name, enrollment_number, phone, lead_id, leads(referred_by_associate, associates:referred_by_associate(id, name, associate_code))')
+      .select('id, full_name, enrollment_number, phone, father_name, lead_id, leads(referred_by_associate, associates:referred_by_associate(id, name, associate_code))')
       .order('full_name')
 
     const mapped: StudentOption[] = (studs ?? []).map((s: any) => ({
@@ -235,6 +240,7 @@ export function DispatchManager() {
       full_name: s.full_name,
       enrollment_number: s.enrollment_number ?? '',
       phone: s.phone ?? '',
+      father_name: s.father_name ?? null,
       lead_id: s.lead_id ?? null,
       referred_by_associate: s.leads?.referred_by_associate ?? null,
       associate_id: s.leads?.associates?.id ?? null,
@@ -262,6 +268,8 @@ export function DispatchManager() {
       dispatch_type: d.dispatch_type,
       student_id: '',
       student_name: d.student_name,
+      student_phone: d.student_phone ?? '',
+      father_name: d.father_name ?? '',
       enrollment_number: d.enrollment_number ?? '',
       associate_id: d.associate_id ?? '',
       document_type: d.document_type,
@@ -278,25 +286,31 @@ export function DispatchManager() {
 
   function handleStudentSelect(s: StudentOption | null) {
     if (!s) {
-      setForm(p => ({ ...p, student_id: '', student_name: '', enrollment_number: '', associate_id: '' }))
+      setForm(p => ({ ...p, student_id: '', student_name: '', student_phone: '', father_name: '', enrollment_number: '', associate_id: '' }))
       return
     }
     setForm(p => ({
       ...p,
       student_id: s.id,
       student_name: s.full_name,
+      student_phone: s.phone,
+      father_name: s.father_name ?? '',
       enrollment_number: s.enrollment_number,
       associate_id: s.associate_id ?? p.associate_id,
     }))
   }
 
   async function handleSave() {
-    if (!form.student_name.trim()) { toast.error('Please select a student'); return }
+    if (!form.student_name.trim()) { toast.error('Student name is required'); return }
+    if (!form.student_phone.trim()) { toast.error('Phone number is required'); return }
+    if (!form.father_name.trim()) { toast.error("Father's name is required"); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       dispatch_type: form.dispatch_type,
       student_name: form.student_name.trim(),
+      student_phone: form.student_phone.trim() || null,
+      father_name: form.father_name.trim() || null,
       enrollment_number: form.enrollment_number.trim() || null,
       associate_id: form.associate_id || null,
       document_type: form.document_type,
@@ -672,33 +686,56 @@ export function DispatchManager() {
               </div>
 
               {editItem ? (
-                <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
-                  <p className="text-sm font-semibold text-gray-900">{form.student_name}</p>
-                  {form.enrollment_number && <p className="text-xs text-gray-400 font-mono">{form.enrollment_number}</p>}
+                <div className="space-y-2">
+                  <input type="text" value={form.student_name} onChange={e => setForm(p => ({ ...p, student_name: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="tel" value={form.student_phone} onChange={e => setForm(p => ({ ...p, student_phone: e.target.value }))}
+                      placeholder="Phone *" className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" value={form.father_name} onChange={e => setForm(p => ({ ...p, father_name: e.target.value }))}
+                      placeholder="Father's name *" className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <input type="text" value={form.enrollment_number} onChange={e => setForm(p => ({ ...p, enrollment_number: e.target.value }))}
+                    placeholder="Enrollment number" className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               ) : manualEntry ? (
                 <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Student full name *"
-                    value={form.student_name}
+                  <input type="text" placeholder="Student full name *" value={form.student_name}
                     onChange={e => setForm(p => ({ ...p, student_name: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Enrollment number (optional)"
-                    value={form.enrollment_number}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="tel" placeholder="Phone number *" value={form.student_phone}
+                      onChange={e => setForm(p => ({ ...p, student_phone: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" placeholder="Father's name *" value={form.father_name}
+                      onChange={e => setForm(p => ({ ...p, father_name: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <input type="text" placeholder="Enrollment number (optional)" value={form.enrollment_number}
                     onChange={e => setForm(p => ({ ...p, enrollment_number: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               ) : (
-                <StudentCombobox
-                  students={students}
-                  value={form.student_id}
-                  onChange={handleStudentSelect}
-                />
+                <>
+                  <StudentCombobox students={students} value={form.student_id} onChange={handleStudentSelect} />
+                  {/* Show filled details after student is selected */}
+                  {form.student_id && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Phone *</p>
+                        <input type="tel" value={form.student_phone}
+                          onChange={e => setForm(p => ({ ...p, student_phone: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Father's Name *</p>
+                        <input type="text" value={form.father_name}
+                          onChange={e => setForm(p => ({ ...p, father_name: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -818,7 +855,7 @@ export function DispatchManager() {
               <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || (!editItem && !form.student_name)}
+                disabled={saving || !form.student_name || !form.student_phone || !form.father_name}
                 className={`min-w-24 ${form.dispatch_type === 'inbound' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
               >
                 {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : editItem ? 'Update' : 'Save'}

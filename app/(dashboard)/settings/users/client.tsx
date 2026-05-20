@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, Briefcase, UserCircle2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,8 +36,7 @@ interface EmployeeRow {
   designation: string | null
   joining_date: string | null
   is_active: boolean
-  basic_salary: number
-  profile: { id: string; full_name: string; email: string; phone: string | null; role: string } | null
+  profile: { id: string } | null
 }
 
 interface AssociateRow {
@@ -59,7 +58,10 @@ const ASSOC_STATUS: Record<string, { label: string; cls: string }> = {
   rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-800' },
 }
 
-type Tab = 'staff' | 'employees' | 'associates'
+type Tab = 'staff' | 'associates'
+
+// Merged profile with optional employee info
+type StaffRow = Profile & { emp_code?: string; department?: string; designation?: string; joining_date?: string }
 
 export function UsersSettingsClient({
   users: initialUsers,
@@ -82,6 +84,19 @@ export function UsersSettingsClient({
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<CreateUserData>({
     resolver: zodResolver(createUserSchema),
+  })
+
+  // Merge employee details into staff rows
+  const empByProfileId = Object.fromEntries(initialEmployees.map(e => [e.profile?.id ?? '', e]))
+  const staffRows: StaffRow[] = users.map(u => {
+    const emp = empByProfileId[u.id]
+    return {
+      ...u,
+      emp_code: emp?.employee_code,
+      department: emp?.department ?? undefined,
+      designation: emp?.designation ?? undefined,
+      joining_date: emp?.joining_date ?? undefined,
+    }
   })
 
   async function onCreateUser(data: CreateUserData) {
@@ -149,15 +164,45 @@ export function UsersSettingsClient({
     })
   }
 
-  // ── Staff columns ────────────────────────────────────────────────────────────
-  const staffColumns: ColumnDef<Profile>[] = [
-    { accessorKey: 'full_name', header: 'Name' },
-    { accessorKey: 'email', header: 'Email' },
+  // ── Staff columns (profile + merged employee info) ───────────────────────────
+  const staffColumns: ColumnDef<StaffRow>[] = [
+    {
+      accessorKey: 'full_name', header: 'Name',
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-gray-900">{row.original.full_name}</p>
+          {row.original.emp_code && (
+            <p className="text-[11px] text-gray-400 font-mono">{row.original.emp_code}</p>
+          )}
+        </div>
+      )
+    },
+    { accessorKey: 'email', header: 'Email', cell: ({ row }) => <span className="text-xs">{row.original.email}</span> },
     {
       accessorKey: 'role', header: 'Role',
       cell: ({ row }) => <Badge variant="outline">{ROLE_LABELS[row.original.role] ?? row.original.role}</Badge>
     },
     { accessorKey: 'phone', header: 'Phone', cell: ({ row }) => row.original.phone ?? '-' },
+    {
+      id: 'dept_desig', header: 'Dept / Designation',
+      cell: ({ row }) => {
+        const d = row.original.department
+        const desig = row.original.designation
+        if (!d && !desig) return <span className="text-gray-300 text-xs">—</span>
+        return (
+          <div>
+            {d && <p className="text-xs font-medium text-gray-700">{d}</p>}
+            {desig && <p className="text-[11px] text-gray-400">{desig}</p>}
+          </div>
+        )
+      }
+    },
+    {
+      id: 'joining', header: 'Joined',
+      cell: ({ row }) => row.original.joining_date
+        ? <span className="text-xs text-gray-500">{format(new Date(row.original.joining_date), 'dd MMM yyyy')}</span>
+        : <span className="text-gray-300 text-xs">—</span>
+    },
     {
       accessorKey: 'is_active', header: 'Status',
       cell: ({ row }) => (
@@ -184,29 +229,6 @@ export function UsersSettingsClient({
     },
   ]
 
-  // ── Employee columns ─────────────────────────────────────────────────────────
-  const employeeColumns: ColumnDef<EmployeeRow>[] = [
-    { id: 'name', header: 'Name', accessorFn: r => r.profile?.full_name ?? '', cell: ({ row }) => <span className="font-medium">{row.original.profile?.full_name ?? '—'}</span> },
-    { accessorKey: 'employee_code', header: 'Emp Code', cell: ({ row }) => <span className="font-mono text-xs text-gray-600">{row.original.employee_code}</span> },
-    { id: 'email', header: 'Email', accessorFn: r => r.profile?.email ?? '', cell: ({ row }) => <span className="text-xs">{row.original.profile?.email ?? '—'}</span> },
-    { id: 'phone', header: 'Phone', accessorFn: r => r.profile?.phone ?? '', cell: ({ row }) => row.original.profile?.phone ?? '-' },
-    { id: 'role', header: 'Role', accessorFn: r => r.profile?.role ?? '', cell: ({ row }) => <Badge variant="outline" className="text-xs">{ROLE_LABELS[row.original.profile?.role as UserRole] ?? row.original.profile?.role ?? '—'}</Badge> },
-    { accessorKey: 'department', header: 'Dept', cell: ({ row }) => row.original.department ?? '-' },
-    { accessorKey: 'designation', header: 'Designation', cell: ({ row }) => row.original.designation ?? '-' },
-    {
-      accessorKey: 'joining_date', header: 'Joined',
-      cell: ({ row }) => row.original.joining_date ? format(new Date(row.original.joining_date), 'dd MMM yyyy') : '-'
-    },
-    {
-      accessorKey: 'is_active', header: 'Status',
-      cell: ({ row }) => (
-        <Badge className={row.original.is_active ? 'bg-green-100 text-green-800 border-0' : 'bg-red-100 text-red-800 border-0'}>
-          {row.original.is_active ? 'Active' : 'Inactive'}
-        </Badge>
-      )
-    },
-  ]
-
   // ── Associate columns ────────────────────────────────────────────────────────
   const associateColumns: ColumnDef<AssociateRow>[] = [
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
@@ -214,7 +236,7 @@ export function UsersSettingsClient({
     { accessorKey: 'email', header: 'Email', cell: ({ row }) => <span className="text-xs">{row.original.email}</span> },
     { accessorKey: 'phone', header: 'Phone' },
     {
-      id: 'location', header: 'Location', accessorFn: r => `${r.current_city ?? ''} ${r.current_state ?? ''}`,
+      id: 'location', header: 'Location',
       cell: ({ row }) => {
         const loc = [row.original.current_city, row.original.current_state].filter(Boolean).join(', ')
         return loc || '-'
@@ -238,16 +260,15 @@ export function UsersSettingsClient({
   ]
 
   const tabs: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: 'staff',      label: 'Staff',      icon: Users,        count: users.length },
-    { key: 'employees',  label: 'Employees',  icon: Briefcase,    count: initialEmployees.length },
-    { key: 'associates', label: 'Associates', icon: UserCircle2,  count: initialAssociates.length },
+    { key: 'staff',      label: 'Staff',      icon: Users,       count: users.length },
+    { key: 'associates', label: 'Associates', icon: UserCircle2, count: initialAssociates.length },
   ]
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="User Management"
-        description="Manage staff, employees and associates"
+        description="Manage staff and associates"
         action={
           activeTab === 'staff' ? (
             <Dialog open={open} onOpenChange={setOpen}>
@@ -304,10 +325,8 @@ export function UsersSettingsClient({
         })}
       </div>
 
-      {/* ── Tab content ── */}
-      {activeTab === 'staff' && <DataTable data={users} columns={staffColumns} />}
-      {activeTab === 'employees' && <DataTable data={initialEmployees} columns={employeeColumns} />}
-      {activeTab === 'associates' && <DataTable data={initialAssociates} columns={associateColumns} />}
+      {activeTab === 'staff'      && <DataTable data={staffRows}            columns={staffColumns} />}
+      {activeTab === 'associates' && <DataTable data={initialAssociates}    columns={associateColumns} />}
 
       {/* ── Dialogs ── */}
       {confirmUser && (

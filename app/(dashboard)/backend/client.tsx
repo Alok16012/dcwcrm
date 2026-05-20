@@ -169,7 +169,8 @@ export function BackendListClient() {
           department:departments(id, name),
           sub_section:department_sub_sections(id, name),
           session:sessions(id, name),
-          counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at)
+          counsellor:profiles!students_assigned_counsellor_fkey(id, email, full_name, role, is_active, created_at),
+          associate:associates!students_referred_by_associate_fkey(id, name, associate_code)
         `)
         .order('enrollment_date', { ascending: true })
 
@@ -403,6 +404,19 @@ export function BackendListClient() {
               {initials(name)}
             </span>
             <span className="text-xs font-medium text-gray-700 truncate max-w-[90px]">{name}</span>
+          </span>
+        )
+      }
+    },
+    {
+      id: 'associate', accessorFn: (row: any) => (row as any).associate?.name ?? '', header: 'Associate',
+      cell: ({ row }: any) => {
+        const a = (row.original as any).associate
+        if (!a) return <span className="text-gray-400 text-xs">-</span>
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
+            {a.name}
+            {a.associate_code && <span className="text-indigo-400 font-normal">({a.associate_code})</span>}
           </span>
         )
       }

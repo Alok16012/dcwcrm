@@ -209,6 +209,7 @@ export function DispatchManager() {
   const [formOpen, setFormOpen] = useState(false)
   const [editItem, setEditItem] = useState<Dispatch | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [manualEntry, setManualEntry] = useState(false)
   const [showOptional, setShowOptional] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -250,6 +251,7 @@ export function DispatchManager() {
   function openAdd(type: 'inbound' | 'outbound') {
     setEditItem(null)
     setForm({ ...EMPTY_FORM, dispatch_type: type })
+    setManualEntry(false)
     setShowOptional(false)
     setFormOpen(true)
   }
@@ -653,12 +655,43 @@ export function DispatchManager() {
 
             {/* ── Student picker ── */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Student *</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">Student *</Label>
+                {!editItem && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualEntry(v => !v)
+                      setForm(p => ({ ...p, student_id: '', student_name: '', enrollment_number: '', associate_id: '' }))
+                    }}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    {manualEntry ? 'Search from students' : 'Enter manually'}
+                  </button>
+                )}
+              </div>
+
               {editItem ? (
-                // In edit mode show static info
                 <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
                   <p className="text-sm font-semibold text-gray-900">{form.student_name}</p>
                   {form.enrollment_number && <p className="text-xs text-gray-400 font-mono">{form.enrollment_number}</p>}
+                </div>
+              ) : manualEntry ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Student full name *"
+                    value={form.student_name}
+                    onChange={e => setForm(p => ({ ...p, student_name: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Enrollment number (optional)"
+                    value={form.enrollment_number}
+                    onChange={e => setForm(p => ({ ...p, enrollment_number: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               ) : (
                 <StudentCombobox

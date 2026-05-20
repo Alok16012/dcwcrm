@@ -202,6 +202,7 @@ export interface Student {
   guardian_name?: string
   guardian_phone?: string
   guardian_relationship?: string
+  referred_by_associate?: string
   phone: string
   email?: string
   city?: string

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Calendar, IndianRupee, FileText, Building2 } from 'lucide-react'
+import { User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Calendar, IndianRupee, FileText, Building2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,8 @@ import {
     type Department, type DepartmentSubSection, type Session,
     PAYMENT_MODE_LABELS
 } from '@/types/app.types'
+
+interface Associate { id: string; name: string; associate_code: string | null }
 
 interface StudentFormProps {
     student?: Partial<Student>
@@ -67,6 +69,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     const [subSections, setSubSections] = useState<DepartmentSubSection[]>([])
     const [sessions, setSessions] = useState<Session[]>([])
     const [counsellors, setCounsellors] = useState<Profile[]>([])
+    const [associates, setAssociates] = useState<Associate[]>([])
     const [loading, setLoading] = useState(false)
     const supabase = createClient()
 
@@ -78,6 +81,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             guardian_name: student?.guardian_name ?? '',
             guardian_phone: (student as any)?.guardian_phone ?? '',
             guardian_relationship: (student as any)?.guardian_relationship ?? '',
+            referred_by_associate: (student as any)?.referred_by_associate ?? '',
             phone: student?.phone ?? '',
             email: student?.email ?? '',
             city: student?.city ?? '',
@@ -105,11 +109,12 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         async function load() {
             setLoading(true)
             try {
-                const [{ data: c }, { data: p }, { data: d }, { data: s }] = await Promise.all([
+                const [{ data: c }, { data: p }, { data: d }, { data: s }, { data: assocs }] = await Promise.all([
                     supabase.from('courses').select('*').order('name'),
                     supabase.from('profiles').select('*').in('role', ['counselor', 'lead', 'admin']).eq('is_active', true).order('full_name'),
                     supabase.from('departments').select('*').order('name'),
                     supabase.from('sessions').select('*').order('name', { ascending: false }),
+                    (supabase as any).from('associates').select('id, name, associate_code').eq('status', 'approved').order('name'),
                 ])
 
                 if (!isMounted) return
@@ -117,6 +122,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 setCounsellors((p ?? []) as any[])
                 setDepartments(d ?? [])
                 setSessions(s ?? [])
+                setAssociates((assocs ?? []) as Associate[])
 
                 if (student?.id) {
                     reset({
@@ -125,6 +131,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         guardian_name: student?.guardian_name ?? '',
                         guardian_phone: (student as any)?.guardian_phone ?? '',
                         guardian_relationship: (student as any)?.guardian_relationship ?? '',
+                        referred_by_associate: (student as any)?.referred_by_associate ?? '',
                         phone: student?.phone ?? '',
                         email: student?.email ?? '',
                         city: student?.city ?? '',
@@ -310,18 +317,18 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 </div>
             </div>
 
-            {/* ── Guardian / Associate ── */}
+            {/* ── Guardian ── */}
             <div className="bg-teal-50/50 rounded-xl p-4 border border-teal-100">
-                <SectionHeader icon={UserCheck} title="Guardian / Associate" color="border-teal-200" />
+                <SectionHeader icon={UserCheck} title="Guardian Details" color="border-teal-200" />
                 <div className="grid grid-cols-2 gap-4">
-                    <FieldWrapper label="Guardian / Father Name">
+                    <FieldWrapper label="Guardian Name">
                         <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400" />
                             <Input {...register('guardian_name')} placeholder="Guardian name" className="pl-9 bg-white border-teal-200" />
                         </div>
                     </FieldWrapper>
 
-                    <FieldWrapper label="Guardian Phone Number">
+                    <FieldWrapper label="Guardian Phone">
                         <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400" />
                             <Input {...register('guardian_phone')} placeholder="Guardian mobile number" className="pl-9 bg-white border-teal-200" />
@@ -335,6 +342,36 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </div>
                     </FieldWrapper>
                 </div>
+            </div>
+
+            {/* ── Associate ── */}
+            <div className="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100">
+                <SectionHeader icon={Users} title="Associate" color="border-indigo-200" />
+                <FieldWrapper label="Referred by Associate">
+                    <Select
+                        value={watch('referred_by_associate') || 'none'}
+                        onValueChange={v => setValue('referred_by_associate', v === 'none' ? '' : v as any)}
+                    >
+                        <SelectTrigger className="bg-white border-indigo-200">
+                            <SelectValue placeholder="Select associate">
+                                {(() => {
+                                    const id = watch('referred_by_associate')
+                                    if (!id) return 'None'
+                                    const a = associates.find(x => x.id === id)
+                                    return a ? `${a.name}${a.associate_code ? ` (${a.associate_code})` : ''}` : 'None'
+                                })()}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {associates.map(a => (
+                                <SelectItem key={a.id} value={a.id}>
+                                    {a.name}{a.associate_code ? ` (${a.associate_code})` : ''}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </FieldWrapper>
             </div>
 
             <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">

@@ -208,6 +208,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 department_id: data.department_id || null,
                 sub_section_id: data.sub_section_id || null,
                 assigned_counsellor: data.assigned_counsellor || null,
+                referred_by_associate: (data.referred_by_associate && data.referred_by_associate !== 'none') ? data.referred_by_associate : null,
                 mode: data.mode || null,
                 enrollment_date: data.enrollment_date || null,
                 session_id: data.session_id || null,

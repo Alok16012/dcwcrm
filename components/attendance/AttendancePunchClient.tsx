@@ -90,29 +90,6 @@ export function AttendancePunchClient({ date: initialDate, employees }: Props) {
     }))
   }
 
-  async function saveRow(empId: string) {
-    const row = rows.find(r => r.employee_id === empId)
-    if (!row) return
-    setSaving(empId)
-    try {
-      const status = (row.punch_in && row.punch_out) ? calcStatus(row.punch_in, row.punch_out) : 'absent'
-      const { error } = await supabase.from('attendance').upsert({
-        employee_id: empId,
-        date,
-        status,
-        clock_in:  row.punch_in  ? `${row.punch_in}:00`  : null,
-        clock_out: row.punch_out ? `${row.punch_out}:00` : null,
-      } as never, { onConflict: 'employee_id,date' })
-      if (error) throw error
-      setRows(prev => prev.map(r => r.employee_id === empId ? { ...r, status } : r))
-      toast.success(`Saved — ${row.employee_name}`)
-    } catch {
-      toast.error('Failed to save')
-    } finally {
-      setSaving(null)
-    }
-  }
-
   async function saveAll() {
     setSaving('__all__')
     try {
@@ -194,7 +171,6 @@ export function AttendancePunchClient({ date: initialDate, employees }: Props) {
               <th className="px-4 py-3 text-center font-semibold min-w-[150px]">Punch Out</th>
               <th className="px-4 py-3 text-center font-semibold min-w-[100px]">Hours</th>
               <th className="px-4 py-3 text-center font-semibold min-w-[130px]">Status</th>
-              <th className="px-4 py-3 text-center font-semibold min-w-[80px]">Save</th>
             </tr>
           </thead>
           <tbody>
@@ -240,25 +216,13 @@ export function AttendancePunchClient({ date: initialDate, employees }: Props) {
                   <td className="px-4 py-3 text-center">
                     <Badge className={badge.cls}>{badge.label}</Badge>
                   </td>
-
-                  <td className="px-4 py-3 text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveRow(row.employee_id)}
-                      disabled={saving === row.employee_id}
-                      className="h-7 text-xs px-3"
-                    >
-                      {saving === row.employee_id ? '...' : 'Save'}
-                    </Button>
-                  </td>
                 </tr>
               )
             })}
 
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">
                   No active employees found
                 </td>
               </tr>

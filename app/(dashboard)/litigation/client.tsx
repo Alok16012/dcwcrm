@@ -3,7 +3,7 @@ import { useState, useTransition, useMemo } from 'react'
 import {
   Plus, Pencil, Trash2, IndianRupee, Search,
   Building2, Scale, CreditCard, History, Download,
-  ChevronDown, ChevronRight, UserX,
+  ChevronDown, ChevronRight, UserX, TrendingDown, AlertCircle, CheckCircle2, Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -137,21 +137,32 @@ const EMPTY_PAY: PayForm = {
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, color = 'default' }: { label: string; value: string | number; color?: 'blue' | 'green' | 'amber' | 'red' | 'default' }) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    green: 'bg-green-50 text-green-700 border-green-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    red: 'bg-red-50 text-red-700 border-red-100',
-    default: 'bg-gray-50 text-gray-700 border-gray-100',
-  }
+function StatCard({ label, value, sub, icon: Icon, color = 'default' }: {
+  label: string; value: string | number; sub?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: any; color?: 'blue' | 'amber' | 'red' | 'green' | 'default'
+}) {
+  const cfg = {
+    blue:    { wrap: 'bg-blue-50 border-blue-100',    icon: 'bg-blue-100 text-blue-600',    val: 'text-blue-800' },
+    amber:   { wrap: 'bg-amber-50 border-amber-100',  icon: 'bg-amber-100 text-amber-600',  val: 'text-amber-800' },
+    red:     { wrap: 'bg-red-50 border-red-100',      icon: 'bg-red-100 text-red-500',      val: 'text-red-700' },
+    green:   { wrap: 'bg-green-50 border-green-100',  icon: 'bg-green-100 text-green-600',  val: 'text-green-800' },
+    default: { wrap: 'bg-white border-gray-200',      icon: 'bg-gray-100 text-gray-500',    val: 'text-gray-800' },
+  }[color]
   return (
-    <div className={`rounded-xl border p-4 ${colors[color]}`}>
-      <p className="text-xs font-medium opacity-70 mb-1">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
+    <div className={`rounded-2xl border p-4 flex items-center gap-3 ${cfg.wrap}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.icon}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
+        <p className={`text-xl font-bold leading-none ${cfg.val}`}>{value}</p>
+        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      </div>
     </div>
   )
 }
+
 
 // ─── Receipt Generator ────────────────────────────────────────────────────────
 function downloadReceipt(payment: LitigationPayment, litigation: Litigation) {
@@ -445,18 +456,33 @@ export function LitigationClient({
 
   function statusBadge(l: Litigation) {
     const pending = (l.amount_refunded ?? 0) - (l.amount_paid ?? 0)
-    if (pending <= 0) return <Badge className="bg-green-100 text-green-800 border-0 text-xs">Cleared</Badge>
-    if (l.amount_paid > 0) return <Badge className="bg-amber-100 text-amber-800 border-0 text-xs">Partial</Badge>
-    return <Badge className="bg-red-100 text-red-800 border-0 text-xs">Pending</Badge>
+    if (pending <= 0) return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+        <CheckCircle2 className="w-3 h-3" /> Cleared
+      </span>
+    )
+    if (l.amount_paid > 0) return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+        <Clock className="w-3 h-3" /> Partial
+      </span>
+    )
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+        <AlertCircle className="w-3 h-3" /> Pending
+      </span>
+    )
   }
 
   // ─── Cases Table ─────────────────────────────────────────────────────────────
   function CasesTable({ list, type }: { list: Litigation[]; type: 'litigation' | 'debt' }) {
     if (list.length === 0) return (
-      <div className="text-center py-16">
-        <Scale className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-500 font-medium">No {type} cases found</p>
-        <Button className="mt-4 gap-1.5" onClick={() => openAdd(type)}>
+      <div className="text-center py-20">
+        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <Scale className="w-8 h-8 text-gray-300" />
+        </div>
+        <p className="text-gray-500 font-semibold">No {type === 'debt' ? 'debt' : 'litigation'} cases</p>
+        <p className="text-xs text-gray-400 mt-1">Add the first case to get started</p>
+        <Button className="mt-5 gap-1.5" onClick={() => openAdd(type)}>
           <Plus className="w-4 h-4" /> Add {type === 'debt' ? 'Debt' : 'Litigation'}
         </Button>
       </div>
@@ -465,71 +491,114 @@ export function LitigationClient({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Student</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department / Board</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Type / Session</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Reason</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Total</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Paid</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Refund</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Pending</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Actions</th>
+            <tr className="border-b border-gray-100">
+              <th className="text-left px-5 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Student</th>
+              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Department</th>
+              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Type & Reason</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Amount</th>
+              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Progress</th>
+              <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Status</th>
+              <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-50">
             {list.map((l) => {
-              const pendingRefund = (l.amount_refunded ?? 0) - (l.amount_paid ?? 0)
+              const refundable = l.amount_refunded ?? 0
+              const paid = l.amount_paid ?? 0
+              const pendingRefund = refundable - paid
+              const paidPct = refundable > 0 ? Math.min(100, Math.round((paid / refundable) * 100)) : 0
               const pCount = paymentsFor(l.id).length
               return (
-                <tr key={l.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{l.student_name}</p>
-                    {l.father_name && <p className="text-xs text-gray-500">Father: {l.father_name}</p>}
-                    {l.phone && <p className="text-xs text-gray-400">{l.phone}</p>}
+                <tr key={l.id} className="hover:bg-slate-50/60 transition-colors group">
+                  {/* Student */}
+                  <td className="px-5 py-4">
+                    <p className="font-semibold text-gray-900 text-[13px]">{l.student_name}</p>
+                    {l.father_name && <p className="text-xs text-gray-500 mt-0.5">s/o {l.father_name}</p>}
+                    {l.phone && <p className="text-xs text-gray-400 font-mono tracking-tight">{l.phone}</p>}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{l.department?.name ?? '—'}</p>
-                    {l.sub_section && <p className="text-xs text-purple-600">{l.sub_section.name}</p>}
+                  {/* Department */}
+                  <td className="px-4 py-4">
+                    <p className="font-medium text-gray-800 text-[13px]">{l.department?.name ?? '—'}</p>
+                    {l.sub_section && (
+                      <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
+                        {l.sub_section.name}
+                      </span>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-1">{l.session?.name ?? '—'}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    {l.litigation_type && (
-                      <p className="text-xs font-medium text-blue-700">{litTypeLabel(l.litigation_type, type)}</p>
+                  {/* Type & Reason */}
+                  <td className="px-4 py-4 max-w-[180px]">
+                    {l.litigation_type ? (
+                      <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                        {litTypeLabel(l.litigation_type, type)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
                     )}
                     {l.litigation_type === 'adjusted' && l.adjusted_with && (
-                      <p className="text-xs text-orange-600 font-medium">↔ {l.adjusted_with}</p>
+                      <p className="text-[11px] text-orange-600 font-medium mt-1">↔ {l.adjusted_with}</p>
                     )}
-                    <p className="text-xs text-gray-500">{l.session?.name ?? '—'}</p>
+                    {l.reason && (
+                      <p className="text-[11px] text-gray-500 mt-1 leading-relaxed line-clamp-2">{l.reason}</p>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600 max-w-[140px] truncate">{l.reason ?? '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(l.litigation_amount)}</td>
-                  <td className="px-4 py-3 text-right font-medium text-green-700">{formatCurrency(l.amount_paid)}</td>
-                  <td className="px-4 py-3 text-right font-medium text-blue-600">{formatCurrency(l.amount_refunded ?? 0)}</td>
-                  <td className="px-4 py-3 text-right font-medium text-red-600">{pendingRefund > 0 ? formatCurrency(pendingRefund) : <span className="text-gray-400">—</span>}</td>
-                  <td className="px-4 py-3 text-center">{statusBadge(l)}</td>
-                  <td className="px-4 py-3">
+                  {/* Amount */}
+                  <td className="px-4 py-4 text-right">
+                    <p className="font-bold text-gray-900 text-[13px]">{formatCurrency(l.litigation_amount)}</p>
+                    <p className="text-[11px] text-blue-600 mt-0.5">Refund: {formatCurrency(refundable)}</p>
+                  </td>
+                  {/* Progress */}
+                  <td className="px-4 py-4 min-w-[140px]">
+                    <div className="flex items-center justify-between text-[11px] mb-1">
+                      <span className="text-green-700 font-medium">{formatCurrency(paid)}</span>
+                      {pendingRefund > 0 && <span className="text-red-500 font-medium">{formatCurrency(pendingRefund)}</span>}
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${paidPct === 100 ? 'bg-green-400' : paidPct > 0 ? 'bg-amber-400' : 'bg-gray-200'}`}
+                        style={{ width: `${paidPct}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">{paidPct}% recovered</p>
+                  </td>
+                  {/* Status */}
+                  <td className="px-4 py-4 text-center">{statusBadge(l)}</td>
+                  {/* Actions */}
+                  <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1">
                       {pendingRefund > 0 && (
                         <button
                           onClick={() => { setPayTarget(l); setPayForm(EMPTY_PAY) }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium"
                           title="Record Payment"
+                          className="w-8 h-8 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 flex items-center justify-center transition-colors"
                         >
-                          <IndianRupee className="w-3 h-3" /> Pay
+                          <IndianRupee className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <button
                         onClick={() => setShowHistory(l)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-medium"
-                        title="Payment History"
+                        title={`Payment History (${pCount})`}
+                        className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center relative transition-colors"
                       >
-                        <History className="w-3 h-3" /> {pCount > 0 ? pCount : ''}
+                        <History className="w-3.5 h-3.5" />
+                        {pCount > 0 && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold flex items-center justify-center">
+                            {pCount}
+                          </span>
+                        )}
                       </button>
-                      <button onClick={() => openEdit(l)} className="w-7 h-7 rounded-lg hover:bg-blue-50 text-blue-500 flex items-center justify-center">
+                      <button
+                        onClick={() => openEdit(l)}
+                        title="Edit"
+                        className="w-8 h-8 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 flex items-center justify-center transition-colors"
+                      >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setDeleteTarget(l)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-400 flex items-center justify-center">
+                      <button
+                        onClick={() => setDeleteTarget(l)}
+                        title="Delete"
+                        className="w-8 h-8 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 flex items-center justify-center transition-colors"
+                      >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -546,49 +615,50 @@ export function LitigationClient({
   const typeList = form.record_type === 'debt' ? DEBT_TYPES : LITIGATION_TYPES
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Scale className="w-5 h-5 text-indigo-600" /> Litigation & Debt Management
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+              <Scale className="w-5 h-5 text-white" />
+            </div>
+            Litigation & Debt
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track litigation cases, debts & payments department-wise</p>
+          <p className="text-sm text-gray-400 mt-1 ml-11">Department-wise cases, refunds & recovery tracking</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => openAdd('litigation')} className="gap-1.5">
+          <Button onClick={() => openAdd('litigation')} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700">
             <Plus className="w-4 h-4" /> Add Litigation
           </Button>
-          <Button onClick={() => openAdd('debt')} variant="outline" className="gap-1.5 border-orange-200 text-orange-700 hover:bg-orange-50">
+          <Button onClick={() => openAdd('debt')} variant="outline" className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50">
             <CreditCard className="w-4 h-4" /> Add Debt
           </Button>
         </div>
       </div>
 
-
-
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Litigation Cases" value={litigationList.length} color="blue" />
-        <StatCard label="Litigation Pending" value={formatCurrency(totalLit - paidLit)} color={totalLit - paidLit > 0 ? 'red' : 'default'} />
-        <StatCard label="Debt Cases" value={debtList.length} color="amber" />
-        <StatCard label="Debt Pending" value={formatCurrency(totalDebt - paidDebt)} color={totalDebt - paidDebt > 0 ? 'red' : 'default'} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Litigation Cases" value={litigationList.length} sub={`₹${(totalLit/1000).toFixed(0)}K total`} icon={Scale} color="blue" />
+        <StatCard label="Lit. Pending" value={formatCurrency(totalLit - paidLit)} sub={`${paidLit > 0 ? Math.round(paidLit/totalLit*100) : 0}% recovered`} icon={TrendingDown} color={totalLit - paidLit > 0 ? 'red' : 'green'} />
+        <StatCard label="Debt Cases" value={debtList.length} sub={`₹${(totalDebt/1000).toFixed(0)}K total`} icon={CreditCard} color="amber" />
+        <StatCard label="Debt Pending" value={formatCurrency(totalDebt - paidDebt)} sub={`${paidDebt > 0 ? Math.round(paidDebt/totalDebt*100) : 0}% recovered`} icon={TrendingDown} color={totalDebt - paidDebt > 0 ? 'red' : 'green'} />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-52">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by name, phone, father name..."
+            placeholder="Search student, phone, father name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-9 h-9 bg-white border-gray-200 rounded-xl"
           />
         </div>
         <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v ?? 'all')}>
-          <SelectTrigger className="w-52 h-9">
+          <SelectTrigger className="w-52 h-9 rounded-xl border-gray-200">
             <Building2 className="w-4 h-4 mr-2 text-gray-400" />
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
@@ -603,73 +673,84 @@ export function LitigationClient({
 
       {/* Main Tabs */}
       <Tabs defaultValue="litigation">
-        <TabsList>
-          <TabsTrigger value="litigation" className="gap-2">
-            <Scale className="w-4 h-4" /> Litigation ({litigationList.length})
+        <TabsList className="bg-gray-100 rounded-xl p-1">
+          <TabsTrigger value="litigation" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Scale className="w-3.5 h-3.5" /> Litigation
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">{litigationList.length}</span>
           </TabsTrigger>
-          <TabsTrigger value="debt" className="gap-2">
-            <CreditCard className="w-4 h-4" /> Debt ({debtList.length})
+          <TabsTrigger value="debt" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <CreditCard className="w-3.5 h-3.5" /> Debt
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{debtList.length}</span>
           </TabsTrigger>
           {droppedStudents.length > 0 && (
-            <TabsTrigger value="dropped" className="gap-2">
-              <UserX className="w-4 h-4" /> Dropped Students ({droppedStudents.length})
+            <TabsTrigger value="dropped" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <UserX className="w-3.5 h-3.5" /> Dropped
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">{droppedStudents.length}</span>
             </TabsTrigger>
           )}
         </TabsList>
 
         <TabsContent value="litigation" className="mt-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <CasesTable list={litigationList} type="litigation" />
           </div>
         </TabsContent>
 
         <TabsContent value="debt" className="mt-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <CasesTable list={debtList} type="debt" />
           </div>
         </TabsContent>
 
         {droppedStudents.length > 0 && (
           <TabsContent value="dropped" className="mt-4">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Student</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Department</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Session</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Drop Reason</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Actions</th>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-5 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Student</th>
+                      <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Department</th>
+                      <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Session</th>
+                      <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Drop Reason</th>
+                      <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-50">
                     {droppedStudents.map((s) => (
-                      <tr key={s.id} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{s.full_name}</p>
-                          {s.guardian_name && <p className="text-xs text-gray-500">Father: {s.guardian_name}</p>}
-                          <p className="text-xs text-gray-400">{s.phone}</p>
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-gray-900 text-[13px]">{s.full_name}</p>
+                          {s.guardian_name && <p className="text-xs text-gray-500 mt-0.5">s/o {s.guardian_name}</p>}
+                          <p className="text-xs text-gray-400 font-mono">{s.phone}</p>
                         </td>
-                        <td className="px-4 py-3">
-                          <p className="text-gray-800">{s.department?.name ?? '—'}</p>
-                          {s.sub_section && <p className="text-xs text-purple-600">{s.sub_section.name}</p>}
+                        <td className="px-4 py-4">
+                          <p className="font-medium text-gray-800 text-[13px]">{s.department?.name ?? '—'}</p>
+                          {s.sub_section && (
+                            <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
+                              {s.sub_section.name}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{s.session?.name ?? '—'}</td>
-                        <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate">{s.drop_reason ?? '—'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-4 text-xs text-gray-500">{s.session?.name ?? '—'}</td>
+                        <td className="px-4 py-4 text-xs text-gray-500 max-w-[180px]">
+                          {s.drop_reason
+                            ? <span className="line-clamp-2 leading-relaxed">{s.drop_reason}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => openAddFromStudent(s, 'litigation')}
-                              className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-medium flex items-center gap-1"
+                              className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                             >
-                              <Scale className="w-3 h-3" /> Add to Litigation
+                              <Scale className="w-3 h-3" /> Litigation
                             </button>
                             <button
                               onClick={() => openAddFromStudent(s, 'debt')}
-                              className="px-2 py-1 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 text-xs font-medium flex items-center gap-1"
+                              className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                             >
-                              <CreditCard className="w-3 h-3" /> Add to Debt
+                              <CreditCard className="w-3 h-3" /> Debt
                             </button>
                           </div>
                         </td>

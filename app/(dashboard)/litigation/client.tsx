@@ -495,8 +495,10 @@ export function LitigationClient({
               <th className="text-left px-5 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Student</th>
               <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Department</th>
               <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Type & Reason</th>
-              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Amount</th>
-              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Progress</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Total</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Refund Due</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Paid Back</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Pending</th>
               <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Status</th>
               <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Actions</th>
             </tr>
@@ -546,36 +548,40 @@ export function LitigationClient({
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed line-clamp-2">{l.reason}</p>
                     )}
                   </td>
-                  {/* Amount */}
+                  {/* Total */}
                   <td className="px-4 py-4 text-right">
                     <p className="font-bold text-gray-900 text-[13px]">{formatCurrency(l.litigation_amount)}</p>
-                    <p className="text-[11px] text-blue-600 mt-0.5">Refund: {formatCurrency(refundable)}</p>
                   </td>
-                  {/* Progress */}
-                  <td className="px-4 py-4 min-w-[140px]">
-                    {isCleared && refundable === 0 ? (
-                      <>
-                        <p className="text-[11px] text-green-700 font-medium mb-1">No refund owed</p>
-                        <div className="h-1.5 w-full rounded-full bg-green-100 overflow-hidden">
-                          <div className="h-full w-full rounded-full bg-green-400" />
-                        </div>
-                        <p className="text-[10px] text-green-500 mt-1">Fully cleared</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="text-green-700 font-medium">{formatCurrency(paid)} paid</span>
-                          {pendingRefund > 0 && <span className="text-red-500 font-medium">{formatCurrency(pendingRefund)} left</span>}
-                        </div>
-                        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                  {/* Refund Due */}
+                  <td className="px-4 py-4 text-right">
+                    {refundable > 0
+                      ? <p className="font-semibold text-blue-600 text-[13px]">{formatCurrency(refundable)}</p>
+                      : <p className="text-gray-300 text-[13px]">—</p>
+                    }
+                  </td>
+                  {/* Paid Back */}
+                  <td className="px-4 py-4 text-right min-w-[110px]">
+                    <p className={`font-semibold text-[13px] ${paid > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                      {paid > 0 ? formatCurrency(paid) : '—'}
+                    </p>
+                    {refundable > 0 && (
+                      <div className="mt-1.5">
+                        <div className="h-1 w-full rounded-full bg-gray-100 overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${paidPct === 100 ? 'bg-green-400' : paidPct > 0 ? 'bg-amber-400' : 'bg-red-300'}`}
-                            style={{ width: `${Math.max(paidPct, paidPct === 0 ? 0 : 4)}%` }}
+                            className={`h-full rounded-full ${paidPct === 100 ? 'bg-green-400' : paidPct > 0 ? 'bg-amber-400' : 'bg-gray-200'}`}
+                            style={{ width: `${paidPct}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1">{paidPct}% of {formatCurrency(refundable)}</p>
-                      </>
+                        <p className="text-[10px] text-gray-400 mt-0.5 text-right">{paidPct}%</p>
+                      </div>
                     )}
+                  </td>
+                  {/* Pending */}
+                  <td className="px-4 py-4 text-right">
+                    {pendingRefund > 0
+                      ? <p className="font-semibold text-red-500 text-[13px]">{formatCurrency(pendingRefund)}</p>
+                      : <p className="text-gray-300 text-[13px]">—</p>
+                    }
                   </td>
                   {/* Status */}
                   <td className="px-4 py-4 text-center">{statusBadge(l)}</td>

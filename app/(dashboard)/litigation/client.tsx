@@ -506,7 +506,11 @@ export function LitigationClient({
               const refundable = l.amount_refunded ?? 0
               const paid = l.amount_paid ?? 0
               const pendingRefund = refundable - paid
-              const paidPct = refundable > 0 ? Math.min(100, Math.round((paid / refundable) * 100)) : 0
+              const isCleared = pendingRefund <= 0
+              // progress = paid / refundable; if no refund target but cleared, show 100%
+              const paidPct = refundable > 0
+                ? Math.min(100, Math.round((paid / refundable) * 100))
+                : isCleared ? 100 : 0
               const pCount = paymentsFor(l.id).length
               return (
                 <tr key={l.id} className="hover:bg-slate-50/60 transition-colors group">
@@ -549,17 +553,29 @@ export function LitigationClient({
                   </td>
                   {/* Progress */}
                   <td className="px-4 py-4 min-w-[140px]">
-                    <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="text-green-700 font-medium">{formatCurrency(paid)}</span>
-                      {pendingRefund > 0 && <span className="text-red-500 font-medium">{formatCurrency(pendingRefund)}</span>}
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${paidPct === 100 ? 'bg-green-400' : paidPct > 0 ? 'bg-amber-400' : 'bg-gray-200'}`}
-                        style={{ width: `${paidPct}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">{paidPct}% recovered</p>
+                    {isCleared && refundable === 0 ? (
+                      <>
+                        <p className="text-[11px] text-green-700 font-medium mb-1">No refund owed</p>
+                        <div className="h-1.5 w-full rounded-full bg-green-100 overflow-hidden">
+                          <div className="h-full w-full rounded-full bg-green-400" />
+                        </div>
+                        <p className="text-[10px] text-green-500 mt-1">Fully cleared</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-[11px] mb-1">
+                          <span className="text-green-700 font-medium">{formatCurrency(paid)} paid</span>
+                          {pendingRefund > 0 && <span className="text-red-500 font-medium">{formatCurrency(pendingRefund)} left</span>}
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${paidPct === 100 ? 'bg-green-400' : paidPct > 0 ? 'bg-amber-400' : 'bg-red-300'}`}
+                            style={{ width: `${Math.max(paidPct, paidPct === 0 ? 0 : 4)}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">{paidPct}% of {formatCurrency(refundable)}</p>
+                      </>
+                    )}
                   </td>
                   {/* Status */}
                   <td className="px-4 py-4 text-center">{statusBadge(l)}</td>

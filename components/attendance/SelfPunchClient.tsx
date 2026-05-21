@@ -136,7 +136,6 @@ export function SelfPunchClient({ employeeId, employeeName }: Props) {
         status,
         punch_out_lat: gps?.lat ?? null,
         punch_out_lng: gps?.lng ?? null,
-        updated_at: new Date().toISOString(),
       }).eq('employee_id', employeeId).eq('date', today)
       if (error) throw error
       toast.success(`Punched Out at ${format(new Date(), 'hh:mm a')}`)

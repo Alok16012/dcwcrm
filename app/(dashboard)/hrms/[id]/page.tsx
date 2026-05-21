@@ -3,21 +3,23 @@ import { format, getMonth, getYear } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import { ROLE_LABELS } from '@/types/app.types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import AttendanceGrid from '@/components/hrms/AttendanceGrid'
+import EmployeeAttendanceCalendar from '@/components/hrms/EmployeeAttendanceCalendar'
 import PayrollTable from '@/components/hrms/PayrollTable'
 
 interface PageProps {
   params: { id: string }
+  searchParams: { month?: string; year?: string; tab?: string }
 }
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
-export default async function EmployeeDetailPage({ params }: PageProps) {
+export default async function EmployeeDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params
+  const sp = await searchParams
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) redirect('/login')
 
   const { data: currentProfile } = await supabase
@@ -29,9 +31,9 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
   if (!currentProfile || !['admin', 'backend'].includes(currentProfile.role)) redirect('/')
 
   const now = new Date()
-  const currentMonth = getMonth(now) + 1
-  const currentYear = getYear(now)
-  const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
+  const currentMonth = Number(sp.month ?? getMonth(now) + 1)
+  const currentYear = Number(sp.year ?? getYear(now))
+  const defaultTab = sp.tab ?? 'profile'
 
   const empRes = await supabase.from('employees').select('id, employee_code, department, designation, joining_date, basic_salary, hra, allowances, pf_deduction, tds_deduction, bank_account, bank_ifsc, is_active, profile_id, salary_cycle_start_day').eq('id', id).single()
 
@@ -45,47 +47,36 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
 
   if (!employee) notFound()
 
-  const [attRes, payrollRes, studentsRes] = await Promise.all([
-    supabase.from('attendance').select('date, status').eq('employee_id', id).gte('date', `${monthStr}-01`).lte('date', `${monthStr}-31`),
-    supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
-    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
-  ])
-
-  const attendanceRaw = attRes.data as { date: string; status: string }[] | null
-  const payrollData = payrollRes.data as Record<string, unknown>[] | null
-
-  // Fetch profile separately
-  const { data: profileRaw } = await supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single()
-  const profile = profileRaw as { id: string; full_name: string; email: string; phone: string | null; role: string } | null
-
-  // Build attendance map keyed by date string
-  const attendanceMap: Record<string, import('@/types/app.types').AttendanceStatus> = {}
-  for (const a of attendanceRaw ?? []) {
-    attendanceMap[a.date] = a.status as import('@/types/app.types').AttendanceStatus
-  }
-
-  // Compute cycle dates for this employee
+  // Compute cycle dates FIRST so attendance query uses correct range
   const cycleDay = employee.salary_cycle_start_day ?? 1
   const cycleStartDate = cycleDay === 1
     ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
     : (() => {
         const d = new Date(currentYear, currentMonth - 2, cycleDay)
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        return format(d, 'yyyy-MM-dd')
       })()
   const cycleEndDate = cycleDay === 1
-    ? (() => { const d = new Date(currentYear, currentMonth, 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+    ? format(new Date(currentYear, currentMonth, 0), 'yyyy-MM-dd')
     : (() => {
         const d = new Date(currentYear, currentMonth - 1, cycleDay - 1)
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        return format(d, 'yyyy-MM-dd')
       })()
 
-  const employeeAttendance = [{
-    employee_id: employee.id,
-    employee_name: profile?.full_name ?? '—',
-    cycle_start: cycleStartDate,
-    cycle_end: cycleEndDate,
-    attendance: attendanceMap,
-  }]
+  const [attRes, payrollRes, studentsRes, profileRes] = await Promise.all([
+    supabase.from('attendance').select('date, status').eq('employee_id', id).gte('date', cycleStartDate).lte('date', cycleEndDate),
+    supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
+    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
+    supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
+  ])
+
+  const attendanceRaw = attRes.data as { date: string; status: string }[] | null
+  const payrollData = payrollRes.data as Record<string, unknown>[] | null
+  const profile = profileRes.data as { id: string; full_name: string; email: string; phone: string | null; role: string } | null
+
+  const attendanceMap: Record<string, import('@/types/app.types').AttendanceStatus> = {}
+  for (const a of attendanceRaw ?? []) {
+    attendanceMap[a.date] = a.status as import('@/types/app.types').AttendanceStatus
+  }
 
   type PayrollRow = { id: string; employee_id: string; employee_name: string; employee_code?: string; designation?: string; department?: string; bank_account?: string; month: number; year: number; basic: number; hra: number; allowances: number; incentive: number; gross: number; pf: number; tds: number; other_deductions: number; leave_deduction: number; net: number; status: 'draft' | 'processed' | 'paid'; payment_date: string | null }
   const payrollRows = (payrollData ?? []).map((p) => ({
@@ -128,7 +119,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
         <p className="text-sm text-muted-foreground">{employee.employee_code} · {employee.designation}</p>
       </div>
 
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
@@ -170,12 +161,14 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
         </TabsContent>
 
         <TabsContent value="attendance" className="pt-4">
-          <AttendanceGrid
-            data={employeeAttendance}
+          <EmployeeAttendanceCalendar
+            employeeId={employee.id}
+            employeeName={profile?.full_name ?? '—'}
+            cycleStart={cycleStartDate}
+            cycleEnd={cycleEndDate}
+            initialAttendance={attendanceMap}
             year={currentYear}
             month={currentMonth}
-            rangeStart={cycleStartDate}
-            rangeEnd={cycleEndDate}
           />
         </TabsContent>
 

@@ -43,6 +43,9 @@ export default function EmployeeAttendanceCalendar({
   const [attendance, setAttendance] = useState(initialAttendance)
   const [active, setActive] = useState<string | null>(null) // date with open picker
   const [isPending, startTransition] = useTransition()
+  const [bulkFrom, setBulkFrom] = useState(cycleStart)
+  const [bulkTo, setBulkTo] = useState('')
+  const [bulkStatus, setBulkStatus] = useState<AttendanceStatus>('present')
   const supabase = createClient()
 
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -81,6 +84,29 @@ export default function EmployeeAttendanceCalendar({
         toast.error('Failed: ' + (e?.message ?? 'unknown'))
       } finally {
         setActive(null)
+      }
+    })
+  }
+
+  function bulkMark() {
+    if (!bulkTo) { toast.error('Select an end date'); return }
+    const dates = getDates(bulkFrom, bulkTo).filter(d => d <= today && d >= cycleStart && d <= cycleEnd)
+    if (!dates.length) { toast.error('No valid dates in range'); return }
+    startTransition(async () => {
+      try {
+        const upserts = dates.map(d => ({ employee_id: employeeId, date: d, status: bulkStatus }))
+        const { error } = await supabase.from('attendance')
+          .upsert(upserts as never, { onConflict: 'employee_id,date' })
+        if (error) throw error
+        setAttendance(prev => {
+          const next = { ...prev }
+          dates.forEach(d => { next[d] = bulkStatus })
+          return next
+        })
+        toast.success(`${dates.length} days marked as ${STATUS_CONFIG[bulkStatus].label}`)
+        setBulkTo('')
+      } catch (e: any) {
+        toast.error('Failed: ' + (e?.message ?? 'unknown'))
       }
     })
   }
@@ -184,6 +210,54 @@ export default function EmployeeAttendanceCalendar({
             </div>
           )
         })}
+      </div>
+
+      {/* ── Bulk mark bar ── */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bulk Mark Attendance</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 font-medium">From</label>
+            <input
+              type="date"
+              value={bulkFrom}
+              min={cycleStart}
+              max={today}
+              onChange={e => setBulkFrom(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 font-medium">To</label>
+            <input
+              type="date"
+              value={bulkTo}
+              min={bulkFrom || cycleStart}
+              max={today}
+              onChange={e => setBulkTo(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 font-medium">Status</label>
+            <select
+              value={bulkStatus}
+              onChange={e => setBulkStatus(e.target.value as AttendanceStatus)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {ALL_STATUSES.map(s => (
+                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={bulkMark}
+            disabled={isPending || !bulkTo}
+            className="text-xs font-semibold px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {isPending ? 'Saving…' : 'Apply'}
+          </button>
+        </div>
       </div>
 
       {/* ── Legend ── */}

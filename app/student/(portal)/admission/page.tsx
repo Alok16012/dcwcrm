@@ -1,180 +1,295 @@
-import { createServerClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { CheckCircle2, Clock, XCircle, Download, FileText, CreditCard, GraduationCap, Award } from 'lucide-react'
+'use client'
+import { useState, useEffect, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { CheckCircle2, Clock, Upload, Download, X } from 'lucide-react'
+import { toast } from 'sonner'
 
-export default async function AdmissionPage() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/student/login')
+const DOC_SLOTS = [
+  { key: 'admit_card_url',      label: 'Admit Card' },
+  { key: 'enrollment_card_url', label: 'Enrollment Card' },
+  { key: 'id_card_url',         label: 'ID Card' },
+  { key: 'marksheet_url',       label: 'Marksheet' },
+  { key: 'certificate_url',     label: 'Certificate' },
+] as const
 
-  const { data: student } = await supabase
-    .from('students')
-    .select(`
-      id, full_name, enrollment_number, enrollment_date, status, mode,
-      verification_status, exam_status, result_status, admission_progress,
-      admit_card_url, enrollment_card_url, id_card_url, marksheet_url, certificate_url,
-      university_name, board_name,
-      course:courses(name), sub_course:sub_courses(name),
-      department:departments(name), sub_section:department_sub_sections(name),
-      session:sessions(name)
-    `)
-    .eq('portal_user_id', user.id)
-    .single()
+type DocKey = typeof DOC_SLOTS[number]['key']
 
-  if (!student) redirect('/student/login')
+const STATUS_COLOR: Record<string, string> = {
+  pending:        'bg-yellow-100 text-yellow-700',
+  in_review:      'bg-blue-100 text-blue-700',
+  verified:       'bg-green-100 text-green-700',
+  rejected:       'bg-red-100 text-red-700',
+  not_scheduled:  'bg-gray-100 text-gray-500',
+  scheduled:      'bg-blue-100 text-blue-700',
+  completed:      'bg-indigo-100 text-indigo-700',
+  result_awaited: 'bg-yellow-100 text-yellow-700',
+  passed:         'bg-green-100 text-green-700',
+  failed:         'bg-red-100 text-red-700',
+  awaited:        'bg-gray-100 text-gray-500',
+  declared:       'bg-indigo-100 text-indigo-700',
+}
 
-  const s = student as {
-    id: string; full_name: string; enrollment_number: string; enrollment_date: string | null;
-    status: string; mode: string | null; verification_status: string; exam_status: string;
-    result_status: string; admission_progress: number;
-    admit_card_url: string | null; enrollment_card_url: string | null;
-    id_card_url: string | null; marksheet_url: string | null; certificate_url: string | null;
-    university_name: string | null; board_name: string | null;
-    course: { name: string } | null; sub_course: { name: string } | null;
-    department: { name: string } | null; sub_section: { name: string } | null;
-    session: { name: string } | null;
+export default function AdmissionPage() {
+  const supabase = createClient() as any
+  const [student, setStudent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [uploads, setUploads] = useState<any[]>([])
+
+  // Upload modal
+  const [uploadDoc, setUploadDoc] = useState<{ key: DocKey; label: string } | null>(null)
+  const [remarks, setRemarks] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { window.location.href = '/student/login'; return }
+
+      const { data: s } = await supabase
+        .from('students')
+        .select(`id, full_name, enrollment_number, enrollment_date, status,
+          verification_status, exam_status, result_status, admission_progress,
+          admit_card_url, enrollment_card_url, id_card_url, marksheet_url, certificate_url,
+          course:courses(name), department:departments(name), session:sessions(name)`)
+        .eq('portal_user_id', user.id)
+        .single()
+
+      if (!s) { window.location.href = '/student/login'; return }
+      setStudent(s)
+
+      const { data: u } = await supabase
+        .from('student_uploads')
+        .select('*')
+        .eq('student_id', s.id)
+        .order('uploaded_at', { ascending: false })
+      setUploads(u ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  async function handleUpload(file: File) {
+    if (!uploadDoc || !student) return
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `student-self/${student.id}/${uploadDoc.key}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('student-documents').upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('student-documents').getPublicUrl(path)
+      const url = urlData.publicUrl
+
+      const { data: inserted } = await supabase.from('student_uploads').insert({
+        student_id: student.id,
+        document_type: uploadDoc.key,
+        file_url: url,
+        remarks: remarks.trim() || null,
+      }).select('*').single()
+
+      setUploads(prev => [inserted, ...prev])
+      toast.success(`${uploadDoc.label} uploaded`)
+      setUploadDoc(null)
+      setRemarks('')
+    } catch (e: any) {
+      toast.error('Upload failed: ' + (e?.message ?? ''))
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const timeline = [
-    { step: 'Admission Received', done: true, desc: 'Your admission form has been received.' },
-    { step: 'Documents Submitted', done: true, desc: 'Required documents have been submitted.' },
-    { step: 'Verification', done: s.verification_status === 'verified', inProgress: s.verification_status === 'in_review', desc: `Status: ${s.verification_status.replace('_', ' ')}` },
-    { step: 'Enrollment Confirmed', done: s.admission_progress >= 60, desc: 'Enrollment number assigned.' },
-    { step: 'Exam Scheduled', done: s.exam_status !== 'not_scheduled', inProgress: s.exam_status === 'scheduled', desc: `Exam: ${s.exam_status.replace(/_/g, ' ')}` },
-    { step: 'Result Declared', done: s.result_status !== 'awaited', desc: `Result: ${s.result_status.replace(/_/g, ' ')}` },
-    { step: 'Marksheet / Certificate', done: !!s.marksheet_url || !!s.certificate_url, desc: 'Marksheet & certificate dispatch.' },
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+    </div>
+  )
+
+  if (!student) return null
+
+  const infoRows = [
+    { label: 'Full Name', value: student.full_name },
+    { label: 'Enrollment No.', value: student.enrollment_number },
+    { label: 'Course', value: student.course?.name ?? '—' },
+    { label: 'Department', value: student.department?.name ?? '—' },
+    { label: 'Session', value: student.session?.name ?? '—' },
+    { label: 'Enrollment Date', value: student.enrollment_date ? new Date(student.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' },
+    { label: 'Status', value: student.status },
   ]
 
-  const verColor: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    in_review: 'bg-blue-100 text-blue-800 border-blue-200',
-    verified: 'bg-green-100 text-green-800 border-green-200',
-    rejected: 'bg-red-100 text-red-800 border-red-200',
-  }
-
-  const docs = [
-    { label: 'Admit Card', url: s.admit_card_url, icon: FileText },
-    { label: 'Enrollment Card', url: s.enrollment_card_url, icon: CreditCard },
-    { label: 'ID Card', url: s.id_card_url, icon: CreditCard },
-    { label: 'Marksheet', url: s.marksheet_url, icon: Award },
-    { label: 'Certificate', url: s.certificate_url, icon: GraduationCap },
-  ].filter(d => d.url)
+  const statusRows = [
+    { label: 'Verification', value: student.verification_status },
+    { label: 'Exam', value: student.exam_status },
+    { label: 'Result', value: student.result_status },
+  ]
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">My Admission Status</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Track your complete admission journey</p>
+        <h1 className="text-xl font-bold text-gray-900">My Admission</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Your enrollment details and documents</p>
       </div>
 
-      {/* Progress */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-blue-100 text-sm">Overall Progress</p>
-            <p className="text-3xl font-extrabold mt-1">{s.admission_progress}%</p>
-          </div>
-          <span className={`text-xs px-3 py-1.5 rounded-full font-medium border ${verColor[s.verification_status] ?? 'bg-white/20 text-white border-white/20'}`}>
-            {s.verification_status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-          </span>
-        </div>
-        <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-white rounded-full transition-all"
-            style={{ width: `${s.admission_progress}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Enrollment details */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <h2 className="font-semibold text-gray-900 mb-4">Enrollment Details</h2>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          {[
-            { label: 'Full Name', value: s.full_name },
-            { label: 'Enrollment No.', value: s.enrollment_number },
-            { label: 'Course', value: s.course?.name ?? '—' },
-            { label: 'Standard / Level', value: s.sub_course?.name ?? '—' },
-            { label: 'University / Board', value: s.university_name ?? s.sub_section?.name ?? '—' },
-            { label: 'Board Name', value: s.board_name ?? s.department?.name ?? '—' },
-            { label: 'Session', value: s.session?.name ?? '—' },
-            { label: 'Mode', value: s.mode?.replace('_', ' ') ?? '—' },
-            { label: 'Enrollment Date', value: s.enrollment_date ? new Date(s.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' },
-            { label: 'Status', value: s.status },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p className="text-xs text-gray-400">{label}</p>
-              <p className="text-sm font-medium text-gray-800 capitalize">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Status cards */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Verification', value: s.verification_status, icon: CheckCircle2 },
-          { label: 'Exam', value: s.exam_status, icon: Clock },
-          { label: 'Result', value: s.result_status, icon: Award },
-        ].map(({ label, value, icon: Icon }) => (
-          <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
-            <Icon className="h-6 w-6 mx-auto text-blue-500 mb-2" />
-            <p className="text-xs text-gray-400 mb-1">{label}</p>
-            <p className="text-sm font-bold text-gray-800 capitalize">{value.replace(/_/g, ' ')}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Documents */}
-      {docs.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Download className="h-4 w-4 text-blue-500" /> My Documents
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {docs.map(({ label, url, icon: Icon }) => (
-              <a
-                key={label}
-                href={url!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all group"
-              >
-                <div className="w-9 h-9 bg-blue-50 group-hover:bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-700">{label}</p>
-                  <p className="text-xs text-blue-500 flex items-center gap-1">
-                    <Download className="h-3 w-3" /> Download
-                  </p>
-                </div>
-              </a>
+      {/* Info table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-gray-50">
+            {infoRows.map(({ label, value }) => (
+              <tr key={label}>
+                <td className="px-4 py-3 text-xs font-semibold text-gray-400 w-40">{label}</td>
+                <td className="px-4 py-3 font-medium text-gray-800 capitalize">{value}</td>
+              </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Status + progress */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-400">Admission Progress</span>
+            <span className="text-xs font-bold text-blue-600">{student.admission_progress}%</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${student.admission_progress}%` }} />
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-gray-50">
+            {statusRows.map(({ label, value }) => (
+              <tr key={label}>
+                <td className="px-4 py-3 text-xs font-semibold text-gray-400 w-40">{label}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${STATUS_COLOR[value] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {value.replace(/_/g, ' ')}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Documents from admin */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-50">
+          <h2 className="text-sm font-bold text-gray-800">Documents</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Issued by institution</p>
+        </div>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-gray-50">
+            {DOC_SLOTS.map(({ key, label }) => {
+              const url = student[key]
+              return (
+                <tr key={key}>
+                  <td className="px-4 py-3 text-xs font-semibold text-gray-400 w-40">{label}</td>
+                  <td className="px-4 py-3">
+                    {url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
+                        <Download className="w-3.5 h-3.5" /> Download
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-xs text-gray-300">
+                        <Clock className="w-3.5 h-3.5" /> Not issued yet
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {url && <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Student uploads */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-800">My Uploads</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Documents submitted by you</p>
+          </div>
+          <button
+            onClick={() => { setUploadDoc({ key: 'admit_card_url', label: 'Document' }); setRemarks('') }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5" /> Upload
+          </button>
+        </div>
+        {uploads.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-gray-400">No uploads yet</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-50">
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Document</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Remarks</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Uploaded</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-widest">File</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {uploads.map((u: any) => (
+                <tr key={u.id}>
+                  <td className="px-4 py-3 text-xs font-medium text-gray-700 capitalize">{u.document_type.replace(/_/g, ' ')}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{u.remarks ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">{new Date(u.uploaded_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td className="px-4 py-3 text-right">
+                    <a href={u.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 justify-end">
+                      <Download className="w-3 h-3" /> View
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Upload Modal */}
+      {uploadDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setUploadDoc(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-gray-900">Upload Document</h3>
+              <button onClick={() => setUploadDoc(null)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }} />
+
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-8 flex flex-col items-center gap-2 hover:border-blue-400 hover:bg-blue-50/40 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Upload className="w-7 h-7 text-gray-300" />
+                <span className="text-sm font-medium text-gray-500">{uploading ? 'Uploading…' : 'Click to choose file'}</span>
+                <span className="text-xs text-gray-400">PDF · JPG · PNG — max 10 MB</span>
+              </button>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 block mb-1.5">Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 10th marksheet, Aadhar card…"
+                  value={remarks}
+                  onChange={e => setRemarks(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-gray-50"
+                />
+              </div>
+
+              <p className="text-[11px] text-gray-400 text-center">Date & time captured automatically.</p>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Timeline */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <h2 className="font-semibold text-gray-900 mb-5">Admission Timeline</h2>
-        <div className="relative">
-          <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
-          <div className="space-y-5">
-            {timeline.map(({ step, done, inProgress, desc }) => (
-              <div key={step} className="flex gap-4 relative">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 ${done ? 'bg-green-500' : inProgress ? 'bg-blue-500' : 'bg-gray-200'}`}>
-                  {done ? <CheckCircle2 className="h-4 w-4 text-white" /> : inProgress ? <Clock className="h-4 w-4 text-white" /> : <div className="w-2 h-2 bg-gray-400 rounded-full" />}
-                </div>
-                <div className="pb-1">
-                  <p className={`text-sm font-semibold ${done ? 'text-green-700' : inProgress ? 'text-blue-700' : 'text-gray-400'}`}>{step}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 capitalize">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

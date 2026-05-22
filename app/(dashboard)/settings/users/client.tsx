@@ -284,7 +284,7 @@ export function UsersSettingsClient({
                   <div><Label>Phone</Label><Input {...register('phone')} /></div>
                   <div>
                     <Label>Role</Label>
-                    <Select onValueChange={v => setValue('role', v as UserRole)}>
+                    <Select onValueChange={v => setValue('role', v as Exclude<UserRole, 'student'>)}>
                       <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="admin">Admin</SelectItem>

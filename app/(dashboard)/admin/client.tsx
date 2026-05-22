@@ -14,6 +14,7 @@ import { CrmSyncMonitor } from './tabs/CrmSyncMonitor'
 import { SystemSettings } from './tabs/SystemSettings'
 import { AssociateManager } from './tabs/AssociateManager'
 import { FeePlanBuilder } from './tabs/FeePlanBuilder'
+import { StudentPortalManager } from './tabs/StudentPortalManager'
 
 export function AdminPanelClient() {
   const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
@@ -58,6 +59,7 @@ export function AdminPanelClient() {
             <TabsTrigger value="crm" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">CRM Sync</TabsTrigger>
             <TabsTrigger value="associates" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Associates</TabsTrigger>
             <TabsTrigger value="feeplan" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Fee Plan PDF</TabsTrigger>
+            <TabsTrigger value="student-portal" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">Student Portal</TabsTrigger>
             <TabsTrigger value="settings" className="whitespace-nowrap text-xs px-3 py-1.5 rounded-lg">System Settings</TabsTrigger>
           </TabsList>
         </div>
@@ -91,6 +93,9 @@ export function AdminPanelClient() {
         </TabsContent>
         <TabsContent value="associates" className="mt-4">
           <AssociateManager />
+        </TabsContent>
+        <TabsContent value="student-portal" className="mt-4">
+          <StudentPortalManager />
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
           <SystemSettings />

@@ -255,11 +255,42 @@ export interface Database {
           city: string | null
           course_id: string | null
           sub_course_id: string | null
+          department_id: string | null
+          sub_section_id: string | null
+          session_id: string | null
           assigned_counsellor: string | null
           total_fee: number | null
           amount_paid: number
           enrollment_date: string | null
           status: string
+          mode: string | null
+          referred_by_associate: string | null
+          // portal columns
+          portal_user_id: string | null
+          portal_username: string | null
+          portal_temp_password: string | null
+          portal_active: boolean
+          verification_status: string
+          exam_status: string
+          result_status: string
+          admission_progress: number
+          admit_card_url: string | null
+          enrollment_card_url: string | null
+          id_card_url: string | null
+          marksheet_url: string | null
+          certificate_url: string | null
+          profile_photo_url: string | null
+          university_name: string | null
+          board_name: string | null
+          father_name: string | null
+          guardian_name: string | null
+          guardian_phone: string | null
+          guardian_relationship: string | null
+          dob: string | null
+          gender: string | null
+          address: string | null
+          state: string | null
+          pincode: string | null
           created_at: string
           updated_at: string
         }
@@ -273,11 +304,41 @@ export interface Database {
           city?: string | null
           course_id?: string | null
           sub_course_id?: string | null
+          department_id?: string | null
+          sub_section_id?: string | null
+          session_id?: string | null
           assigned_counsellor?: string | null
           total_fee?: number | null
           amount_paid?: number
           enrollment_date?: string | null
           status?: string
+          mode?: string | null
+          referred_by_associate?: string | null
+          portal_user_id?: string | null
+          portal_username?: string | null
+          portal_temp_password?: string | null
+          portal_active?: boolean
+          verification_status?: string
+          exam_status?: string
+          result_status?: string
+          admission_progress?: number
+          admit_card_url?: string | null
+          enrollment_card_url?: string | null
+          id_card_url?: string | null
+          marksheet_url?: string | null
+          certificate_url?: string | null
+          profile_photo_url?: string | null
+          university_name?: string | null
+          board_name?: string | null
+          father_name?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_relationship?: string | null
+          dob?: string | null
+          gender?: string | null
+          address?: string | null
+          state?: string | null
+          pincode?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -291,12 +352,214 @@ export interface Database {
           city?: string | null
           course_id?: string | null
           sub_course_id?: string | null
+          department_id?: string | null
+          sub_section_id?: string | null
+          session_id?: string | null
           assigned_counsellor?: string | null
           total_fee?: number | null
           amount_paid?: number
           enrollment_date?: string | null
           status?: string
+          mode?: string | null
+          referred_by_associate?: string | null
+          portal_user_id?: string | null
+          portal_username?: string | null
+          portal_temp_password?: string | null
+          portal_active?: boolean
+          verification_status?: string
+          exam_status?: string
+          result_status?: string
+          admission_progress?: number
+          admit_card_url?: string | null
+          enrollment_card_url?: string | null
+          id_card_url?: string | null
+          marksheet_url?: string | null
+          certificate_url?: string | null
+          profile_photo_url?: string | null
+          university_name?: string | null
+          board_name?: string | null
+          father_name?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_relationship?: string | null
+          dob?: string | null
+          gender?: string | null
+          address?: string | null
+          state?: string | null
+          pincode?: string | null
           updated_at?: string
+        }
+      }
+      student_notifications: {
+        Row: {
+          id: string
+          student_id: string | null
+          title: string
+          message: string
+          type: string
+          is_read: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          student_id?: string | null
+          title: string
+          message: string
+          type?: string
+          is_read?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string | null
+          title?: string
+          message?: string
+          type?: string
+          is_read?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+      }
+      student_announcements: {
+        Row: {
+          id: string
+          title: string
+          body: string
+          type: string
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          body: string
+          type?: string
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          body?: string
+          type?: string
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+        }
+      }
+      student_support_tickets: {
+        Row: {
+          id: string
+          student_id: string
+          subject: string
+          message: string
+          status: string
+          priority: string
+          admin_reply: string | null
+          replied_by: string | null
+          replied_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          subject: string
+          message: string
+          status?: string
+          priority?: string
+          admin_reply?: string | null
+          replied_by?: string | null
+          replied_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          subject?: string
+          message?: string
+          status?: string
+          priority?: string
+          admin_reply?: string | null
+          replied_by?: string | null
+          replied_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      study_materials: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          type: string
+          url: string | null
+          course_id: string | null
+          sub_course_id: string | null
+          is_active: boolean
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          type?: string
+          url?: string | null
+          course_id?: string | null
+          sub_course_id?: string | null
+          is_active?: boolean
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          type?: string
+          url?: string | null
+          course_id?: string | null
+          sub_course_id?: string | null
+          is_active?: boolean
+          uploaded_by?: string | null
+          created_at?: string
+        }
+      }
+      student_faqs: {
+        Row: {
+          id: string
+          question: string
+          answer: string
+          category: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          question: string
+          answer: string
+          category?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          question?: string
+          answer?: string
+          category?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
         }
       }
       student_documents: {

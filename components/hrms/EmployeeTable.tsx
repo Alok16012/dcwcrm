@@ -257,7 +257,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
               </div>
               <div className="space-y-1">
                 <Label>Role</Label>
-                <Select onValueChange={(v) => setValue('role', v as UserRole)} defaultValue="lead">
+                <Select onValueChange={(v) => setValue('role', v as 'admin' | 'lead' | 'counselor' | 'backend' | 'housekeeping')} defaultValue="lead">
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (

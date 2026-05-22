@@ -30,19 +30,48 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session — this keeps the token alive automatically
   const { data: { user } } = await supabase.auth.getUser()
-
   const { pathname } = request.nextUrl
 
-  // Redirect unauthenticated users away from protected routes
-  if (!user && pathname.startsWith('/') && !pathname.startsWith('/login') && !pathname.startsWith('/api') && !pathname.startsWith('/associate')) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  const isStudentRoute = pathname.startsWith('/student/') && pathname !== '/student/login'
+  const isStudentLogin = pathname === '/student/login'
+  const isAdminLogin = pathname === '/login'
+  const isApiRoute = pathname.startsWith('/api')
+  const isAssociateRoute = pathname.startsWith('/associate')
 
-  // Redirect logged-in users away from login page
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (isApiRoute) return response
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const role = profile?.role
+
+    // Student trying to hit CRM routes — send to student portal
+    if (role === 'student' && !isStudentRoute && !isStudentLogin) {
+      return NextResponse.redirect(new URL('/student/dashboard', request.url))
+    }
+    // Non-student trying to access student portal routes
+    if (role !== 'student' && isStudentRoute) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    // Bounce logged-in users off login pages
+    if (isAdminLogin && role !== 'student') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    if (isStudentLogin && role === 'student') {
+      return NextResponse.redirect(new URL('/student/dashboard', request.url))
+    }
+  } else {
+    // Unauthenticated
+    if (isStudentRoute) {
+      return NextResponse.redirect(new URL('/student/login', request.url))
+    }
+    if (!isAdminLogin && !isStudentLogin && !isAssociateRoute) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
   }
 
   return response

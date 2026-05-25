@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { pdf } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/client'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { SalarySlipPDF } from './SalarySlipPDF'
 
 interface PayrollRow {
   id: string
@@ -127,8 +129,6 @@ export default function PayrollTable({
 
   const downloadSlip = async (row: PayrollRow) => {
     try {
-      const { pdf } = await import('@react-pdf/renderer')
-      const { SalarySlipPDF } = await import('./SalarySlipPDF')
       const logoBase64 = await fetch('/brand-logo.png')
         .then(r => r.blob())
         .then(blob => new Promise<string>((resolve) => {
@@ -167,8 +167,9 @@ export default function PayrollTable({
       a.download = `Salary_Slip_${row.employee_name.replace(/\s+/g, '_')}_${monthName.replace(' ', '_')}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-    } catch {
-      toast.error('Failed to generate PDF')
+    } catch (e: any) {
+      console.error('Salary slip PDF error:', e)
+      toast.error('PDF failed: ' + (e?.message ?? String(e)))
     }
   }
 

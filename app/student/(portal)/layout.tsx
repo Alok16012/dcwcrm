@@ -15,7 +15,7 @@ export default async function StudentPortalLayout({ children }: { children: Reac
     .eq('id', user.id)
     .single() as { data: { role: string; full_name: string; email: string } | null }
 
-  if (!profile || profile.role !== 'student') redirect('/login')
+  if (!profile || profile.role !== 'student') redirect('/student/login')
 
   const { data: student } = await supabase
     .from('students')
@@ -24,6 +24,7 @@ export default async function StudentPortalLayout({ children }: { children: Reac
     .single()
 
   if (!student) redirect('/student/login')
+  if (!(student as any).portal_active) redirect('/student/login')
 
   const studentInfo = {
     id: (student as { id: string }).id,

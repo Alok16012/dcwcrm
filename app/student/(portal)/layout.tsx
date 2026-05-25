@@ -24,7 +24,6 @@ export default async function StudentPortalLayout({ children }: { children: Reac
     .single()
 
   if (!student) redirect('/student/login')
-  if (!(student as any).portal_active) redirect('/student/login')
 
   const studentInfo = {
     id: (student as { id: string }).id,

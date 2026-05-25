@@ -231,6 +231,7 @@ export default function PayrollTable({
           <thead>
             <tr className="border-b bg-muted/50 text-xs">
               <th className="px-3 py-2 text-left">Employee</th>
+              <th className="px-3 py-2 text-left">Month</th>
               <th className="px-3 py-2 text-right">Basic</th>
               <th className="px-3 py-2 text-right">HRA</th>
               <th className="px-3 py-2 text-right">Allow.</th>
@@ -248,6 +249,9 @@ export default function PayrollTable({
             {data.map((row) => (
               <tr key={row.id} className="border-b hover:bg-muted/30">
                 <td className="px-3 py-2 font-medium">{row.employee_name}</td>
+                <td className="px-3 py-2 text-xs font-semibold text-blue-700 whitespace-nowrap">
+                  {format(new Date(row.year, row.month - 1), 'MMM yyyy')}
+                </td>
                 <td className="px-3 py-2 text-right text-xs">{fmt(row.basic)}</td>
                 <td className="px-3 py-2 text-right">
                   {isAdmin && row.status === 'draft' ? (

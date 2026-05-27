@@ -33,11 +33,12 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  const isStudentRoute = pathname.startsWith('/student/') && pathname !== '/student/login'
-  const isStudentLogin = pathname === '/student/login'
-  const isAdminLogin = pathname === '/login'
-  const isApiRoute = pathname.startsWith('/api')
+  const isStudentRoute   = pathname.startsWith('/student/') && pathname !== '/student/login'
+  const isStudentLogin   = pathname === '/student/login'
+  const isAdminLogin     = pathname === '/login'
+  const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin
 
   if (isApiRoute) return response
 
@@ -50,29 +51,33 @@ export async function proxy(request: NextRequest) {
 
     let role = profile?.role
 
-    // Fallback: if no profile row exists, check if this user is linked to a student record
-    // This handles students whose profile upsert failed during credential creation
+    // Fallback: if no profile row, check students table
     if (!role) {
       const { data: studentRecord } = await supabase
         .from('students')
         .select('id')
         .eq('portal_user_id', user.id)
         .maybeSingle()
-      if (studentRecord) {
-        role = 'student'
-      }
+      if (studentRecord) role = 'student'
     }
 
-    // Student trying to hit CRM routes — send to student portal
+    // Student → always go to student portal
     if (role === 'student' && !isStudentRoute && !isStudentLogin) {
       return NextResponse.redirect(new URL('/student/dashboard', request.url))
     }
-    // Non-student trying to access student portal routes
     if (role !== 'student' && isStudentRoute) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      return NextResponse.redirect(new URL(role === 'associate' ? '/associate' : '/dashboard', request.url))
     }
+
+    // Associate → always go to /associate, never admin area
+    if (role === 'associate' && isAdminRoute) {
+      return NextResponse.redirect(new URL('/associate', request.url))
+    }
+
     // Bounce logged-in users off login pages
-    if (isAdminLogin && role !== 'student') {
+    if (isAdminLogin) {
+      if (role === 'student')   return NextResponse.redirect(new URL('/student/dashboard', request.url))
+      if (role === 'associate') return NextResponse.redirect(new URL('/associate', request.url))
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     if (isStudentLogin && role === 'student') {

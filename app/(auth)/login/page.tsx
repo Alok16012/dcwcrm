@@ -37,6 +37,15 @@ export default function LoginPage() {
         toast.error(error.message)
         return
       }
+      // Route associate users to their own portal
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: { role: string } | null }
+        if (profile?.role === 'associate') {
+          window.location.replace('/associate')
+          return
+        }
+      }
       window.location.replace('/dashboard')
     } catch {
       toast.error('Something went wrong')

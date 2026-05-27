@@ -3,45 +3,39 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee, TrendingUp, Bell } from 'lucide-react'
+import {
+  CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee,
+  TrendingUp, Bell, Users, Wallet, ArrowRight, AlertCircle, Copy,
+  UserCheck, BarChart2, ChevronRight, Package,
+} from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
+const LEAD_STATUS: Record<string, { label: string; color: string }> = {
+  new:          { label: 'New',        color: 'bg-blue-100 text-blue-800' },
+  contacted:    { label: 'Contacted',  color: 'bg-indigo-100 text-indigo-800' },
+  interested:   { label: 'Interested', color: 'bg-purple-100 text-purple-800' },
+  not_interested:{ label: 'Not Interested', color: 'bg-gray-100 text-gray-600' },
+  follow_up:    { label: 'Follow-up',  color: 'bg-amber-100 text-amber-800' },
+  converted:    { label: 'Converted',  color: 'bg-green-100 text-green-800' },
+  lost:         { label: 'Lost',       color: 'bg-red-100 text-red-800' },
+}
+
 interface Associate {
-  id: string
-  name: string
-  associate_code: string | null
-  wallet_balance: number
-}
-
-interface Lead {
-  id: string
-  full_name: string
-  status: string
-  created_at: string
-  course?: { name: string } | null
-  referred_by_associate?: string
-}
-
-interface WalletTxn {
-  id: string
-  type: 'credit' | 'debit'
-  amount: number
-  reason: string | null
-  created_at: string
-  associate_id: string
+  id: string; name: string; associate_code: string | null; wallet_balance: number; email: string
 }
 
 export default function AssociateClient() {
   const supabase = createClient()
   const db = supabase as any
   const [associate, setAssociate] = useState<Associate | null>(null)
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [txns, setTxns] = useState<WalletTxn[]>([])
-  const [unread, setUnread] = useState(0)
-  const [pendingTasks, setPendingTasks] = useState<any[]>([])
+  const [stats, setStats] = useState({ totalLeads: 0, totalStudents: 0, commissionEarned: 0, pendingRequests: 0 })
+  const [recentLeads, setRecentLeads] = useState<any[]>([])
+  const [recentTxns, setRecentTxns] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -49,21 +43,33 @@ export default function AssociateClient() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const { data: assoc } = await db.from('associates').select('id, name, associate_code, wallet_balance').eq('user_id', user.id).single()
+    const { data: assoc } = await db.from('associates').select('id, name, associate_code, wallet_balance, email').eq('user_id', user.id).single()
     if (!assoc) { setLoading(false); return }
     setAssociate(assoc)
 
-    const [leadRes, txnRes, notifRes, taskRes] = await Promise.all([
-      supabase.from('leads').select('id, full_name, status, created_at, course:courses(name), referred_by_associate').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }).limit(5),
-      db.from('associate_wallet_txns').select('*').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
-      db.from('associate_notifications').select('id').eq('associate_id', assoc.id).eq('is_read', false),
-      db.from('tasks').select('id,title,urgency,due_date,status').eq('assigned_to', user.id).neq('status', 'done').order('due_date').limit(4),
+    const [
+      leadRes, studentRes, txnRes, notifRes, pendingRes,
+    ] = await Promise.all([
+      supabase.from('leads').select('id, full_name, phone, status, created_at, course:courses(name)').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }),
+      db.from('students').select('id', { count: 'exact', head: false }).eq('referred_by_associate', assoc.id),
+      db.from('associate_wallet_txns').select('id, type, amount, reason, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
+      db.from('associate_notifications').select('id, title, message, type, is_read, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
+      db.from('wallet_recharge_requests').select('id', { count: 'exact', head: false }).eq('associate_id', assoc.id).eq('status', 'pending'),
     ])
 
-    setLeads((leadRes.data ?? []) as Lead[])
-    setTxns((txnRes.data ?? []) as WalletTxn[])
-    setUnread((notifRes.data ?? []).length)
-    setPendingTasks(taskRes.data ?? [])
+    const allLeads = (leadRes.data ?? []) as any[]
+    const allTxns = (txnRes.data ?? []) as any[]
+    const commissionEarned = allTxns.filter((t: any) => t.type === 'credit').reduce((s: number, t: any) => s + t.amount, 0)
+
+    setStats({
+      totalLeads: allLeads.length,
+      totalStudents: (studentRes.data ?? []).length,
+      commissionEarned,
+      pendingRequests: (pendingRes.data ?? []).length,
+    })
+    setRecentLeads(allLeads.slice(0, 6))
+    setRecentTxns(allTxns)
+    setNotifications((notifRes.data ?? []) as any[])
     setLoading(false)
   }, [supabase, db])
 
@@ -76,99 +82,185 @@ export default function AssociateClient() {
       </div>
     )
   }
-
   if (!associate) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] text-muted-foreground text-center">
+      <div className="flex items-center justify-center min-h-[400px] text-center">
         <div>
-          <p className="font-medium">Associate profile not found</p>
-          <p className="text-sm mt-1">Contact admin if this is unexpected</p>
+          <p className="font-semibold text-gray-800">Associate profile not found</p>
+          <p className="text-sm text-gray-400 mt-1">Contact admin if this is unexpected</p>
         </div>
       </div>
     )
   }
 
-  const converted = leads.filter(l => l.status === 'converted').length
-  const inProgress = leads.filter(l => !['converted', 'lost'].includes(l.status)).length
-  const totalEarned = txns.filter(t => t.type === 'credit').reduce((s, t) => s + t.amount, 0)
+  const unread = notifications.filter(n => !n.is_read).length
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Welcome, {associate.name} · Code:{' '}
-            <span className="font-mono font-semibold text-blue-700">{associate.associate_code ?? '—'}</span>
-          </p>
+    <div className="space-y-5 max-w-5xl">
+
+      {/* Welcome Banner */}
+      <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-indigo-900 rounded-2xl p-6 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10">
+          <BarChart2 className="w-28 h-28" />
         </div>
-        <div className="flex gap-2 items-center">
-          {unread > 0 && (
-            <Link href="/associate/notifications">
-              <Badge className="bg-red-100 text-red-700 border-0 gap-1 cursor-pointer hover:bg-red-200 transition-colors">
-                <Bell className="w-3 h-3" /> {unread} new
-              </Badge>
-            </Link>
-          )}
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5 h-8">
+        <div className="relative flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <p className="text-blue-300 text-sm font-medium">Welcome back,</p>
+            <h1 className="text-2xl font-extrabold mt-0.5">{associate.name}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {associate.associate_code && (
+                <button
+                  onClick={() => { navigator.clipboard.writeText(associate.associate_code!); toast.success('Code copied') }}
+                  className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-xs px-3 py-1.5 rounded-full font-mono font-semibold hover:bg-white/30 transition-colors"
+                >
+                  {associate.associate_code}
+                  <Copy className="w-3 h-3 opacity-70" />
+                </button>
+              )}
+              <span className="bg-emerald-400/20 border border-emerald-400/30 text-emerald-300 text-xs px-3 py-1.5 rounded-full font-semibold">
+                {fmt(associate.wallet_balance)} Wallet
+              </span>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={load} className="border-white/30 text-white bg-white/10 hover:bg-white/20 gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </Button>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Wallet Balance" value={fmt(associate.wallet_balance)} color="blue" icon={<IndianRupee className="w-4 h-4" />} />
-        <StatCard label="Total Earned" value={fmt(totalEarned)} color="green" icon={<TrendingUp className="w-4 h-4" />} />
-        <StatCard label="Converted" value={converted.toString()} color="green" icon={<CheckCircle2 className="w-4 h-4" />} />
-        <StatCard label="In Progress" value={inProgress.toString()} color="amber" icon={<GraduationCap className="w-4 h-4" />} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Total Leads"
+          value={stats.totalLeads.toString()}
+          sub="Referred by you"
+          icon={Users}
+          color="blue"
+          href="/associate/admissions"
+        />
+        <StatCard
+          label="Total Students"
+          value={stats.totalStudents.toString()}
+          sub="Converted admissions"
+          icon={GraduationCap}
+          color="indigo"
+          href="/associate/students"
+        />
+        <StatCard
+          label="Commission Earned"
+          value={fmt(stats.commissionEarned)}
+          sub="Total credits received"
+          icon={TrendingUp}
+          color="emerald"
+          href="/associate/account"
+        />
+        <StatCard
+          label="Wallet Balance"
+          value={fmt(associate.wallet_balance)}
+          sub={stats.pendingRequests > 0 ? `${stats.pendingRequests} recharge pending` : 'Available balance'}
+          icon={Wallet}
+          color={stats.pendingRequests > 0 ? 'amber' : 'blue'}
+          href="/associate/account"
+        />
       </div>
 
-      {/* Recent panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Referrals */}
-        <div className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm text-slate-700">Recent Referrals</h3>
-            <Link href="/associate/admissions" className="text-xs text-blue-600 hover:underline">View all →</Link>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-4 md:grid-cols-7 gap-2.5">
+        {[
+          { label: 'Add Lead',    href: '/associate/admissions?new=1',icon: Users,         color: 'text-blue-600',    bg: 'bg-blue-50' },
+          { label: 'My Students', href: '/associate/students',         icon: GraduationCap, color: 'text-indigo-600',  bg: 'bg-indigo-50' },
+          { label: 'Accounts',    href: '/associate/account',          icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Dispatch',    href: '/associate/dispatch',         icon: Package,       color: 'text-purple-600',  bg: 'bg-purple-50' },
+          { label: 'Resources',   href: '/associate/resources',        icon: BarChart2,     color: 'text-orange-600',  bg: 'bg-orange-50' },
+          { label: 'Support',     href: '/associate/support',          icon: AlertCircle,   color: 'text-rose-600',    bg: 'bg-rose-50' },
+          { label: 'Profile',     href: '/associate/profile',          icon: UserCheck,     color: 'text-gray-600',    bg: 'bg-gray-100' },
+        ].map(({ label, href, icon: Icon, color, bg }) => (
+          <Link
+            key={href}
+            href={href}
+            className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 hover:shadow-md hover:border-gray-200 transition-all text-center"
+          >
+            <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
+              <Icon className={`h-4 w-4 ${color}`} />
+            </div>
+            <span className="text-[10px] font-semibold text-gray-600 leading-tight">{label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Content Grid */}
+      <div className="grid lg:grid-cols-2 gap-4">
+
+        {/* Recent Leads */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-500" />
+              <span className="font-semibold text-gray-900 text-sm">Recent Leads</span>
+            </div>
+            <Link href="/associate/admissions" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              View all <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
-          {leads.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No referrals yet</p>
+          {recentLeads.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <Users className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+              <p className="text-sm font-medium text-gray-400">No referrals yet</p>
+              <p className="text-xs text-gray-300 mt-1">Add a lead to get started</p>
+            </div>
           ) : (
-            <div className="space-y-0 divide-y">
-              {leads.map(l => (
-                <div key={l.id} className="flex items-center justify-between py-2.5">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{l.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{l.course?.name ?? '—'}</p>
+            <div className="divide-y divide-gray-50">
+              {recentLeads.map((l: any) => {
+                const st = LEAD_STATUS[l.status] ?? LEAD_STATUS['new']!
+                return (
+                  <div key={l.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{l.full_name}</p>
+                      <p className="text-xs text-gray-400">{l.course?.name ?? '—'} · {l.phone}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ml-3 whitespace-nowrap ${st.color}`}>
+                      {st.label}
+                    </span>
                   </div>
-                  <LeadStatusBadge status={l.status} />
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
+          <div className="px-5 py-3 border-t border-gray-50">
+            <Link href="/associate/admissions?new=1" className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+              + Add New Lead
+            </Link>
+          </div>
         </div>
 
-        {/* Recent Wallet Txns */}
-        <div className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm text-slate-700">Recent Transactions</h3>
-            <Link href="/associate/account" className="text-xs text-blue-600 hover:underline">View all →</Link>
+        {/* Recent Transactions */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center gap-2">
+              <IndianRupee className="h-4 w-4 text-emerald-500" />
+              <span className="font-semibold text-gray-900 text-sm">Recent Transactions</span>
+            </div>
+            <Link href="/associate/account" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              View all <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
-          {txns.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No transactions yet</p>
+          {recentTxns.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+              <p className="text-sm font-medium text-gray-400">No transactions yet</p>
+            </div>
           ) : (
-            <div className="space-y-0 divide-y">
-              {txns.map(t => (
-                <div key={t.id} className="flex items-center justify-between py-2.5">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{t.reason ?? 'Transaction'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(t.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+            <div className="divide-y divide-gray-50">
+              {recentTxns.map((t: any) => (
+                <div key={t.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{t.reason ?? 'Transaction'}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(t.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </p>
                   </div>
-                  <span className={`font-bold font-mono text-sm ${t.type === 'credit' ? 'text-green-700' : 'text-red-600'}`}>
+                  <span className={`font-bold text-sm font-mono ml-3 ${t.type === 'credit' ? 'text-emerald-600' : 'text-red-500'}`}>
                     {t.type === 'credit' ? '+' : '-'}{fmt(t.amount)}
                   </span>
                 </div>
@@ -178,34 +270,34 @@ export default function AssociateClient() {
         </div>
       </div>
 
-      {/* Pending Tasks widget */}
-      {pendingTasks.length > 0 && (
-        <div className="rounded-xl border bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b bg-gradient-to-r from-violet-50 to-blue-50 flex items-center justify-between">
+      {/* Latest Updates */}
+      {notifications.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-violet-600" />
-              <p className="font-semibold text-slate-800 text-sm">Pending Tasks</p>
-              <span className="bg-violet-600 text-white text-[10px] rounded-full px-1.5 py-0.5">{pendingTasks.length}</span>
+              <Bell className="h-4 w-4 text-indigo-500" />
+              <span className="font-semibold text-gray-900 text-sm">Latest Updates</span>
+              {unread > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>
+              )}
             </div>
-            <Link href="/associate/tasks" className="text-xs text-violet-600 hover:underline">View all →</Link>
+            <Link href="/associate/notifications" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              See all <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-          <div className="divide-y">
-            {pendingTasks.map((t: any) => {
-              const todayStr = new Date().toISOString().slice(0, 10)
-              const isToday = t.due_date === todayStr
-              const isOverdue = t.due_date < todayStr
-              return (
-                <div key={t.id} className={`px-4 py-2.5 flex items-center gap-3 ${isToday ? 'bg-amber-50' : isOverdue ? 'bg-red-50' : ''}`}>
-                  <div className={`w-1 h-5 rounded-full flex-shrink-0 ${t.urgency === 'urgent' ? 'bg-red-500' : t.urgency === 'high' ? 'bg-orange-400' : 'bg-blue-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
-                    <p className={`text-xs ${isToday ? 'text-amber-600 font-medium' : isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                      {isToday ? 'Due Today!' : isOverdue ? 'Overdue' : new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    </p>
-                  </div>
+          <div className="divide-y divide-gray-50">
+            {notifications.map((n: any) => (
+              <div key={n.id} className={`px-5 py-3 flex gap-3 items-start ${!n.is_read ? 'bg-blue-50/40' : 'hover:bg-gray-50'} transition-colors`}>
+                <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${n.type === 'urgent' ? 'bg-red-500' : n.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</p>
+                  {n.message && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{n.message}</p>}
                 </div>
-              )
-            })}
+                <p className="text-[10px] text-gray-300 shrink-0 mt-0.5 font-medium">
+                  {new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -213,18 +305,27 @@ export default function AssociateClient() {
   )
 }
 
-function StatCard({ label, value, color, icon }: { label: string; value: string; color: 'blue' | 'green' | 'amber'; icon: React.ReactNode }) {
-  const c = { blue: 'bg-blue-50 border-blue-100 text-blue-700', green: 'bg-green-50 border-green-100 text-green-700', amber: 'bg-amber-50 border-amber-100 text-amber-700' }
+function StatCard({ label, value, sub, icon: Icon, color, href }: {
+  label: string; value: string; sub: string; icon: any;
+  color: 'blue' | 'indigo' | 'emerald' | 'amber'; href: string
+}) {
+  const colors = {
+    blue:   { bg: 'bg-blue-50',   border: 'border-blue-100',   icon: 'text-blue-600',   val: 'text-blue-700' },
+    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: 'text-indigo-600', val: 'text-indigo-700' },
+    emerald:{ bg: 'bg-emerald-50',border: 'border-emerald-100',icon: 'text-emerald-600',val: 'text-emerald-700' },
+    amber:  { bg: 'bg-amber-50',  border: 'border-amber-100',  icon: 'text-amber-600',  val: 'text-amber-700' },
+  }
+  const c = colors[color]
   return (
-    <div className={`rounded-xl border p-4 space-y-2 ${c[color]}`}>
-      <div className="flex items-center gap-2 opacity-70">{icon}<p className="text-xs font-medium">{label}</p></div>
-      <p className="text-xl font-bold">{value}</p>
-    </div>
+    <Link href={href} className={`${c.bg} ${c.border} border rounded-2xl p-4 hover:shadow-md transition-all group`}>
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</p>
+        <div className={`w-8 h-8 bg-white rounded-xl flex items-center justify-center border ${c.border}`}>
+          <Icon className={`h-4 w-4 ${c.icon}`} />
+        </div>
+      </div>
+      <p className={`text-xl font-extrabold ${c.val} leading-tight`}>{value}</p>
+      <p className="text-[10px] text-gray-400 mt-1 font-medium">{sub}</p>
+    </Link>
   )
-}
-
-function LeadStatusBadge({ status }: { status: string }) {
-  if (status === 'converted') return <Badge className="bg-green-100 text-green-800 border-0 text-xs gap-1"><CheckCircle2 className="w-3 h-3" />Converted</Badge>
-  if (status === 'lost') return <Badge className="bg-red-100 text-red-800 border-0 text-xs gap-1"><XCircle className="w-3 h-3" />Lost</Badge>
-  return <Badge className="bg-amber-100 text-amber-800 border-0 text-xs gap-1"><Clock className="w-3 h-3" />{status.replace(/_/g, ' ')}</Badge>
 }

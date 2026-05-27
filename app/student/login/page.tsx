@@ -31,26 +31,21 @@ export default function StudentLoginPage() {
     try {
       const rawUsername = data.username.trim()
 
-      // Step 1: look up the actual login email from the server (handles any email format)
-      let portalEmail: string
-      try {
-        const res = await fetch('/api/students/lookup-portal-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enrollment_number: rawUsername }),
-        })
-        if (res.ok) {
-          const json = await res.json()
-          portalEmail = json.email
-        } else {
-          // Fallback: derive from enrollment number directly
-          portalEmail = rawUsername.includes('@')
-            ? rawUsername
-            : `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
-        }
-      } catch {
-        portalEmail = `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
+      // Step 1: resolve the actual auth email for this enrollment number
+      const lookupRes = await fetch('/api/students/lookup-portal-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollment_number: rawUsername }),
+      })
+
+      if (!lookupRes.ok) {
+        const json = await lookupRes.json().catch(() => ({}))
+        // Show the specific error from the server
+        toast.error(json.error ?? 'Enrollment number not found. Please contact your counsellor.')
+        return
       }
+
+      const { email: portalEmail } = await lookupRes.json()
 
       // Step 2: sign in with the resolved email
       const { error } = await supabase.auth.signInWithPassword({
@@ -59,9 +54,12 @@ export default function StudentLoginPage() {
       })
 
       if (error) {
-        toast.error('Invalid enrollment number or password. Please check and try again.')
+        toast.error('Wrong password. Please try again or contact your counsellor to reset it.')
         return
       }
+
+      // Ensure the profile row exists (it may have been missing for older accounts)
+      await fetch('/api/students/ensure-profile', { method: 'POST' }).catch(() => {})
 
       window.location.replace('/student/dashboard')
     } catch {

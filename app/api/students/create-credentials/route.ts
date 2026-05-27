@@ -51,14 +51,20 @@ export async function POST(request: NextRequest) {
 
     if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-    await (adminClient as any).from('profiles').upsert({
+    const { error: profileErr } = await (adminClient as any).from('profiles').upsert({
       id: authData.user.id,
       email: portalEmail,
       full_name: student.full_name,
       role: 'student',
-      phone: student.phone,
+      phone: student.phone ?? null,
       is_active: true,
-    })
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+    if (profileErr) {
+      // Profile creation failed — log but don't block; ensure-profile will fix it on login
+      console.error('Profile upsert failed:', profileErr.message)
+    }
 
     const { error: updateErr } = await (adminClient as any)
       .from('students')

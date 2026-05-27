@@ -47,7 +47,21 @@ export async function middleware(request: NextRequest) {
       .select('role')
       .eq('id', user.id)
       .single()
-    const role = profile?.role
+
+    let role = profile?.role
+
+    // Fallback: if no profile row exists, check if this user is linked to a student record
+    // This handles students whose profile upsert failed during credential creation
+    if (!role) {
+      const { data: studentRecord } = await supabase
+        .from('students')
+        .select('id')
+        .eq('portal_user_id', user.id)
+        .maybeSingle()
+      if (studentRecord) {
+        role = 'student'
+      }
+    }
 
     // Student trying to hit CRM routes — send to student portal
     if (role === 'student' && !isStudentRoute && !isStudentLogin) {

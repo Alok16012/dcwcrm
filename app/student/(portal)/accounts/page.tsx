@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Wallet, CheckCircle2, Clock, AlertCircle, Download, Receipt } from 'lucide-react'
+import { Wallet, CheckCircle2, Clock, AlertCircle, Download, Receipt, IndianRupee } from 'lucide-react'
 
 export default async function AccountsPage() {
   const supabase = await createServerClient()
@@ -20,9 +20,9 @@ export default async function AccountsPage() {
 
   const { data: payments } = await (supabase as any)
     .from('payments')
-    .select('id, amount, payment_mode, payment_date, receipt_number, notes')
+    .select('id, amount, payment_mode, payment_date, receipt_number, notes, receipt_url')
     .eq('student_id', s.id)
-    .order('payment_date', { ascending: false }) as { data: Array<{ id: string; amount: number; payment_mode: string; payment_date: string; receipt_number: string | null; notes: string | null }> | null }
+    .order('payment_date', { ascending: false }) as { data: Array<{ id: string; amount: number; payment_mode: string; payment_date: string; receipt_number: string | null; notes: string | null; receipt_url: string | null }> | null }
 
   const modeLabel: Record<string, string> = {
     cash: 'Cash', upi: 'UPI', card: 'Card', neft: 'NEFT',
@@ -94,25 +94,33 @@ export default async function AccountsPage() {
           <div className="py-12 text-center text-gray-400 text-sm">No payments recorded yet</div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {payments.map(p => (
-              <div key={p.id} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">₹{p.amount.toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-gray-400">
-                      {modeLabel[p.payment_mode] ?? p.payment_mode}
-                      {p.receipt_number && ` · ${p.receipt_number}`}
-                    </p>
-                  </div>
+            {payments.map((p, idx) => (
+              <div key={p.id} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center shrink-0 text-green-500 font-bold text-xs">
+                  #{idx + 1}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-medium text-gray-700">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900">₹{p.amount.toLocaleString('en-IN')}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {modeLabel[p.payment_mode] ?? p.payment_mode}
+                    {p.receipt_number && <span className="font-mono"> · {p.receipt_number}</span>}
+                    {p.notes && <span> · {p.notes}</span>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-xs font-medium text-gray-500">
                     {new Date(p.payment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
-                  {p.notes && <p className="text-xs text-gray-400 max-w-32 truncate">{p.notes}</p>}
+                  {p.receipt_url && (
+                    <a
+                      href={p.receipt_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Download className="h-3 w-3" /> Receipt
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

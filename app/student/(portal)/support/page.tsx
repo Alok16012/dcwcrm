@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { HelpCircle, Send, Bell, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
+import { HelpCircle, Send, Bell, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 
 interface Ticket { id: string; subject: string; message: string; status: string; priority: string; admin_reply: string | null; created_at: string }
-interface Notification { id: string; title: string; message: string; type: string; is_read: boolean; created_at: string }
+interface Notification { id: string; title: string; message: string; type: string; is_read: boolean; created_at: string; file_url?: string | null; category?: string | null }
 interface Announcement { id: string; title: string; body: string; type: string; created_at: string }
 interface FAQ { id: string; question: string; answer: string; category: string }
 interface Dispatch { id: string; document_type: string; courier: string | null; tracking_number: string | null; status: string; dispatch_date: string | null; expected_delivery: string | null }
@@ -173,9 +173,25 @@ export default function SupportPage() {
           ) : notifications.map(n => (
             <div key={n.id} className={`border rounded-2xl p-4 ${notifTypeColor[n.type] ?? 'bg-gray-50 border-gray-100'} ${!n.is_read ? 'ring-1 ring-blue-200' : ''}`}>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className={`text-sm font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`text-sm font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</p>
+                    {n.category && (
+                      <span className="text-[10px] px-2 py-0.5 bg-white/70 border border-gray-200 rounded-full text-gray-500 font-medium">{n.category}</span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">{n.message}</p>
+                  {n.file_url && (
+                    <a
+                      href={n.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 font-medium hover:text-blue-800 hover:underline underline-offset-2"
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      View attachment
+                    </a>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-gray-400">{new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>

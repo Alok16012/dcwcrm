@@ -9,14 +9,6 @@ export default async function StudentPortalLayout({ children }: { children: Reac
 
   if (!user) redirect('/student/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name, email')
-    .eq('id', user.id)
-    .single() as { data: { role: string; full_name: string; email: string } | null }
-
-  if (!profile || profile.role !== 'student') redirect('/student/login')
-
   const { data: student } = await supabase
     .from('students')
     .select('id, full_name, enrollment_number, profile_photo_url, course:courses(name), portal_active')

@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const portalEmail = student.email || `${student.enrollment_number.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
+    // Always use enrollment-derived email so login page can always derive it the same way
+    const portalEmail = `${student.enrollment_number.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
     const username = student.enrollment_number
 
     if (student.portal_user_id) {

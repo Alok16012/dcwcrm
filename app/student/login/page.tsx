@@ -29,24 +29,43 @@ export default function StudentLoginPage() {
   async function onSubmit(data: LoginForm) {
     setLoading(true)
     try {
-      // Convert enrollment number to the internal portal email format
       const rawUsername = data.username.trim()
-      // Try as direct email first, then fall back to portal email format
-      const portalEmail = rawUsername.includes('@')
-        ? rawUsername
-        : `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
 
+      // Step 1: look up the actual login email from the server (handles any email format)
+      let portalEmail: string
+      try {
+        const res = await fetch('/api/students/lookup-portal-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enrollment_number: rawUsername }),
+        })
+        if (res.ok) {
+          const json = await res.json()
+          portalEmail = json.email
+        } else {
+          // Fallback: derive from enrollment number directly
+          portalEmail = rawUsername.includes('@')
+            ? rawUsername
+            : `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
+        }
+      } catch {
+        portalEmail = `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@dcwportal.in`
+      }
+
+      // Step 2: sign in with the resolved email
       const { error } = await supabase.auth.signInWithPassword({
         email: portalEmail,
         password: data.password,
       })
+
       if (error) {
-        toast.error('Invalid enrollment number or password')
+        toast.error('Invalid enrollment number or password. Please check and try again.')
         return
       }
+
       window.location.replace('/student/dashboard')
     } catch {
-      toast.error('Something went wrong')
+      toast.error('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -120,11 +139,13 @@ export default function StudentLoginPage() {
                     <Input
                       id="username"
                       placeholder="e.g. ENR-123456"
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500"
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 uppercase"
                       {...register('username')}
                       autoComplete="username"
+                      autoCapitalize="characters"
                     />
                     {errors.username && <p className="text-xs text-red-500">{errors.username.message}</p>}
+                    <p className="text-xs text-gray-400">Enter your enrollment number exactly as given (e.g. ENR-123456)</p>
                   </div>
 
                   <div className="space-y-1.5">

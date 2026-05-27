@@ -4,78 +4,86 @@ import Link from 'next/link'
 import {
   GraduationCap, Wallet, BookOpen, HelpCircle, Bell,
   ChevronRight, CheckCircle2, Clock, AlertCircle, User,
-  FileText, IndianRupee, ArrowRight, Paperclip,
+  FileText, IndianRupee, ArrowRight, Paperclip, TrendingUp,
+  CircleDot, Circle,
 } from 'lucide-react'
 
-// ── helpers ──────────────────────────────────────────────────
-const VER: Record<string, { label: string; cls: string; done: boolean; active: boolean }> = {
-  pending:   { label: 'Pending',   cls: 'text-yellow-600 bg-yellow-50 border-yellow-200', done: false, active: true },
-  in_review: { label: 'In Review', cls: 'text-blue-600 bg-blue-50 border-blue-200',       done: false, active: true },
-  verified:  { label: 'Verified',  cls: 'text-green-600 bg-green-50 border-green-200',    done: true,  active: false },
-  rejected:  { label: 'Rejected',  cls: 'text-red-600 bg-red-50 border-red-200',          done: false, active: false },
+const VER: Record<string, { label: string; color: string; bg: string; border: string; done: boolean; active: boolean }> = {
+  pending:   { label: 'Pending',   color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200', done: false, active: true },
+  in_review: { label: 'In Review', color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',  done: false, active: true },
+  verified:  { label: 'Verified',  color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200',done: true,  active: false },
+  rejected:  { label: 'Rejected',  color: 'text-red-700',    bg: 'bg-red-50',    border: 'border-red-200',   done: false, active: false },
 }
-const EXAM: Record<string, { label: string; cls: string; done: boolean }> = {
-  not_scheduled:  { label: 'Not Scheduled', cls: 'text-gray-500 bg-gray-50 border-gray-200',      done: false },
-  scheduled:      { label: 'Scheduled',     cls: 'text-blue-600 bg-blue-50 border-blue-200',       done: false },
-  completed:      { label: 'Completed',     cls: 'text-indigo-600 bg-indigo-50 border-indigo-200', done: true },
-  result_awaited: { label: 'Result Awaited',cls: 'text-yellow-600 bg-yellow-50 border-yellow-200', done: false },
-  passed:         { label: 'Passed',        cls: 'text-green-600 bg-green-50 border-green-200',    done: true },
-  failed:         { label: 'Failed',        cls: 'text-red-600 bg-red-50 border-red-200',          done: false },
+const EXAM: Record<string, { label: string; color: string; bg: string; border: string; done: boolean }> = {
+  not_scheduled:  { label: 'Not Scheduled',  color: 'text-gray-600',   bg: 'bg-gray-50',    border: 'border-gray-200',   done: false },
+  scheduled:      { label: 'Scheduled',      color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   done: false },
+  completed:      { label: 'Completed',      color: 'text-indigo-700', bg: 'bg-indigo-50',  border: 'border-indigo-200', done: true },
+  result_awaited: { label: 'Result Awaited', color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',  done: false },
+  passed:         { label: 'Passed',         color: 'text-emerald-700',bg: 'bg-emerald-50', border: 'border-emerald-200',done: true },
+  failed:         { label: 'Failed',         color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    done: false },
 }
-const RESULT: Record<string, { label: string; cls: string; done: boolean }> = {
-  awaited:  { label: 'Awaited',  cls: 'text-gray-500 bg-gray-50 border-gray-200',      done: false },
-  declared: { label: 'Declared', cls: 'text-green-600 bg-green-50 border-green-200',   done: true },
-  passed:   { label: 'Passed',   cls: 'text-green-600 bg-green-50 border-green-200',   done: true },
-  failed:   { label: 'Failed',   cls: 'text-red-600 bg-red-50 border-red-200',         done: false },
-}
-
-const NOTIF_CLS: Record<string, string> = {
-  info:    'bg-blue-50 border-blue-200',
-  success: 'bg-green-50 border-green-200',
-  warning: 'bg-yellow-50 border-yellow-200',
-  alert:   'bg-red-50 border-red-200',
+const RESULT: Record<string, { label: string; color: string; bg: string; border: string; done: boolean }> = {
+  awaited:  { label: 'Awaited',  color: 'text-gray-600',   bg: 'bg-gray-50',    border: 'border-gray-200',   done: false },
+  declared: { label: 'Declared', color: 'text-emerald-700',bg: 'bg-emerald-50', border: 'border-emerald-200', done: true },
+  passed:   { label: 'Passed',   color: 'text-emerald-700',bg: 'bg-emerald-50', border: 'border-emerald-200', done: true },
+  failed:   { label: 'Failed',   color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',     done: false },
+  re_appear:{ label: 'Re-Appear',color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200',  done: false },
 }
 const NOTIF_DOT: Record<string, string> = {
-  info: 'bg-blue-500', success: 'bg-green-500', warning: 'bg-yellow-500', alert: 'bg-red-500',
+  info: 'bg-blue-500', success: 'bg-emerald-500', warning: 'bg-amber-500', alert: 'bg-red-500',
+}
+const NOTIF_BG: Record<string, string> = {
+  info: 'bg-blue-500/10', success: 'bg-emerald-500/10', warning: 'bg-amber-500/10', alert: 'bg-red-500/10',
 }
 
-// ── timeline step ────────────────────────────────────────────
 function TimelineStep({
   step, label, sub, done, active, last,
 }: { step: number; label: string; sub: string; done: boolean; active: boolean; last?: boolean }) {
   return (
-    <div className="flex flex-col items-center flex-1">
+    <div className="flex flex-col items-center flex-1 min-w-0">
       <div className="relative flex items-center w-full">
-        {/* Left connector */}
-        <div className={`flex-1 h-0.5 ${step === 1 ? 'opacity-0' : done ? 'bg-green-400' : 'bg-gray-200'}`} />
-        {/* Circle */}
-        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center z-10 shrink-0 ${
-          done    ? 'bg-green-500 border-green-500 text-white' :
-          active  ? 'bg-blue-500 border-blue-500 text-white animate-pulse' :
-                    'bg-white border-gray-300 text-gray-400'
+        <div className={`flex-1 h-[3px] rounded-full ${step === 1 ? 'opacity-0' : done ? 'bg-emerald-400' : active ? 'bg-blue-200' : 'bg-gray-100'}`} />
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 shrink-0 transition-all ${
+          done   ? 'bg-emerald-500 shadow-emerald-200 shadow-md' :
+          active ? 'bg-blue-600 shadow-blue-200 shadow-md ring-4 ring-blue-100' :
+                   'bg-white border-2 border-gray-200'
         }`}>
           {done ? (
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-5 h-5 text-white" />
           ) : active ? (
-            <Clock className="w-4 h-4" />
+            <Clock className="w-5 h-5 text-white" />
           ) : (
-            <span className="text-xs font-bold">{step}</span>
+            <span className="text-xs font-bold text-gray-400">{step}</span>
           )}
         </div>
-        {/* Right connector */}
-        <div className={`flex-1 h-0.5 ${last ? 'opacity-0' : done ? 'bg-green-400' : 'bg-gray-200'}`} />
+        <div className={`flex-1 h-[3px] rounded-full ${last ? 'opacity-0' : done ? 'bg-emerald-400' : 'bg-gray-100'}`} />
       </div>
-      <p className={`text-xs font-semibold mt-1.5 text-center ${done ? 'text-green-700' : active ? 'text-blue-700' : 'text-gray-400'}`}>
-        {label}
-      </p>
-      <p className={`text-[10px] text-center mt-0.5 ${done ? 'text-green-500' : active ? 'text-blue-500' : 'text-gray-300'}`}>
-        {sub}
-      </p>
+      <p className={`text-[11px] font-bold mt-2 text-center leading-tight ${
+        done ? 'text-emerald-700' : active ? 'text-blue-700' : 'text-gray-400'
+      }`}>{label}</p>
+      <p className={`text-[10px] text-center mt-0.5 ${
+        done ? 'text-emerald-500' : active ? 'text-blue-500' : 'text-gray-300'
+      }`}>{sub}</p>
     </div>
   )
 }
 
-// ── page ─────────────────────────────────────────────────────
+function StatusCard({
+  label, value, icon: Icon, color, bg, border, href,
+}: { label: string; value: string; icon: any; color: string; bg: string; border: string; href: string }) {
+  return (
+    <Link href={href} className={`${bg} ${border} border rounded-2xl p-4 hover:shadow-md transition-all group`}>
+      <div className="flex items-start justify-between mb-3">
+        <p className={`text-[10px] font-bold uppercase tracking-widest ${color} opacity-70`}>{label}</p>
+        <div className={`w-8 h-8 rounded-xl ${bg} border ${border} flex items-center justify-center`}>
+          <Icon className={`h-4 w-4 ${color}`} />
+        </div>
+      </div>
+      <p className={`text-lg font-extrabold ${color} leading-tight`}>{value}</p>
+    </Link>
+  )
+}
+
 export default async function StudentDashboardPage() {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -87,7 +95,7 @@ export default async function StudentDashboardPage() {
       id, full_name, enrollment_number, status,
       verification_status, exam_status, result_status, admission_progress,
       total_fee, amount_paid, enrollment_date,
-      course:courses(name), department:departments(name), sub_section:department_sub_sections(name)
+      course:courses(name), department:departments(name)
     `)
     .eq('portal_user_id', user.id)
     .single()
@@ -99,7 +107,7 @@ export default async function StudentDashboardPage() {
     verification_status: string; exam_status: string; result_status: string;
     admission_progress: number; total_fee: number | null; amount_paid: number;
     enrollment_date: string | null;
-    course: { name: string } | null; department: { name: string } | null; sub_section: { name: string } | null;
+    course: { name: string } | null; department: { name: string } | null;
   }
 
   const pending = (s.total_fee ?? 0) - s.amount_paid
@@ -118,171 +126,199 @@ export default async function StudentDashboardPage() {
       .limit(3),
   ])
 
-  // Derive timeline step states
-  const enrolled    = true
-  const verDone     = s.verification_status === 'verified'
-  const verActive   = ['pending', 'in_review'].includes(s.verification_status)
-  const examDone    = ['completed', 'passed', 'failed'].includes(s.exam_status)
-  const examActive  = ['scheduled', 'result_awaited'].includes(s.exam_status)
-  const resultDone  = ['declared', 'passed', 'failed'].includes(s.result_status)
+  const verDone    = s.verification_status === 'verified'
+  const verActive  = ['pending', 'in_review'].includes(s.verification_status)
+  const examDone   = ['completed', 'passed', 'failed'].includes(s.exam_status)
+  const examActive = ['scheduled', 'result_awaited'].includes(s.exam_status)
+  const resultDone = ['declared', 'passed', 'failed'].includes(s.result_status)
   const resultActive = s.result_status === 'awaited' && examDone
 
-  const verCfg  = VER[s.verification_status]  ?? VER['pending']!
-  const examCfg = EXAM[s.exam_status]          ?? EXAM['not_scheduled']!
-  const resCfg  = RESULT[s.result_status]      ?? RESULT['awaited']!
+  // Auto-compute progress if DB field is 0
+  const computedProgress = (() => {
+    if (s.admission_progress > 0) return s.admission_progress
+    if (resultDone) return 100
+    if (examDone) return 75
+    if (examActive) return 60
+    if (verDone) return 50
+    if (verActive) return 25
+    return 20 // enrolled
+  })()
 
+  const verCfg  = VER[s.verification_status]  ?? VER['pending']!
+  const examCfg = EXAM[s.exam_status]         ?? EXAM['not_scheduled']!
+  const resCfg  = RESULT[s.result_status]     ?? RESULT['awaited']!
   const unreadCount = (notifs as any[] ?? []).filter((n: any) => !n.is_read).length
+
+  const firstName = s.full_name.split(' ')[0]
 
   return (
     <div className="space-y-5 max-w-4xl">
 
-      {/* ── Welcome banner ── */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 rounded-2xl p-5 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+      {/* Welcome Banner */}
+      <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.07]" style={{
+          backgroundImage: 'radial-gradient(circle, white 1.5px, transparent 1.5px)',
+          backgroundSize: '22px 22px',
+        }} />
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10">
+          <GraduationCap className="w-28 h-28 text-white" />
+        </div>
         <div className="relative">
-          <p className="text-blue-200 text-sm">Welcome back,</p>
-          <h1 className="text-2xl font-bold mt-0.5">{s.full_name}</h1>
+          <p className="text-blue-200 text-sm font-medium">Welcome back,</p>
+          <h1 className="text-2xl font-extrabold mt-1 tracking-tight">{s.full_name}</h1>
           <div className="flex flex-wrap gap-2 mt-3">
-            <span className="bg-white/20 text-xs px-3 py-1 rounded-full font-medium">{s.enrollment_number}</span>
-            {s.course && <span className="bg-white/20 text-xs px-3 py-1 rounded-full">{(s.course as { name: string }).name}</span>}
-            {s.department && <span className="bg-white/20 text-xs px-3 py-1 rounded-full">{(s.department as { name: string }).name}</span>}
+            <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-xs px-3 py-1.5 rounded-full font-semibold">
+              {s.enrollment_number}
+            </span>
+            {s.course && (
+              <span className="bg-white/15 text-xs px-3 py-1.5 rounded-full">{(s.course as { name: string }).name}</span>
+            )}
+            {s.department && (
+              <span className="bg-white/15 text-xs px-3 py-1.5 rounded-full">{(s.department as { name: string }).name}</span>
+            )}
             {s.enrollment_date && (
-              <span className="bg-white/20 text-xs px-3 py-1 rounded-full">
-                Enrolled: {new Date(s.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              <span className="bg-white/15 text-xs px-3 py-1.5 rounded-full">
+                Enrolled {new Date(s.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Admission Journey Timeline ── */}
+      {/* Admission Journey */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-bold text-gray-900">Admission Journey</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{s.admission_progress}% complete</p>
-          </div>
-          <Link href="/student/admission" className="text-xs text-blue-600 flex items-center gap-1 hover:underline font-medium">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-bold text-gray-900 text-base">Admission Journey</h2>
+          <Link href="/student/admission" className="text-xs text-blue-600 flex items-center gap-1 hover:underline font-semibold">
             View details <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
 
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs text-gray-400">{computedProgress}% complete</p>
+          <p className="text-xs font-semibold text-blue-600">{computedProgress === 100 ? 'Completed!' : 'In Progress'}</p>
+        </div>
+
         {/* Progress bar */}
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-6">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all"
-            style={{ width: `${s.admission_progress}%` }}
+            className="h-full bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-500 rounded-full transition-all duration-500"
+            style={{ width: `${computedProgress}%` }}
           />
         </div>
 
-        {/* Step timeline */}
-        <div className="flex items-start">
-          <TimelineStep step={1} label="Enrolled"     sub="Admission"             done={enrolled}    active={false} />
-          <TimelineStep step={2} label="Docs Review"  sub={verCfg.label}          done={verDone}     active={verActive} />
-          <TimelineStep step={3} label="Verified"     sub={verDone ? 'Done' : '—'} done={verDone}     active={false} />
-          <TimelineStep step={4} label="Examination"  sub={examCfg.label}         done={examDone}    active={examActive} />
-          <TimelineStep step={5} label="Result"       sub={resCfg.label}          done={resultDone}  active={resultActive} last />
+        {/* Timeline */}
+        <div className="flex items-start px-2">
+          <TimelineStep step={1} label="Enrolled"    sub="Confirmed"       done={true}        active={false} />
+          <TimelineStep step={2} label="Docs Review" sub={verCfg.label}    done={verDone}     active={verActive} />
+          <TimelineStep step={3} label="Verified"    sub={verDone ? 'Done' : '—'} done={verDone} active={false} />
+          <TimelineStep step={4} label="Examination" sub={examCfg.label}   done={examDone}    active={examActive} />
+          <TimelineStep step={5} label="Result"      sub={resCfg.label}    done={resultDone}  active={resultActive} last />
         </div>
       </div>
 
-      {/* ── Status cards ── */}
+      {/* Status Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Verification */}
-        <Link href="/student/admission" className={`border rounded-2xl p-4 hover:shadow-md transition-shadow ${verCfg.cls}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Verification</p>
-          <p className="text-base font-bold mt-1 capitalize">{verCfg.label}</p>
-          <div className="mt-2">
-            {verDone ? <CheckCircle2 className="h-5 w-5" /> : verActive ? <Clock className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          </div>
-        </Link>
-        {/* Exam */}
-        <Link href="/student/admission" className={`border rounded-2xl p-4 hover:shadow-md transition-shadow ${examCfg.cls}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Exam Status</p>
-          <p className="text-base font-bold mt-1 capitalize">{examCfg.label.replace(/_/g, ' ')}</p>
-          <div className="mt-2">
-            {examDone ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
-          </div>
-        </Link>
-        {/* Result */}
-        <Link href="/student/admission" className={`border rounded-2xl p-4 hover:shadow-md transition-shadow ${resCfg.cls}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Result</p>
-          <p className="text-base font-bold mt-1 capitalize">{resCfg.label}</p>
-          <div className="mt-2">
-            {resultDone ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
-          </div>
-        </Link>
-        {/* Fee */}
-        <Link href="/student/accounts" className={`border rounded-2xl p-4 hover:shadow-md transition-shadow ${pending > 0 ? 'text-red-600 bg-red-50 border-red-200' : 'text-green-600 bg-green-50 border-green-200'}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Fee Dues</p>
-          <p className="text-base font-bold mt-1">{pending > 0 ? `₹${pending.toLocaleString('en-IN')}` : 'Clear'}</p>
-          <div className="mt-2">
-            {pending > 0 ? <AlertCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
-          </div>
-        </Link>
+        <StatusCard
+          label="Verification"
+          value={verCfg.label}
+          icon={verDone ? CheckCircle2 : verActive ? Clock : AlertCircle}
+          color={verCfg.color} bg={verCfg.bg} border={verCfg.border}
+          href="/student/admission"
+        />
+        <StatusCard
+          label="Exam Status"
+          value={examCfg.label}
+          icon={examDone ? CheckCircle2 : Clock}
+          color={examCfg.color} bg={examCfg.bg} border={examCfg.border}
+          href="/student/admission"
+        />
+        <StatusCard
+          label="Result"
+          value={resCfg.label}
+          icon={resultDone ? CheckCircle2 : Clock}
+          color={resCfg.color} bg={resCfg.bg} border={resCfg.border}
+          href="/student/admission"
+        />
+        <StatusCard
+          label="Fee Dues"
+          value={pending > 0 ? `₹${pending.toLocaleString('en-IN')}` : 'Clear'}
+          icon={pending > 0 ? AlertCircle : CheckCircle2}
+          color={pending > 0 ? 'text-red-700' : 'text-emerald-700'}
+          bg={pending > 0 ? 'bg-red-50' : 'bg-emerald-50'}
+          border={pending > 0 ? 'border-red-200' : 'border-emerald-200'}
+          href="/student/accounts"
+        />
       </div>
 
-      {/* ── Quick Actions ── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* Quick Actions */}
+      <div className="grid grid-cols-5 gap-3">
         {[
-          { label: 'My Admission',    href: '/student/admission', icon: GraduationCap, color: 'text-blue-600',   bg: 'bg-blue-50',   ring: 'ring-blue-100' },
-          { label: 'Accounts',        href: '/student/accounts',  icon: IndianRupee,   color: 'text-green-600',  bg: 'bg-green-50',  ring: 'ring-green-100' },
-          { label: 'Study Materials', href: '/student/materials', icon: BookOpen,      color: 'text-purple-600', bg: 'bg-purple-50', ring: 'ring-purple-100' },
-          { label: 'Help & Support',  href: '/student/support',   icon: HelpCircle,    color: 'text-orange-600', bg: 'bg-orange-50', ring: 'ring-orange-100' },
-          { label: 'My Profile',      href: '/student/profile',   icon: User,          color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-100' },
-        ].map(({ label, href, icon: Icon, color, bg, ring }) => (
+          { label: 'My Admission',    href: '/student/admission', icon: GraduationCap, color: 'text-blue-600',    bg: 'bg-blue-50',    hover: 'hover:bg-blue-100'    },
+          { label: 'Accounts',        href: '/student/accounts',  icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50', hover: 'hover:bg-emerald-100' },
+          { label: 'Study Materials', href: '/student/materials', icon: BookOpen,      color: 'text-purple-600',  bg: 'bg-purple-50',  hover: 'hover:bg-purple-100'  },
+          { label: 'Help & Support',  href: '/student/support',   icon: HelpCircle,    color: 'text-orange-600',  bg: 'bg-orange-50',  hover: 'hover:bg-orange-100'  },
+          { label: 'My Profile',      href: '/student/profile',   icon: User,          color: 'text-indigo-600',  bg: 'bg-indigo-50',  hover: 'hover:bg-indigo-100'  },
+        ].map(({ label, href, icon: Icon, color, bg, hover }) => (
           <Link
             key={href}
             href={href}
-            className={`bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2.5 hover:shadow-md hover:ring-2 ${ring} transition-all text-center group`}
+            className={`bg-white border border-gray-100 rounded-2xl p-3.5 flex flex-col items-center gap-2 hover:shadow-md hover:border-gray-200 transition-all text-center group`}
           >
-            <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+            <div className={`w-12 h-12 ${bg} ${hover} rounded-xl flex items-center justify-center transition-colors`}>
               <Icon className={`h-5 w-5 ${color}`} />
             </div>
-            <span className="text-xs font-semibold text-gray-700 leading-tight">{label}</span>
+            <span className="text-[11px] font-semibold text-gray-600 leading-tight">{label}</span>
           </Link>
         ))}
       </div>
 
-      {/* ── Notifications & Announcements ── */}
+      {/* Notifications + Announcements */}
       <div className="grid md:grid-cols-2 gap-4">
 
         {/* Notifications */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-blue-500" />
-              <h2 className="font-semibold text-gray-900">Notifications</h2>
+              <span className="font-semibold text-gray-900 text-sm">Notifications</span>
               {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{unreadCount}</span>
               )}
             </div>
-            <Link href="/student/support" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <Link href="/student/support" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
               See all <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
+
           {!(notifs as any[])?.length ? (
-            <div className="px-5 py-8 text-center">
-              <Bell className="h-8 w-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">No notifications yet</p>
+            <div className="px-5 py-10 text-center">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Bell className="h-6 w-6 text-gray-300" />
+              </div>
+              <p className="text-sm font-medium text-gray-400">No notifications yet</p>
+              <p className="text-xs text-gray-300 mt-1">Updates from your counsellor will appear here</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
               {(notifs as any[]).map((n: any) => (
-                <div key={n.id} className={`px-4 py-3 flex gap-3 ${!n.is_read ? 'bg-blue-50/30' : ''}`}>
-                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${NOTIF_DOT[n.type] ?? 'bg-gray-400'}`} />
+                <div key={n.id} className={`px-4 py-3 flex gap-3 items-start ${!n.is_read ? 'bg-blue-50/40' : 'hover:bg-gray-50'} transition-colors`}>
+                  <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 ${NOTIF_BG[n.type] ?? 'bg-gray-100'}`}>
+                    <div className={`w-2 h-2 rounded-full ${NOTIF_DOT[n.type] ?? 'bg-gray-400'}`} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className={`text-sm font-semibold truncate ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</p>
-                      {n.category && <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-500">{n.category}</span>}
+                      {n.category && <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-md text-gray-500 font-medium">{n.category}</span>}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
                     {n.file_url && (
-                      <a href={n.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 mt-1 hover:underline">
+                      <a href={n.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 mt-1.5 hover:underline font-medium">
                         <Paperclip className="h-3 w-3" /> Attachment
                       </a>
                     )}
                   </div>
-                  <p className="text-[10px] text-gray-400 shrink-0 mt-0.5">
+                  <p className="text-[10px] text-gray-300 shrink-0 mt-1 font-medium">
                     {new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                   </p>
                 </div>
@@ -293,27 +329,30 @@ export default async function StudentDashboardPage() {
 
         {/* Announcements */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-orange-500" />
-              <h2 className="font-semibold text-gray-900">Announcements</h2>
+              <span className="font-semibold text-gray-900 text-sm">Announcements</span>
             </div>
-            <Link href="/student/support" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <Link href="/student/support" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
               See all <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {!(announcements as any[])?.length ? (
-            <div className="px-5 py-8 text-center">
-              <FileText className="h-8 w-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">No announcements</p>
+            <div className="px-5 py-10 text-center">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <FileText className="h-6 w-6 text-gray-300" />
+              </div>
+              <p className="text-sm font-medium text-gray-400">No announcements</p>
+              <p className="text-xs text-gray-300 mt-1">Important notices will show here</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
               {(announcements as any[]).map((a: any) => (
                 <div key={a.id} className="px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                  <p className="text-sm font-medium text-gray-800 leading-snug">{a.title}</p>
-                  {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.body}</p>}
-                  <p className="text-xs text-gray-400 mt-1 capitalize">
+                  <p className="text-sm font-semibold text-gray-800 leading-snug">{a.title}</p>
+                  {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{a.body}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1.5 uppercase tracking-wide font-medium">
                     {a.type} · {new Date(a.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
@@ -323,38 +362,48 @@ export default async function StudentDashboardPage() {
         </div>
       </div>
 
-      {/* ── Fee mini summary ── */}
+      {/* Fee Summary */}
       {s.total_fee && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-green-500" /> Fee Summary
-            </h2>
-            <Link href="/student/accounts" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                <Wallet className="h-4 w-4 text-emerald-600" />
+              </div>
+              <h2 className="font-bold text-gray-900">Fee Summary</h2>
+            </div>
+            <Link href="/student/accounts" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-semibold">
               Full details <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[11px] text-gray-400">Total Fee</p>
-              <p className="text-sm font-bold text-gray-800 mt-0.5">₹{s.total_fee.toLocaleString('en-IN')}</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-xl p-3.5">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Total Fee</p>
+              <p className="text-base font-extrabold text-gray-800 mt-1">₹{s.total_fee.toLocaleString('en-IN')}</p>
             </div>
-            <div className="bg-green-50 rounded-xl p-3">
-              <p className="text-[11px] text-green-600">Paid</p>
-              <p className="text-sm font-bold text-green-700 mt-0.5">₹{s.amount_paid.toLocaleString('en-IN')}</p>
+            <div className="bg-emerald-50 rounded-xl p-3.5">
+              <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Paid</p>
+              <p className="text-base font-extrabold text-emerald-700 mt-1">₹{s.amount_paid.toLocaleString('en-IN')}</p>
             </div>
-            <div className={`rounded-xl p-3 ${pending > 0 ? 'bg-red-50' : 'bg-green-50'}`}>
-              <p className={`text-[11px] ${pending > 0 ? 'text-red-600' : 'text-green-600'}`}>Pending</p>
-              <p className={`text-sm font-bold mt-0.5 ${pending > 0 ? 'text-red-700' : 'text-green-700'}`}>
+            <div className={`rounded-xl p-3.5 ${pending > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+              <p className={`text-[10px] font-semibold uppercase tracking-wide ${pending > 0 ? 'text-red-500' : 'text-emerald-600'}`}>Pending</p>
+              <p className={`text-base font-extrabold mt-1 ${pending > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
                 {pending > 0 ? `₹${pending.toLocaleString('en-IN')}` : 'Nil'}
               </p>
             </div>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full"
+              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-500"
               style={{ width: `${s.total_fee ? Math.min(100, Math.round((s.amount_paid / s.total_fee) * 100)) : 0}%` }}
             />
+          </div>
+          <div className="flex justify-between mt-1.5">
+            <p className="text-[10px] text-gray-400">0%</p>
+            <p className="text-[10px] text-gray-400 font-medium">
+              {s.total_fee ? Math.min(100, Math.round((s.amount_paid / s.total_fee) * 100)) : 0}% paid
+            </p>
+            <p className="text-[10px] text-gray-400">100%</p>
           </div>
         </div>
       )}

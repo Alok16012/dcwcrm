@@ -54,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   // Lead specific items
   { label: 'Incentive',    href: '/incentive',   icon: Gift,         roles: ['lead', 'counselor'] },
   { label: 'Performance',  href: '/performance', icon: TrendingUp,   roles: ['lead', 'counselor'] },
-  { label: 'Mentorship',   href: '/mentorship',  icon: Award,        roles: ['lead'] },
+  { label: 'Mentorship',   href: '/mentorship',  icon: Award,        roles: ['lead', 'counselor'] },
 ]
 
 interface SidebarProps {

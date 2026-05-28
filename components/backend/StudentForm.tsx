@@ -155,7 +155,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     supabase.from('departments').select('*').order('name'),
                     supabase.from('sessions').select('*').order('name', { ascending: false }),
                     (supabase as any).from('associates').select('id, name, associate_code').eq('status', 'approved').order('name'),
-                    supabase.from('profiles').select('id, full_name').eq('role', 'lead').eq('is_active', true).order('full_name'),
+                    supabase.from('profiles').select('id, full_name').in('role', ['lead', 'counselor']).eq('is_active', true).order('full_name'),
                 ])
 
                 if (!isMounted) return
@@ -343,9 +343,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             const found = leads.find(l => l.id === selectedLead) ?? null
             setCurrentMentor(found)
             setSelectedLead('')
-            toast.success('Telecaller assigned for mentorship')
-        } catch {
-            toast.error('Failed to assign telecaller')
+            toast.success('Mentor assigned successfully')
+        } catch (err: any) {
+            toast.error(err?.message ?? 'Failed to assign mentor')
         } finally {
             setSavingMentorship(false)
         }
@@ -697,9 +697,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     {currentMentor ? (
                         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-center justify-between">
                             <div>
-                                <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider mb-0.5">Currently Assigned Telecaller</p>
+                                <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider mb-0.5">Currently Assigned Mentor</p>
                                 <p className="text-sm font-bold text-violet-900">{currentMentor.full_name}</p>
-                                <p className="text-xs text-violet-400 mt-0.5">Telecaller fills work details from their own portal</p>
+                                <p className="text-xs text-violet-400 mt-0.5">Mentor fills work details from their own portal</p>
                             </div>
                             <Button type="button" size="sm" variant="outline"
                                 className="text-red-500 border-red-200 hover:bg-red-50 h-7 text-xs"
@@ -710,22 +710,22 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     ) : (
                         <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center">
                             <GraduationCap className="w-9 h-9 mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm text-gray-500 font-medium">No telecaller assigned yet</p>
-                            <p className="text-xs text-gray-400 mt-0.5">Assign a lead/telecaller below to start mentorship</p>
+                            <p className="text-sm text-gray-500 font-medium">No mentor assigned yet</p>
+                            <p className="text-xs text-gray-400 mt-0.5">Assign a lead or counselor below to start mentorship</p>
                         </div>
                     )}
 
                     {/* Assign / Reassign */}
                     <div className="bg-violet-50/60 rounded-xl p-4 border border-violet-100">
-                        <SectionHeader icon={UserCheck} title={currentMentor ? 'Reassign Telecaller' : 'Assign Telecaller'} color="border-violet-200" />
+                        <SectionHeader icon={UserCheck} title={currentMentor ? 'Reassign Mentor' : 'Assign Mentor'} color="border-violet-200" />
                         {leads.length === 0 ? (
                             <p className="text-sm text-gray-500 bg-white border border-dashed border-gray-300 rounded-lg px-4 py-3">
-                                No lead profiles found. Create profiles with role = lead first.
+                                No lead or counselor profiles found.
                             </p>
                         ) : (
                             <div className="flex gap-3 items-end">
                                 <div className="flex-1">
-                                    <FieldWrapper label="Select Telecaller / Lead">
+                                    <FieldWrapper label="Select Lead / Counselor">
                                         <Select value={selectedLead || 'none'} onValueChange={v => setSelectedLead(v === 'none' ? '' : (v ?? ''))}>
                                             <SelectTrigger className="bg-white border-violet-200">
                                                 <SelectValue placeholder="— Select —">
@@ -733,7 +733,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                                 </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">— Select Telecaller —</SelectItem>
+                                                <SelectItem value="none">— Select Lead / Counselor —</SelectItem>
                                                 {leads.map(l => (
                                                     <SelectItem key={l.id} value={l.id}>{l.full_name}</SelectItem>
                                                 ))}

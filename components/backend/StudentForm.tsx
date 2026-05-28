@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
     User, Phone, Mail, MapPin, Tag, BookOpen, UserCheck, Calendar,
     IndianRupee, FileText, Building2, Users, GraduationCap,
-    ClipboardList, CheckCircle2, Clock, XCircle, Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,22 +19,9 @@ import {
     type Department, type DepartmentSubSection, type Session,
     PAYMENT_MODE_LABELS
 } from '@/types/app.types'
-import { format } from 'date-fns'
 
 interface Associate { id: string; name: string; associate_code: string | null }
 interface Telecaller { id: string; full_name: string }
-
-interface MentorshipRecord {
-    id: string
-    task_type: string
-    description: string | null
-    rating: number | null
-    status: string
-    salary_percentage: number | null
-    admin_remarks: string | null
-    created_at: string
-    telecaller: { id: string; full_name: string } | null
-}
 
 interface StudentFormProps {
     student?: Partial<Student>
@@ -55,18 +41,6 @@ const STATUS_DOT: Record<string, string> = {
     completed: 'bg-blue-500',
     dropped: 'bg-red-500',
     on_hold: 'bg-yellow-500',
-}
-
-const TASK_LABELS: Record<string, string> = {
-    work_assignment: 'Work Assignment',
-    practical: 'Practical',
-    exam: 'Exam',
-}
-
-const MENTORSHIP_STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-    pending:  { label: 'Pending Approval', color: 'bg-amber-100 text-amber-800 border-amber-200',    icon: Clock },
-    approved: { label: 'Approved',         color: 'bg-green-100 text-green-800 border-green-200',    icon: CheckCircle2 },
-    rejected: { label: 'Rejected',         color: 'bg-red-100 text-red-800 border-red-200',          icon: XCircle },
 }
 
 function SectionHeader({ icon: Icon, title, color }: { icon: React.ElementType; title: string; color: string }) {
@@ -104,11 +78,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     const [loading, setLoading] = useState(false)
 
     // Mentorship state
-    const [activeFormTab, setActiveFormTab] = useState<'details' | 'mentorship'>('details')
     const [leads, setLeads] = useState<Telecaller[]>([])
     const [selectedLead, setSelectedLead] = useState('')
     const [currentMentor, setCurrentMentor] = useState<Telecaller | null>(null)
-    const [existingMentorships, setExistingMentorships] = useState<MentorshipRecord[]>([])
     const [savingMentorship, setSavingMentorship] = useState(false)
 
     const supabase = createClient()
@@ -192,14 +164,6 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         total_fee: student?.total_fee ?? 0,
                         amount_paid: student?.amount_paid ?? 0,
                     } as any)
-
-                    // Load existing mentorships
-                    const { data: ms } = await supabase
-                        .from('student_mentorships')
-                        .select('*, telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)')
-                        .eq('student_id', student.id)
-                        .order('created_at', { ascending: false })
-                    if (isMounted) setExistingMentorships((ms ?? []) as MentorshipRecord[])
 
                     // Set current mentor from student record
                     const mentorId = (student as any).mentor_telecaller_id
@@ -368,42 +332,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
     return (
         <div>
-            {/* Tab switcher — Mentorship only shown when editing existing student */}
-            <div className="flex gap-1 mb-5 border-b border-gray-200">
-                <button
-                    type="button"
-                    onClick={() => setActiveFormTab('details')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-                        activeFormTab === 'details'
-                            ? 'border-blue-600 text-blue-700'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                    <User className="w-4 h-4" /> Student Details
-                </button>
-                {student?.id && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveFormTab('mentorship')}
-                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-                            activeFormTab === 'mentorship'
-                                ? 'border-violet-600 text-violet-700'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        <GraduationCap className="w-4 h-4" /> Mentorship
-                        {existingMentorships.filter(m => m.status === 'pending').length > 0 && (
-                            <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                                {existingMentorships.filter(m => m.status === 'pending').length}
-                            </span>
-                        )}
-                    </button>
-                )}
-            </div>
-
-            {/* ── DETAILS TAB ── */}
-            {activeFormTab === 'details' && (
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
                         <SectionHeader icon={User} title="Personal Information" color="border-blue-200" />
                         <div className="grid grid-cols-2 gap-4">
@@ -500,6 +429,50 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                             </Select>
                         </FieldWrapper>
                     </div>
+
+                    {/* Mentorship */}
+                    {student?.id && (
+                        <div className="bg-violet-50/50 rounded-xl p-4 border border-violet-100">
+                            <SectionHeader icon={GraduationCap} title="Mentorship" color="border-violet-200" />
+                            <div className="space-y-3">
+                                {currentMentor && (
+                                    <div className="flex items-center justify-between bg-white border border-violet-200 rounded-lg px-3 py-2">
+                                        <div>
+                                            <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider leading-none mb-0.5">Assigned Mentor</p>
+                                            <p className="text-sm font-semibold text-violet-900">{currentMentor.full_name}</p>
+                                        </div>
+                                        <Button type="button" size="sm" variant="ghost"
+                                            className="h-7 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
+                                            onClick={unassignMentor}>
+                                            Remove
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <Select value={selectedLead || 'none'} onValueChange={v => setSelectedLead(v === 'none' ? '' : (v ?? ''))}>
+                                            <SelectTrigger className="bg-white border-violet-200 h-9 text-sm">
+                                                <SelectValue>
+                                                    {selectedLead ? leads.find(l => l.id === selectedLead)?.full_name ?? '— Select Lead / Counselor —' : '— Select Lead / Counselor —'}
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">— Select Lead / Counselor —</SelectItem>
+                                                {leads.map(l => (
+                                                    <SelectItem key={l.id} value={l.id}>{l.full_name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button type="button" onClick={assignMentor}
+                                        disabled={!selectedLead || savingMentorship}
+                                        className="bg-violet-600 hover:bg-violet-700 text-white h-9 text-sm shrink-0">
+                                        {savingMentorship ? 'Assigning...' : currentMentor ? 'Reassign' : 'Assign'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Enrollment */}
                     <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
@@ -688,111 +661,6 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         </Button>
                     </div>
                 </form>
-            )}
-
-            {/* ── MENTORSHIP TAB ── */}
-            {activeFormTab === 'mentorship' && student?.id && (
-                <div className="space-y-5">
-                    {/* Current assignment banner */}
-                    {currentMentor ? (
-                        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider mb-0.5">Currently Assigned Mentor</p>
-                                <p className="text-sm font-bold text-violet-900">{currentMentor.full_name}</p>
-                                <p className="text-xs text-violet-400 mt-0.5">Mentor fills work details from their own portal</p>
-                            </div>
-                            <Button type="button" size="sm" variant="outline"
-                                className="text-red-500 border-red-200 hover:bg-red-50 h-7 text-xs"
-                                onClick={unassignMentor}>
-                                Remove
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center">
-                            <GraduationCap className="w-9 h-9 mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm text-gray-500 font-medium">No mentor assigned yet</p>
-                            <p className="text-xs text-gray-400 mt-0.5">Assign a lead or counselor below to start mentorship</p>
-                        </div>
-                    )}
-
-                    {/* Assign / Reassign */}
-                    <div className="bg-violet-50/60 rounded-xl p-4 border border-violet-100">
-                        <SectionHeader icon={UserCheck} title={currentMentor ? 'Reassign Mentor' : 'Assign Mentor'} color="border-violet-200" />
-                        {leads.length === 0 ? (
-                            <p className="text-sm text-gray-500 bg-white border border-dashed border-gray-300 rounded-lg px-4 py-3">
-                                No lead or counselor profiles found.
-                            </p>
-                        ) : (
-                            <div className="flex gap-3 items-end">
-                                <div className="flex-1">
-                                    <FieldWrapper label="Select Lead / Counselor">
-                                        <Select value={selectedLead || 'none'} onValueChange={v => setSelectedLead(v === 'none' ? '' : (v ?? ''))}>
-                                            <SelectTrigger className="bg-white border-violet-200">
-                                                <SelectValue placeholder="— Select —">
-                                                    {selectedLead ? leads.find(l => l.id === selectedLead)?.full_name ?? '— Select —' : '— Select —'}
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">— Select Lead / Counselor —</SelectItem>
-                                                {leads.map(l => (
-                                                    <SelectItem key={l.id} value={l.id}>{l.full_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FieldWrapper>
-                                </div>
-                                <Button
-                                    type="button"
-                                    onClick={assignMentor}
-                                    disabled={!selectedLead || savingMentorship}
-                                    className="bg-violet-600 hover:bg-violet-700 text-white h-10"
-                                >
-                                    {savingMentorship ? 'Assigning...' : currentMentor ? 'Reassign' : 'Assign'}
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Submitted work history by telecaller */}
-                    {existingMentorships.length > 0 && (
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
-                                <ClipboardList className="w-3.5 h-3.5" /> Submitted Work History
-                            </p>
-                            <div className="space-y-2">
-                                {existingMentorships.map(m => {
-                                    const cfg = MENTORSHIP_STATUS_CFG[m.status] ?? MENTORSHIP_STATUS_CFG.pending
-                                    const StatusIcon = cfg.icon
-                                    return (
-                                        <div key={m.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                    <span className="text-xs font-bold text-gray-700">{TASK_LABELS[m.task_type] ?? m.task_type}</span>
-                                                    {m.rating != null && (
-                                                        <span className="flex items-center gap-0.5 text-xs text-amber-600 font-semibold">
-                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />{m.rating}/10
-                                                        </span>
-                                                    )}
-                                                    {m.telecaller && <span className="text-xs text-gray-500">· {m.telecaller.full_name}</span>}
-                                                    <span className="text-xs text-gray-400">{format(new Date(m.created_at), 'dd MMM yyyy')}</span>
-                                                </div>
-                                                {m.description && <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>}
-                                                {m.status === 'approved' && m.salary_percentage != null && (
-                                                    <p className="text-xs text-green-600 font-semibold mt-0.5">+{m.salary_percentage}% salary bonus approved</p>
-                                                )}
-                                                {m.admin_remarks && <p className="text-xs text-gray-400 italic mt-0.5">"{m.admin_remarks}"</p>}
-                                            </div>
-                                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border flex-shrink-0 ${cfg.color}`}>
-                                                <StatusIcon className="w-3 h-3" /> {cfg.label}
-                                            </span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     )
 }

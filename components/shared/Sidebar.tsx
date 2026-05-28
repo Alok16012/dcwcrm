@@ -7,6 +7,7 @@ import {
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
   Wallet, Package, Bell, User, IndianRupee, HeartHandshake, ClipboardList, School,
+  Award,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -48,9 +49,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Student Portal', href: '/student-portal', icon: School, roles: ['admin', 'backend'] },
   { label: 'OPS', href: '/ops', icon: Briefcase, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
-  // Lead specific items kept at the end
-  { label: 'Incentive', href: '/incentive', icon: Gift, roles: ['lead', 'counselor'] },
-  { label: 'Performance', href: '/performance', icon: TrendingUp, roles: ['lead', 'counselor'] },
+  // Lead specific items
+  { label: 'Incentive',    href: '/incentive',   icon: Gift,         roles: ['lead', 'counselor'] },
+  { label: 'Performance',  href: '/performance', icon: TrendingUp,   roles: ['lead', 'counselor'] },
+  { label: 'Mentorship',   href: '/mentorship',  icon: Award,        roles: ['lead'] },
 ]
 
 interface SidebarProps {

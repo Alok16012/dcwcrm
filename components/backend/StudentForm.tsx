@@ -25,12 +25,6 @@ import { format } from 'date-fns'
 interface Associate { id: string; name: string; associate_code: string | null }
 interface Telecaller { id: string; full_name: string }
 
-interface MentorshipTask {
-    task_type: 'work_assignment' | 'practical' | 'exam'
-    description: string
-    rating: string
-}
-
 interface MentorshipRecord {
     id: string
     task_type: string
@@ -69,23 +63,11 @@ const TASK_LABELS: Record<string, string> = {
     exam: 'Exam',
 }
 
-const TASK_COLORS: Record<string, string> = {
-    work_assignment: 'blue',
-    practical: 'emerald',
-    exam: 'purple',
-}
-
 const MENTORSHIP_STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
     pending:  { label: 'Pending Approval', color: 'bg-amber-100 text-amber-800 border-amber-200',    icon: Clock },
     approved: { label: 'Approved',         color: 'bg-green-100 text-green-800 border-green-200',    icon: CheckCircle2 },
     rejected: { label: 'Rejected',         color: 'bg-red-100 text-red-800 border-red-200',          icon: XCircle },
 }
-
-const EMPTY_TASKS: MentorshipTask[] = [
-    { task_type: 'work_assignment', description: '', rating: '' },
-    { task_type: 'practical',       description: '', rating: '' },
-    { task_type: 'exam',            description: '', rating: '' },
-]
 
 function SectionHeader({ icon: Icon, title, color }: { icon: React.ElementType; title: string; color: string }) {
     return (
@@ -123,9 +105,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
     // Mentorship state
     const [activeFormTab, setActiveFormTab] = useState<'details' | 'mentorship'>('details')
-    const [telecallers, setTelecallers] = useState<Telecaller[]>([])
-    const [selectedTelecaller, setSelectedTelecaller] = useState('')
-    const [mentorshipTasks, setMentorshipTasks] = useState<MentorshipTask[]>(EMPTY_TASKS)
+    const [leads, setLeads] = useState<Telecaller[]>([])
+    const [selectedLead, setSelectedLead] = useState('')
+    const [currentMentor, setCurrentMentor] = useState<Telecaller | null>(null)
     const [existingMentorships, setExistingMentorships] = useState<MentorshipRecord[]>([])
     const [savingMentorship, setSavingMentorship] = useState(false)
 
@@ -167,13 +149,13 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         async function load() {
             setLoading(true)
             try {
-                const [{ data: c }, { data: p }, { data: d }, { data: s }, { data: assocs }, { data: tc }] = await Promise.all([
+                const [{ data: c }, { data: p }, { data: d }, { data: s }, { data: assocs }, { data: leadsData }] = await Promise.all([
                     supabase.from('courses').select('*').order('name'),
                     supabase.from('profiles').select('*').in('role', ['counselor', 'lead', 'admin']).eq('is_active', true).order('full_name'),
                     supabase.from('departments').select('*').order('name'),
                     supabase.from('sessions').select('*').order('name', { ascending: false }),
                     (supabase as any).from('associates').select('id, name, associate_code').eq('status', 'approved').order('name'),
-                    supabase.from('profiles').select('id, full_name').eq('role', 'telecaller').eq('is_active', true).order('full_name'),
+                    supabase.from('profiles').select('id, full_name').eq('role', 'lead').eq('is_active', true).order('full_name'),
                 ])
 
                 if (!isMounted) return
@@ -182,7 +164,8 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 setDepartments(d ?? [])
                 setSessions(s ?? [])
                 setAssociates((assocs ?? []) as Associate[])
-                setTelecallers((tc ?? []) as Telecaller[])
+                const loadedLeads = (leadsData ?? []) as Telecaller[]
+                setLeads(loadedLeads)
 
                 if (student?.id) {
                     reset({
@@ -217,6 +200,18 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                         .eq('student_id', student.id)
                         .order('created_at', { ascending: false })
                     if (isMounted) setExistingMentorships((ms ?? []) as MentorshipRecord[])
+
+                    // Set current mentor from student record
+                    const mentorId = (student as any).mentor_telecaller_id
+                    if (mentorId && isMounted) {
+                        const found = loadedLeads.find(l => l.id === mentorId)
+                        if (found) setCurrentMentor(found)
+                        else {
+                            // Fetch if not in loaded list
+                            const { data: mp } = await supabase.from('profiles').select('id, full_name').eq('id', mentorId).single()
+                            if (mp && isMounted) setCurrentMentor(mp as Telecaller)
+                        }
+                    }
                 }
             } catch (err) {
                 console.error('Error loading form options:', err)
@@ -336,53 +331,39 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         }
     }
 
-    async function saveMentorship() {
-        if (!student?.id) return
-        if (!selectedTelecaller) { toast.error('Please select a telecaller'); return }
-
-        const filledTasks = mentorshipTasks.filter(t => t.description.trim() || t.rating)
-        if (filledTasks.length === 0) {
-            toast.error('Please fill at least one task (description or rating)')
-            return
-        }
-
+    async function assignMentor() {
+        if (!student?.id || !selectedLead) return
         setSavingMentorship(true)
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-            const records = filledTasks.map(t => ({
-                student_id: student.id,
-                telecaller_id: selectedTelecaller,
-                task_type: t.task_type,
-                description: t.description.trim() || null,
-                rating: t.rating ? parseFloat(t.rating) : null,
-                status: 'pending',
-                created_by: user?.id ?? null,
-            }))
-
-            const { error } = await supabase.from('student_mentorships').insert(records as never)
+            const { error } = await supabase
+                .from('students')
+                .update({ mentor_telecaller_id: selectedLead } as never)
+                .eq('id', student.id)
             if (error) throw error
-
-            toast.success('Mentorship submitted for admin approval')
-            setMentorshipTasks(EMPTY_TASKS.map(t => ({ ...t })))
-            setSelectedTelecaller('')
-
-            // Reload history
-            const { data: ms } = await supabase
-                .from('student_mentorships')
-                .select('*, telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)')
-                .eq('student_id', student.id)
-                .order('created_at', { ascending: false })
-            setExistingMentorships((ms ?? []) as MentorshipRecord[])
-        } catch (err) {
-            toast.error('Failed to submit mentorship')
-            console.error(err)
+            const found = leads.find(l => l.id === selectedLead) ?? null
+            setCurrentMentor(found)
+            setSelectedLead('')
+            toast.success('Telecaller assigned for mentorship')
+        } catch {
+            toast.error('Failed to assign telecaller')
         } finally {
             setSavingMentorship(false)
         }
     }
 
-    function updateTask(index: number, field: keyof MentorshipTask, value: string) {
-        setMentorshipTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t))
+    async function unassignMentor() {
+        if (!student?.id) return
+        try {
+            const { error } = await supabase
+                .from('students')
+                .update({ mentor_telecaller_id: null } as never)
+                .eq('id', student.id)
+            if (error) throw error
+            setCurrentMentor(null)
+            toast.success('Mentorship assignment removed')
+        } catch {
+            toast.error('Failed to remove assignment')
+        }
     }
 
     return (
@@ -712,112 +693,71 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             {/* ── MENTORSHIP TAB ── */}
             {activeFormTab === 'mentorship' && student?.id && (
                 <div className="space-y-5">
-                    {/* Telecaller selector */}
+                    {/* Current assignment banner */}
+                    {currentMentor ? (
+                        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider mb-0.5">Currently Assigned Telecaller</p>
+                                <p className="text-sm font-bold text-violet-900">{currentMentor.full_name}</p>
+                                <p className="text-xs text-violet-400 mt-0.5">Telecaller fills work details from their own portal</p>
+                            </div>
+                            <Button type="button" size="sm" variant="outline"
+                                className="text-red-500 border-red-200 hover:bg-red-50 h-7 text-xs"
+                                onClick={unassignMentor}>
+                                Remove
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center">
+                            <GraduationCap className="w-9 h-9 mx-auto mb-2 text-gray-300" />
+                            <p className="text-sm text-gray-500 font-medium">No telecaller assigned yet</p>
+                            <p className="text-xs text-gray-400 mt-0.5">Assign a lead/telecaller below to start mentorship</p>
+                        </div>
+                    )}
+
+                    {/* Assign / Reassign */}
                     <div className="bg-violet-50/60 rounded-xl p-4 border border-violet-100">
-                        <SectionHeader icon={UserCheck} title="Assign Telecaller" color="border-violet-200" />
-                        {telecallers.length === 0 ? (
+                        <SectionHeader icon={UserCheck} title={currentMentor ? 'Reassign Telecaller' : 'Assign Telecaller'} color="border-violet-200" />
+                        {leads.length === 0 ? (
                             <p className="text-sm text-gray-500 bg-white border border-dashed border-gray-300 rounded-lg px-4 py-3">
-                                No telecallers found. Add a profile with role = <code className="text-violet-600 font-mono text-xs">telecaller</code> first.
+                                No lead profiles found. Create profiles with role = lead first.
                             </p>
                         ) : (
-                            <FieldWrapper label="Telecaller" required>
-                                <Select value={selectedTelecaller || 'none'} onValueChange={v => setSelectedTelecaller(v === 'none' ? '' : (v ?? ''))}>
-                                    <SelectTrigger className="bg-white border-violet-200">
-                                        <SelectValue placeholder="Select telecaller">
-                                            {selectedTelecaller
-                                                ? telecallers.find(t => t.id === selectedTelecaller)?.full_name ?? 'Select telecaller'
-                                                : 'Select telecaller'}
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">— Select Telecaller —</SelectItem>
-                                        {telecallers.map(t => (
-                                            <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </FieldWrapper>
+                            <div className="flex gap-3 items-end">
+                                <div className="flex-1">
+                                    <FieldWrapper label="Select Telecaller / Lead">
+                                        <Select value={selectedLead || 'none'} onValueChange={v => setSelectedLead(v === 'none' ? '' : (v ?? ''))}>
+                                            <SelectTrigger className="bg-white border-violet-200">
+                                                <SelectValue placeholder="— Select —">
+                                                    {selectedLead ? leads.find(l => l.id === selectedLead)?.full_name ?? '— Select —' : '— Select —'}
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">— Select Telecaller —</SelectItem>
+                                                {leads.map(l => (
+                                                    <SelectItem key={l.id} value={l.id}>{l.full_name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </FieldWrapper>
+                                </div>
+                                <Button
+                                    type="button"
+                                    onClick={assignMentor}
+                                    disabled={!selectedLead || savingMentorship}
+                                    className="bg-violet-600 hover:bg-violet-700 text-white h-10"
+                                >
+                                    {savingMentorship ? 'Assigning...' : currentMentor ? 'Reassign' : 'Assign'}
+                                </Button>
+                            </div>
                         )}
                     </div>
 
-                    {/* Task cards */}
-                    <div className="space-y-3">
-                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                            <ClipboardList className="w-3.5 h-3.5" /> Mentorship Tasks
-                        </p>
-                        {mentorshipTasks.map((task, i) => {
-                            const color = TASK_COLORS[task.task_type]
-                            const borderCls = `border-${color}-200`
-                            const bgCls = `bg-${color}-50/50`
-                            const textCls = `text-${color}-600`
-                            return (
-                                <div key={task.task_type} className={`rounded-xl p-4 border ${
-                                    task.task_type === 'work_assignment' ? 'bg-blue-50/50 border-blue-200' :
-                                    task.task_type === 'practical' ? 'bg-emerald-50/50 border-emerald-200' :
-                                    'bg-purple-50/50 border-purple-200'
-                                }`}>
-                                    <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${
-                                        task.task_type === 'work_assignment' ? 'text-blue-600' :
-                                        task.task_type === 'practical' ? 'text-emerald-600' :
-                                        'text-purple-600'
-                                    }`}>
-                                        {TASK_LABELS[task.task_type]}
-                                    </p>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="col-span-2 space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-600">Work Description</Label>
-                                            <Textarea
-                                                value={task.description}
-                                                onChange={e => updateTask(i, 'description', e.target.value)}
-                                                placeholder="Describe the mentorship work done..."
-                                                rows={2}
-                                                className="bg-white text-sm resize-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                                                <Star className="w-3 h-3 text-amber-500" /> Rating (0–10)
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="10"
-                                                step="0.5"
-                                                value={task.rating}
-                                                onChange={e => updateTask(i, 'rating', e.target.value)}
-                                                placeholder="e.g. 8.5"
-                                                className="bg-white"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => { setMentorshipTasks(EMPTY_TASKS.map(t => ({ ...t }))); setSelectedTelecaller('') }}
-                        >
-                            Clear
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={saveMentorship}
-                            disabled={savingMentorship}
-                            className="bg-violet-600 hover:bg-violet-700 text-white min-w-[160px]"
-                        >
-                            {savingMentorship ? 'Submitting...' : 'Submit for Approval'}
-                        </Button>
-                    </div>
-
-                    {/* Existing mentorships history */}
+                    {/* Submitted work history by telecaller */}
                     {existingMentorships.length > 0 && (
-                        <div className="mt-2">
+                        <div>
                             <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
-                                <ClipboardList className="w-3.5 h-3.5" /> Mentorship History
+                                <ClipboardList className="w-3.5 h-3.5" /> Submitted Work History
                             </p>
                             <div className="space-y-2">
                                 {existingMentorships.map(m => {
@@ -826,32 +766,24 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                     return (
                                         <div key={m.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
                                                     <span className="text-xs font-bold text-gray-700">{TASK_LABELS[m.task_type] ?? m.task_type}</span>
                                                     {m.rating != null && (
                                                         <span className="flex items-center gap-0.5 text-xs text-amber-600 font-semibold">
-                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                                            {m.rating}/10
+                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />{m.rating}/10
                                                         </span>
                                                     )}
-                                                    {m.telecaller && (
-                                                        <span className="text-xs text-gray-500">· {m.telecaller.full_name}</span>
-                                                    )}
-                                                    <span className="text-xs text-gray-400">
-                                                        {format(new Date(m.created_at), 'dd MMM yyyy')}
-                                                    </span>
+                                                    {m.telecaller && <span className="text-xs text-gray-500">· {m.telecaller.full_name}</span>}
+                                                    <span className="text-xs text-gray-400">{format(new Date(m.created_at), 'dd MMM yyyy')}</span>
                                                 </div>
-                                                {m.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{m.description}</p>}
+                                                {m.description && <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>}
                                                 {m.status === 'approved' && m.salary_percentage != null && (
                                                     <p className="text-xs text-green-600 font-semibold mt-0.5">+{m.salary_percentage}% salary bonus approved</p>
                                                 )}
-                                                {m.admin_remarks && (
-                                                    <p className="text-xs text-gray-500 italic mt-0.5">"{m.admin_remarks}"</p>
-                                                )}
+                                                {m.admin_remarks && <p className="text-xs text-gray-400 italic mt-0.5">"{m.admin_remarks}"</p>}
                                             </div>
                                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border flex-shrink-0 ${cfg.color}`}>
-                                                <StatusIcon className="w-3 h-3" />
-                                                {cfg.label}
+                                                <StatusIcon className="w-3 h-3" /> {cfg.label}
                                             </span>
                                         </div>
                                     )

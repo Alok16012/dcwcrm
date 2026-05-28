@@ -1,14 +1,7 @@
-import { AssociateManager } from '@/app/(dashboard)/admin/tabs/AssociateManager'
-import { PageHeader } from '@/components/shared/PageHeader'
+import dynamic from 'next/dynamic'
+
+const AssociatesClient = dynamic(() => import('./client'), { ssr: false })
 
 export default function AssociatesPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Associates"
-        description="Register new associates and view existing applications"
-      />
-      <AssociateManager />
-    </div>
-  )
+  return <AssociatesClient />
 }

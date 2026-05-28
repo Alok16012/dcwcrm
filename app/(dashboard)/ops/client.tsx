@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import {
   RefreshCw,
-  Bell, Send, IndianRupee,
+  IndianRupee,
   Plus, Pencil, Trash2, Download, FileText, ClipboardList, Truck,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -20,7 +20,6 @@ const FeePlanBuilder = dynamic(
 const TaskManager = dynamic(() => import('./TaskManager'), { ssr: false })
 const DispatchManager = dynamic(() => import('@/components/ops/DispatchManager').then(m => ({ default: m.DispatchManager })), { ssr: false })
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/shared/PageHeader'
 import * as XLSX from 'xlsx'
 
@@ -43,13 +42,6 @@ export default function OpsClient() {
   const supabase = createClient()
   const db = supabase as any
 
-  // ── Notification broadcast state ──
-  const [notifTitle, setNotifTitle] = useState('')
-  const [notifMessage, setNotifMessage] = useState('')
-  const [notifSending, setNotifSending] = useState(false)
-  const [notifHistory, setNotifHistory] = useState<{ id: string; title: string; message: string; created_at: string }[]>([])
-  const [notifHistoryLoading, setNotifHistoryLoading] = useState(false)
-
   // ── Fee management state ──
   const [fees, setFees] = useState<FeeRow[]>([])
   const [feeLoading, setFeeLoading] = useState(false)
@@ -60,45 +52,6 @@ export default function OpsClient() {
   const [depts, setDepts] = useState<Lookup[]>([])
   const [courseList, setCourseList] = useState<Lookup[]>([])
   const [sessionList, setSessionList] = useState<Lookup[]>([])
-
-  const loadNotifHistory = useCallback(async () => {
-    setNotifHistoryLoading(true)
-    // Fetch distinct notifications (deduplicated by title+created_at via group)
-    // We just fetch the latest 20 unique broadcast messages
-    const { data } = await db
-      .from('associate_notifications')
-      .select('id, title, message, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    // Deduplicate: keep first occurrence of each (title + created_at minute)
-    const seen = new Set<string>()
-    const unique = (data ?? []).filter((n: any) => {
-      const key = `${n.title}||${n.created_at.slice(0, 16)}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    }).slice(0, 15)
-    setNotifHistory(unique)
-    setNotifHistoryLoading(false)
-  }, [db])
-
-  async function handleSendNotif() {
-    if (!notifTitle.trim() || !notifMessage.trim()) { toast.error('Title and message required'); return }
-    setNotifSending(true)
-    try {
-      const res = await fetch('/api/associates/notify-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: notifTitle, message: notifMessage }),
-      })
-      const data = await res.json()
-      if (!res.ok) { toast.error(data.error ?? 'Failed to send'); return }
-      toast.success(`Notification sent to ${data.sent} associate${data.sent !== 1 ? 's' : ''}`)
-      setNotifTitle('')
-      setNotifMessage('')
-      loadNotifHistory()
-    } finally { setNotifSending(false) }
-  }
 
   const loadFees = useCallback(async () => {
     setFeeLoading(true)
@@ -207,13 +160,10 @@ export default function OpsClient() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="OPS" description="Notifications, fee management, dispatch and tasks" />
+      <PageHeader title="OPS" description="Fee management, dispatch and tasks" />
 
-      <Tabs defaultValue="notifications" className="space-y-4">
+      <Tabs defaultValue="fees" className="space-y-4">
         <TabsList className="bg-white border">
-          <TabsTrigger value="notifications" className="gap-1.5 text-xs sm:text-sm" onClick={loadNotifHistory}>
-            <Bell className="w-4 h-4" /> Push Notification
-          </TabsTrigger>
           <TabsTrigger value="fees" className="gap-1.5 text-xs sm:text-sm" onClick={loadFees}>
             <IndianRupee className="w-4 h-4" /> Fee Management
           </TabsTrigger>
@@ -228,75 +178,6 @@ export default function OpsClient() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ══ PUSH NOTIFICATIONS ══ */}
-        <TabsContent value="notifications" className="space-y-5">
-          {/* Compose */}
-          <div className="bg-white border rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Bell className="w-4 h-4 text-blue-600" />
-              <h3 className="font-semibold text-gray-900 text-sm">Send to All Approved Associates</h3>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Notification Title</Label>
-              <Input
-                placeholder="e.g. New offer available!"
-                value={notifTitle}
-                onChange={e => setNotifTitle(e.target.value)}
-                maxLength={100}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Message</Label>
-              <Textarea
-                placeholder="Write your message here…"
-                value={notifMessage}
-                onChange={e => setNotifMessage(e.target.value)}
-                rows={4}
-                maxLength={500}
-                className="resize-none"
-              />
-              <p className="text-xs text-slate-400 text-right">{notifMessage.length}/500</p>
-            </div>
-            <Button
-              className="w-full gap-2"
-              onClick={handleSendNotif}
-              disabled={notifSending || !notifTitle.trim() || !notifMessage.trim()}
-            >
-              {notifSending
-                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><Send className="w-4 h-4" /> Send to All Associates</>
-              }
-            </Button>
-          </div>
-
-          {/* History */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Recent Notifications</h4>
-            {notifHistoryLoading ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">Loading…</div>
-            ) : notifHistory.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">No notifications sent yet</div>
-            ) : (
-              <div className="space-y-2">
-                {notifHistory.map(n => (
-                  <div key={n.id} className="bg-white border rounded-xl px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-0.5 flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 truncate">{n.title}</p>
-                        <p className="text-xs text-slate-500 line-clamp-2">{n.message}</p>
-                      </div>
-                      <p className="text-xs text-slate-400 flex-shrink-0 mt-0.5">
-                        {new Date(n.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                        {' '}
-                        {new Date(n.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
         {/* ══ FEE PLAN PDF ══ */}
         <TabsContent value="feeplan" className="space-y-4">
           <FeePlanBuilder />

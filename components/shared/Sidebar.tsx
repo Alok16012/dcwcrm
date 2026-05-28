@@ -47,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['admin', 'backend', 'lead', 'counselor', 'associate'] },
   { label: 'Tasks', href: '/tasks', icon: ClipboardList, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Student Portal', href: '/student-portal', icon: School, roles: ['admin', 'backend'] },
+  { label: 'Push Notification', href: '/push-notification', icon: Bell, roles: ['admin', 'backend'] },
   { label: 'OPS', href: '/ops', icon: Briefcase, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },
   // Lead specific items

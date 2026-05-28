@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import {
   RefreshCw,
   IndianRupee,
-  Plus, Pencil, Trash2, Download, FileText, ClipboardList, Truck,
+  Plus, Pencil, Trash2, Download, FileText,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -17,8 +17,6 @@ const FeePlanBuilder = dynamic(
   () => import('../admin/tabs/FeePlanBuilder').then(m => ({ default: m.FeePlanBuilder })),
   { ssr: false }
 )
-const TaskManager = dynamic(() => import('./TaskManager'), { ssr: false })
-const DispatchManager = dynamic(() => import('@/components/ops/DispatchManager').then(m => ({ default: m.DispatchManager })), { ssr: false })
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import * as XLSX from 'xlsx'
@@ -160,7 +158,7 @@ export default function OpsClient() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="OPS" description="Fee management, dispatch and tasks" />
+      <PageHeader title="OPS" description="Fee management and fee plan builder" />
 
       <Tabs defaultValue="fees" className="space-y-4">
         <TabsList className="bg-white border">
@@ -170,27 +168,11 @@ export default function OpsClient() {
           <TabsTrigger value="feeplan" className="gap-1.5 text-xs sm:text-sm">
             <FileText className="w-4 h-4" /> Fee Plan PDF
           </TabsTrigger>
-          <TabsTrigger value="dispatch" className="gap-1.5 text-xs sm:text-sm">
-            <Truck className="w-4 h-4" /> Dispatch
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="gap-1.5 text-xs sm:text-sm">
-            <ClipboardList className="w-4 h-4" /> Tasks
-          </TabsTrigger>
         </TabsList>
 
         {/* ══ FEE PLAN PDF ══ */}
         <TabsContent value="feeplan" className="space-y-4">
           <FeePlanBuilder />
-        </TabsContent>
-
-        {/* ══ DISPATCH MANAGEMENT ══ */}
-        <TabsContent value="dispatch" className="space-y-4">
-          <DispatchManager />
-        </TabsContent>
-
-        {/* ══ TASK MANAGEMENT ══ */}
-        <TabsContent value="tasks" className="space-y-4">
-          <TaskManager />
         </TabsContent>
 
         {/* ══ FEE MANAGEMENT ══ */}

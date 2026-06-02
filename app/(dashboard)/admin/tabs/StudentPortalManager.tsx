@@ -11,6 +11,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 
+// Display helper: ENR-873254X → DCW-873254
+function fmtEnroll(n: string | null | undefined) {
+  if (!n) return n
+  if (n.startsWith('ENR-')) return 'DCW-' + n.slice(4).replace(/[^0-9]/g, '')
+  return n
+}
+
 interface Student {
   id: string
   full_name: string
@@ -154,7 +161,8 @@ export function StudentPortalManager() {
     !search ||
     s.full_name.toLowerCase().includes(search.toLowerCase()) ||
     s.phone.includes(search) ||
-    s.enrollment_number.toLowerCase().includes(search.toLowerCase())
+    s.enrollment_number.toLowerCase().includes(search.toLowerCase()) ||
+    (fmtEnroll(s.enrollment_number) ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   // ── Send Update ──────────────────────────────────────────────
@@ -284,7 +292,7 @@ export function StudentPortalManager() {
               <InitialAvatar name={s.full_name} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate leading-tight">{s.full_name}</p>
-                <p className="text-[11px] text-gray-400 font-mono truncate">{s.enrollment_number}</p>
+                <p className="text-[11px] text-gray-400 font-mono truncate">{fmtEnroll(s.enrollment_number)}</p>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
@@ -315,7 +323,7 @@ export function StudentPortalManager() {
             <div className="flex-1 min-w-0">
               <p className="font-bold text-gray-900 leading-tight">{selected.full_name}</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                <span className="font-mono">{selected.enrollment_number}</span>
+                <span className="font-mono">{fmtEnroll(selected.enrollment_number)}</span>
                 {(selected.course as any)?.name && <span> · {(selected.course as any).name}</span>}
                 {selected.phone && <span> · {selected.phone}</span>}
               </p>
@@ -653,7 +661,7 @@ export function StudentPortalManager() {
                   <div>
                     <p className="font-semibold text-gray-900">{selected.portal_active ? 'Portal Active' : 'Portal Inactive'}</p>
                     {selected.portal_username ? (
-                      <p className="text-xs text-gray-500 font-mono mt-0.5">Login: {selected.portal_username}</p>
+                      <p className="text-xs text-gray-500 font-mono mt-0.5">Login: {fmtEnroll(selected.portal_username)}</p>
                     ) : (
                       <p className="text-xs text-gray-400 mt-0.5">No credentials set</p>
                     )}
@@ -667,7 +675,7 @@ export function StudentPortalManager() {
                   {selected.portal_username && (
                     <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex items-center justify-between">
                       <span className="text-xs text-gray-400">Username</span>
-                      <span className="text-sm font-mono font-medium text-gray-800">{selected.portal_username}</span>
+                      <span className="text-sm font-mono font-medium text-gray-800">{fmtEnroll(selected.portal_username)}</span>
                     </div>
                   )}
                   <input

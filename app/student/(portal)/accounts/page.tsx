@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Wallet, CheckCircle2, AlertCircle, Download, Receipt, Share2, Copy, Check } from 'lucide-react'
+import { Wallet, CheckCircle2, AlertCircle, Download, Receipt, Share2, Copy, Check, Building2, Smartphone } from 'lucide-react'
 import { toast } from 'sonner'
 
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`
@@ -61,7 +61,14 @@ export default function AccountsPage() {
       payments.forEach((p, i) => {
         lines.push(`  ${i + 1}. ${fmt(p.amount)} — ${modeLabel[p.payment_mode] ?? p.payment_mode} — ${new Date(p.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${p.receipt_number ? ` (${p.receipt_number})` : ''}`)
       })
+      lines.push(``)
     }
+    lines.push(`🏦 Pay To:`)
+    lines.push(`  Name:    EDUSPHERE EDUCATIONAL & WELFARE TRUST`)
+    lines.push(`  UPI ID:  88099511@idfcbank`)
+    lines.push(`  A/C No:  10170545354`)
+    lines.push(`  IFSC:    IDFB0060282`)
+    lines.push(`  Bank:    IDFC FIRST Bank — Patna Kankarbagh Branch`)
     return lines.join('\n')
   }
 
@@ -206,11 +213,74 @@ export default function AccountsPage() {
         </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-        <p className="text-xs font-semibold text-blue-800 mb-1">💡 How to Pay</p>
-        <p className="text-xs text-blue-700">
-          To make a payment, contact your counsellor or visit our office. All receipts are issued by Distance Courses Wala.
-        </p>
+      {/* Payment Details Card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-gray-500" />
+            <h2 className="font-semibold text-gray-900">Payment Details</h2>
+          </div>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+          >
+            {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Share2 className="h-3.5 w-3.5" /> Share</>}
+          </button>
+        </div>
+
+        {/* UPI */}
+        <div className="px-5 py-4 border-b border-gray-50 bg-gradient-to-r from-orange-50 to-yellow-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-xl border border-orange-200 flex items-center justify-center shrink-0">
+              <Smartphone className="h-5 w-5 text-orange-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500 mb-0.5">UPI Payment</p>
+              <p className="text-base font-bold text-gray-900 font-mono">88099511@idfcbank</p>
+              <p className="text-xs text-gray-500 mt-0.5">Scan & pay via PhonePe, GPay, Paytm, BHIM</p>
+            </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText('88099511@idfcbank'); toast.success('UPI ID copied!') }}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors shrink-0"
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </button>
+          </div>
+        </div>
+
+        {/* Bank Details */}
+        <div className="px-5 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Bank Transfer / NEFT / RTGS</p>
+          <div className="space-y-2.5">
+            {[
+              { label: 'Account Name',   value: 'EDUSPHERE EDUCATIONAL & WELFARE TRUST', mono: false },
+              { label: 'Account Number', value: '10170545354', mono: true },
+              { label: 'IFSC Code',      value: 'IDFB0060282', mono: true },
+              { label: 'SWIFT Code',     value: 'IDFBINBBMUM', mono: true },
+              { label: 'Bank',           value: 'IDFC FIRST Bank', mono: false },
+              { label: 'Branch',         value: 'Patna — Kankarbagh Branch', mono: false },
+            ].map(({ label, value, mono }) => (
+              <div key={label} className="flex items-center gap-3">
+                <p className="text-xs text-gray-400 w-32 shrink-0">{label}</p>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <p className={`text-sm font-semibold text-gray-800 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
+                  {mono && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(value); toast.success(`${label} copied!`) }}
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-5 py-3 bg-blue-50 border-t border-blue-100">
+          <p className="text-xs text-blue-700">After payment, share your receipt with your counsellor for confirmation.</p>
+        </div>
       </div>
     </div>
   )

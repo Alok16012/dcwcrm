@@ -32,7 +32,7 @@ export default function AssociateClient() {
   const supabase = createClient()
   const db = supabase as any
   const [associate, setAssociate] = useState<Associate | null>(null)
-  const [stats, setStats] = useState({ totalLeads: 0, totalStudents: 0, commissionEarned: 0, pendingRequests: 0 })
+  const [stats, setStats] = useState({ totalLeads: 0, totalStudents: 0, commissionEarned: 0, totalRevenue: 0 })
   const [recentLeads, setRecentLeads] = useState<any[]>([])
   const [recentTxns, setRecentTxns] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
@@ -48,24 +48,25 @@ export default function AssociateClient() {
     setAssociate(assoc)
 
     const [
-      leadRes, studentRes, txnRes, notifRes, pendingRes,
+      leadRes, studentRes, txnRes, notifRes,
     ] = await Promise.all([
       supabase.from('leads').select('id, full_name, phone, status, created_at, course:courses(name)').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }),
-      db.from('students').select('id', { count: 'exact', head: false }).eq('referred_by_associate', assoc.id),
+      db.from('students').select('id, total_fee').eq('referred_by_associate', assoc.id),
       db.from('associate_wallet_txns').select('id, type, amount, reason, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
       db.from('associate_notifications').select('id, title, message, type, is_read, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
-      db.from('wallet_recharge_requests').select('id', { count: 'exact', head: false }).eq('associate_id', assoc.id).eq('status', 'pending'),
     ])
 
     const allLeads = (leadRes.data ?? []) as any[]
+    const allStudents = (studentRes.data ?? []) as any[]
     const allTxns = (txnRes.data ?? []) as any[]
     const commissionEarned = allTxns.filter((t: any) => t.type === 'credit').reduce((s: number, t: any) => s + t.amount, 0)
+    const totalRevenue = allStudents.reduce((s: number, st: any) => s + (st.total_fee ?? 0), 0)
 
     setStats({
       totalLeads: allLeads.length,
-      totalStudents: (studentRes.data ?? []).length,
+      totalStudents: allStudents.length,
       commissionEarned,
-      pendingRequests: (pendingRes.data ?? []).length,
+      totalRevenue,
     })
     setRecentLeads(allLeads.slice(0, 6))
     setRecentTxns(allTxns)
@@ -118,9 +119,6 @@ export default function AssociateClient() {
                   <Copy className="w-3 h-3 opacity-70" />
                 </button>
               )}
-              <span className="bg-emerald-400/20 border border-emerald-400/30 text-emerald-300 text-xs px-3 py-1.5 rounded-full font-semibold">
-                {fmt(associate.wallet_balance)} Wallet
-              </span>
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={load} className="border-white/30 text-white bg-white/10 hover:bg-white/20 gap-2">
@@ -156,12 +154,12 @@ export default function AssociateClient() {
           href="/associate/account"
         />
         <StatCard
-          label="Wallet Balance"
-          value={fmt(associate.wallet_balance)}
-          sub={stats.pendingRequests > 0 ? `${stats.pendingRequests} recharge pending` : 'Available balance'}
-          icon={Wallet}
-          color={stats.pendingRequests > 0 ? 'amber' : 'blue'}
-          href="/associate/account"
+          label="Total Revenue"
+          value={fmt(stats.totalRevenue)}
+          sub="From referred students"
+          icon={TrendingUp}
+          color="emerald"
+          href="/associate/students"
         />
       </div>
 

@@ -48,9 +48,11 @@ export default function AssociateAdmissionsPage() {
 
   // New lead dialog
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({ full_name: '', phone: '', email: '', remarks: '' })
+  const [form, setForm] = useState({ full_name: '', phone: '', email: '', city: '', state: '', remarks: '' })
   const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
+  const [subCourses, setSubCourses] = useState<{ id: string; name: string }[]>([])
   const [courseId, setCourseId] = useState('')
+  const [subCourseId, setSubCourseId] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const load = useCallback(async () => {
@@ -70,6 +72,7 @@ export default function AssociateAdmissionsPage() {
     ])
     setLeads((leadRes.data ?? []) as Lead[])
     setCourses((courseRes.data ?? []) as { id: string; name: string }[])
+    setSubCourses([])
     setLoading(false)
   }, [supabase, db])
 
@@ -77,6 +80,12 @@ export default function AssociateAdmissionsPage() {
   useEffect(() => {
     if (searchParams.get('new') === '1') setDialogOpen(true)
   }, [searchParams])
+
+  useEffect(() => {
+    if (!courseId) { setSubCourses([]); setSubCourseId(''); return }
+    supabase.from('sub_courses').select('id, name').eq('course_id', courseId).eq('is_active', true).order('name')
+      .then(({ data }) => { setSubCourses((data ?? []) as { id: string; name: string }[]); setSubCourseId('') })
+  }, [courseId, supabase])
 
   const filtered = leads.filter(l => {
     const matchSearch = !search || l.full_name.toLowerCase().includes(search.toLowerCase()) || l.phone.includes(search)
@@ -95,20 +104,24 @@ export default function AssociateAdmissionsPage() {
     if (!assocId) return
     setSubmitting(true)
     try {
-      const { error } = await supabase.from('leads').insert({
+      const { error } = await (supabase as any).from('leads').insert({
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
         remarks: form.remarks.trim() || null,
         course_id: courseId || null,
+        sub_course_id: subCourseId || null,
         referred_by_associate: assocId,
         status: 'new',
       })
       if (error) { toast.error(error.message); return }
       toast.success('Lead added successfully!')
       setDialogOpen(false)
-      setForm({ full_name: '', phone: '', email: '', remarks: '' })
+      setForm({ full_name: '', phone: '', email: '', city: '', state: '', remarks: '' })
       setCourseId('')
+      setSubCourseId('')
       load()
     } finally {
       setSubmitting(false)
@@ -238,6 +251,14 @@ export default function AssociateAdmissionsPage() {
                 <Label>Email</Label>
                 <Input placeholder="Optional" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
               </div>
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input placeholder="e.g. Patna" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>State</Label>
+                <Input placeholder="e.g. Bihar" value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} />
+              </div>
               <div className="col-span-2 space-y-1.5">
                 <Label>Course Interested In</Label>
                 <select
@@ -249,6 +270,19 @@ export default function AssociateAdmissionsPage() {
                   {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              {subCourses.length > 0 && (
+                <div className="col-span-2 space-y-1.5">
+                  <Label>Standard</Label>
+                  <select
+                    value={subCourseId}
+                    onChange={e => setSubCourseId(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">Select standard…</option>
+                    {subCourses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="col-span-2 space-y-1.5">
                 <Label>Remarks / Notes</Label>
                 <textarea

@@ -108,34 +108,40 @@ export default function AssociateStudentsPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
-    const { data: assoc } = await db.from('associates').select('id').eq('user_id', user.id).single()
+    const { data: assoc } = await db.from('associates').select('id, associate_code').eq('user_id', user.id).single()
     if (!assoc) { setLoading(false); return }
 
-    // Primary: students directly linked to this associate
-    const { data: directStudents } = await db.from('students').select(`
+    const STUDENT_FIELDS = `
       id, full_name, enrollment_number, phone, verification_status, exam_status,
       result_status, total_fee, amount_paid, university_name, board_name,
       admit_card_url, marksheet_url, portal_active,
       course:courses(name)
-    `).eq('referred_by_associate', assoc.id).order('created_at', { ascending: false })
+    `
 
-    // Fallback: students linked via leads
+    // Path 1: directly linked via referred_by_associate (associates.id)
+    const { data: directStudents } = await db.from('students').select(STUDENT_FIELDS)
+      .eq('referred_by_associate', assoc.id).order('created_at', { ascending: false })
+
+    // Path 2: students whose lead was referred by this associate
     const { data: assocLeads } = await supabase.from('leads').select('id').eq('referred_by_associate', assoc.id)
     const leadIds = (assocLeads ?? []).map((l: any) => l.id)
-
     let viaLeads: any[] = []
     if (leadIds.length > 0) {
-      const { data } = await db.from('students').select(`
-        id, full_name, enrollment_number, phone, verification_status, exam_status,
-        result_status, total_fee, amount_paid, university_name, board_name,
-        admit_card_url, marksheet_url, portal_active,
-        course:courses(name)
-      `).in('lead_id', leadIds).order('created_at', { ascending: false })
+      const { data } = await db.from('students').select(STUDENT_FIELDS)
+        .in('lead_id', leadIds).order('created_at', { ascending: false })
       viaLeads = data ?? []
     }
 
+    // Path 3: via associate_code field (covers legacy / different join method)
+    let viaCode: any[] = []
+    if (assoc.associate_code) {
+      const { data } = await db.from('students').select(STUDENT_FIELDS)
+        .eq('referred_by_associate', assoc.associate_code).order('created_at', { ascending: false })
+      viaCode = data ?? []
+    }
+
     // Merge, deduplicate by id
-    const allStudents = [...(directStudents ?? []), ...viaLeads]
+    const allStudents = [...(directStudents ?? []), ...viaLeads, ...viaCode]
     const seen = new Set<string>()
     const unique = allStudents.filter((s: any) => { if (seen.has(s.id)) return false; seen.add(s.id); return true })
 

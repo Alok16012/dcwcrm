@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Wallet, PlusCircle, Upload, Clock, CheckCircle2, XCircle, X, FileImage } from 'lucide-react'
+import { Wallet, PlusCircle, Upload, Clock, CheckCircle2, XCircle, X, FileImage, GraduationCap, Share2, Copy, Check, Building2, Smartphone, AlertCircle } from 'lucide-react'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -18,6 +18,12 @@ interface Txn {
   amount: number
   reason: string | null
   created_at: string
+}
+
+interface StudentFee {
+  id: string; full_name: string; enrollment_number: string
+  total_fee: number | null; amount_paid: number
+  course: { name: string } | null
 }
 
 interface RechargeRequest {
@@ -35,11 +41,14 @@ export default function AssociateAccountPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [assocId, setAssocId] = useState<string | null>(null)
+  const [assocName, setAssocName] = useState('')
   const [balance, setBalance] = useState(0)
   const [code, setCode] = useState('')
   const [txns, setTxns] = useState<Txn[]>([])
   const [requests, setRequests] = useState<RechargeRequest[]>([])
+  const [students, setStudents] = useState<StudentFee[]>([])
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
 
   const [rechargeOpen, setRechargeOpen] = useState(false)
   const [amount, setAmount] = useState('')
@@ -50,17 +59,34 @@ export default function AssociateAccountPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
-    const { data: assoc } = await db.from('associates').select('id, wallet_balance, associate_code').eq('user_id', user.id).single()
+    const { data: assoc } = await db.from('associates').select('id, name, wallet_balance, associate_code').eq('user_id', user.id).single()
     if (!assoc) { setLoading(false); return }
     setAssocId(assoc.id)
+    setAssocName(assoc.name ?? '')
     setBalance(assoc.wallet_balance ?? 0)
     setCode(assoc.associate_code ?? '')
-    const [txnRes, reqRes] = await Promise.all([
+
+    // Get leads for this associate to find students via lead_id
+    const { data: assocLeads } = await supabase.from('leads').select('id').eq('referred_by_associate', assoc.id)
+    const leadIds = ((assocLeads ?? []) as any[]).map((l: any) => l.id)
+
+    const [txnRes, reqRes, stuRes1, stuRes2] = await Promise.all([
       db.from('associate_wallet_txns').select('*').eq('associate_id', assoc.id).order('created_at', { ascending: false }),
       db.from('wallet_recharge_requests').select('*').eq('associate_id', assoc.id).order('created_at', { ascending: false }),
+      db.from('students').select('id, full_name, enrollment_number, total_fee, amount_paid, course:courses(name)')
+        .eq('referred_by_associate', assoc.id).order('full_name'),
+      leadIds.length > 0
+        ? db.from('students').select('id, full_name, enrollment_number, total_fee, amount_paid, course:courses(name)')
+            .in('lead_id', leadIds).order('full_name')
+        : Promise.resolve({ data: [] }),
     ])
     setTxns((txnRes.data ?? []) as Txn[])
     setRequests((reqRes.data ?? []) as RechargeRequest[])
+
+    // Merge students, deduplicate
+    const allStu = [...(stuRes1.data ?? []), ...(stuRes2.data ?? [])]
+    const seen = new Set<string>()
+    setStudents(allStu.filter((s: any) => { if (seen.has(s.id)) return false; seen.add(s.id); return true }) as StudentFee[])
     setLoading(false)
   }, [supabase, db])
 
@@ -105,6 +131,46 @@ export default function AssociateAccountPage() {
   const debited = txns.filter(t => t.type === 'debit').reduce((s, t) => s + t.amount, 0)
   const pendingRequests = requests.filter(r => r.status === 'pending')
 
+  const totalFee = students.reduce((s, st) => s + (st.total_fee ?? 0), 0)
+  const totalPaid = students.reduce((s, st) => s + st.amount_paid, 0)
+  const totalPending = totalFee - totalPaid
+
+  function buildShareText() {
+    const lines = [
+      `📊 Fee Summary — ${assocName} (${code})`,
+      ``,
+      `Students: ${students.length}`,
+      `Total Fee:  ${fmt(totalFee)}`,
+      `Paid:       ${fmt(totalPaid)}`,
+      `Pending:    ${fmt(totalPending)}`,
+      ``,
+      `Student-wise:`,
+    ]
+    students.forEach((s, i) => {
+      const pending = (s.total_fee ?? 0) - s.amount_paid
+      lines.push(`  ${i+1}. ${s.full_name} (${s.enrollment_number ?? '—'})`)
+      lines.push(`     Fee: ${fmt(s.total_fee ?? 0)} | Paid: ${fmt(s.amount_paid)} | Pending: ${fmt(pending)}`)
+    })
+    lines.push(``)
+    lines.push(`💳 Pay To:`)
+    lines.push(`  UPI: 88099511@idfcbank`)
+    lines.push(`  A/C: 10170545354 | IFSC: IDFB0060282`)
+    lines.push(`  EDUSPHERE EDUCATIONAL & WELFARE TRUST`)
+    return lines.join('\n')
+  }
+
+  async function handleShare() {
+    const text = buildShareText()
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Fee Summary', text }) } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast.success('Copied to clipboard!')
+      setTimeout(() => setCopied(false), 2500)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -137,6 +203,133 @@ export default function AssociateAccountPage() {
             <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
               <p className="text-2xl font-bold text-red-700">{fmt(debited)}</p>
               <p className="text-xs text-red-600 mt-1">Total Debited</p>
+            </div>
+          </div>
+
+          {/* Student Fee Summary */}
+          {students.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-indigo-500" />
+                  <h3 className="font-semibold text-gray-900 text-sm">Student Fee Summary</h3>
+                  <span className="text-xs text-gray-400">{students.length} students</span>
+                </div>
+                <button onClick={handleShare}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                  {copied ? <><Check className="h-3.5 w-3.5" />Copied!</> : <><Share2 className="h-3.5 w-3.5" />Share</>}
+                </button>
+              </div>
+
+              {/* Totals row */}
+              <div className="grid grid-cols-3 divide-x divide-gray-50 border-b border-gray-50">
+                <div className="px-4 py-3 text-center">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Fee</p>
+                  <p className="text-base font-extrabold text-gray-800 mt-0.5">{fmt(totalFee)}</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-[10px] font-bold text-green-500 uppercase tracking-wide">Paid</p>
+                  <p className="text-base font-extrabold text-green-700 mt-0.5">{fmt(totalPaid)}</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: totalPending > 0 ? '#ef4444' : '#10b981' }}>Pending</p>
+                  <p className={`text-base font-extrabold mt-0.5 ${totalPending > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {totalPending > 0 ? fmt(totalPending) : 'Clear'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Student-wise rows */}
+              <div className="divide-y divide-gray-50">
+                {students.map((s, i) => {
+                  const pending = (s.total_fee ?? 0) - s.amount_paid
+                  return (
+                    <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                      <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0 text-indigo-600 font-bold text-xs">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{s.full_name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {s.enrollment_number && <span className="text-xs font-mono text-gray-400">{s.enrollment_number}</span>}
+                          {s.course && <span className="text-xs text-gray-400">· {(s.course as {name:string}).name}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 space-y-0.5">
+                        {s.total_fee ? (
+                          <>
+                            <p className="text-xs font-bold text-gray-700">{fmt(s.total_fee)}</p>
+                            <p className={`text-xs font-semibold ${pending > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {pending > 0 ? `${fmt(pending)} due` : 'Clear'}
+                            </p>
+                          </>
+                        ) : <p className="text-xs text-gray-400">—</p>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* DCW Payment Details */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-gray-500" />
+                <h3 className="font-semibold text-gray-900 text-sm">Payment Details</h3>
+              </div>
+              <button onClick={handleShare}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+                {copied ? <><Check className="h-3.5 w-3.5" />Copied!</> : <><Share2 className="h-3.5 w-3.5" />Share</>}
+              </button>
+            </div>
+            {/* UPI */}
+            <div className="px-5 py-4 border-b border-gray-50 bg-gradient-to-r from-orange-50 to-yellow-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-xl border border-orange-200 flex items-center justify-center shrink-0">
+                  <Smartphone className="h-5 w-5 text-orange-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500 mb-0.5">UPI Payment</p>
+                  <p className="text-base font-bold text-gray-900 font-mono">88099511@idfcbank</p>
+                  <p className="text-xs text-gray-500 mt-0.5">PhonePe · GPay · Paytm · BHIM</p>
+                </div>
+                <button onClick={() => { navigator.clipboard.writeText('88099511@idfcbank'); toast.success('UPI ID copied!') }}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 shrink-0">
+                  <Copy className="h-3 w-3" /> Copy
+                </button>
+              </div>
+            </div>
+            {/* Bank */}
+            <div className="px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Bank Transfer / NEFT / RTGS</p>
+              <div className="space-y-2.5">
+                {[
+                  { label: 'Account Name',   value: 'EDUSPHERE EDUCATIONAL & WELFARE TRUST', mono: false },
+                  { label: 'Account Number', value: '10170545354', mono: true },
+                  { label: 'IFSC Code',      value: 'IDFB0060282', mono: true },
+                  { label: 'SWIFT Code',     value: 'IDFBINBBMUM', mono: true },
+                  { label: 'Bank',           value: 'IDFC FIRST Bank', mono: false },
+                  { label: 'Branch',         value: 'Patna — Kankarbagh Branch', mono: false },
+                ].map(({ label, value, mono }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <p className="text-xs text-gray-400 w-32 shrink-0">{label}</p>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <p className={`text-sm font-semibold text-gray-800 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
+                      {mono && (
+                        <button onClick={() => { navigator.clipboard.writeText(value); toast.success(`${label} copied!`) }}
+                          className="shrink-0 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-blue-50 border-t border-blue-100">
+              <p className="text-xs text-blue-700">After payment, share receipt with your counsellor for confirmation.</p>
             </div>
           </div>
 

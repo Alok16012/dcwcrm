@@ -240,7 +240,7 @@ export default function AdmissionPage() {
     { label: 'Enrollment No.',  value: student.enrollment_number },
     { label: 'Course',          value: student.course?.name ?? '—' },
     { label: 'Department',      value: student.department?.name ?? '—' },
-    { label: 'Sub-Section',     value: student.sub_section?.name ?? '—' },
+    ...(student.sub_section?.name ? [{ label: 'Sub-Department', value: student.sub_section.name }] : []),
     { label: 'Session',         value: student.session?.name ?? '—' },
     { label: 'Enrollment Date', value: student.enrollment_date ? format(new Date(student.enrollment_date), 'd MMMM yyyy') : '—' },
     { label: 'Status',          value: student.status },

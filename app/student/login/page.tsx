@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { GraduationCap, BookOpen, Award, Users } from 'lucide-react'
+import { GraduationCap, BookOpen, Award, Users, Eye, EyeOff } from 'lucide-react'
 import Image from 'next/image'
 
 const loginSchema = z.object({
@@ -20,6 +20,7 @@ type LoginForm = z.infer<typeof loginSchema>
 
 export default function StudentLoginPage() {
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const supabase = createClient()
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
@@ -136,26 +137,36 @@ export default function StudentLoginPage() {
                     </Label>
                     <Input
                       id="username"
-                      placeholder="e.g. ENR-123456"
+                      placeholder="e.g. DCW-873254"
                       className="h-11 rounded-xl border-gray-300 focus:border-blue-500 uppercase"
                       {...register('username')}
                       autoComplete="username"
                       autoCapitalize="characters"
                     />
                     {errors.username && <p className="text-xs text-red-500">{errors.username.message}</p>}
-                    <p className="text-xs text-gray-400">Enter your enrollment number exactly as given (e.g. ENR-123456)</p>
+                    <p className="text-xs text-gray-400">Enter your enrollment number exactly as given (e.g. DCW-873254)</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500"
-                      {...register('password')}
-                      autoComplete="current-password"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        className="h-11 rounded-xl border-gray-300 focus:border-blue-500 pr-11"
+                        {...register('password')}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                      </button>
+                    </div>
                     {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
                   </div>
 

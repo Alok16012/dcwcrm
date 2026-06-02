@@ -1,49 +1,116 @@
-import { createServerClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { Wallet, CheckCircle2, Clock, AlertCircle, Download, Receipt, IndianRupee } from 'lucide-react'
+'use client'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Wallet, CheckCircle2, AlertCircle, Download, Receipt, Share2, Copy, Check } from 'lucide-react'
+import { toast } from 'sonner'
 
-export default async function AccountsPage() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/student/login')
+const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`
 
-  const { data: student } = await supabase
-    .from('students')
-    .select('id, full_name, enrollment_number, total_fee, amount_paid')
-    .eq('portal_user_id', user.id)
-    .single()
+const modeLabel: Record<string, string> = {
+  cash: 'Cash', upi: 'UPI', card: 'Card', neft: 'NEFT',
+  rtgs: 'RTGS', cheque: 'Cheque', other: 'Other',
+}
 
-  if (!student) redirect('/student/login')
+export default function AccountsPage() {
+  const supabase = createClient() as any
+  const [student, setStudent] = useState<any>(null)
+  const [payments, setPayments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
 
-  const s = student as { id: string; full_name: string; enrollment_number: string; total_fee: number | null; amount_paid: number }
-  const pending = (s.total_fee ?? 0) - s.amount_paid
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { window.location.href = '/student/login'; return }
 
-  const { data: payments } = await (supabase as any)
-    .from('payments')
-    .select('id, amount, payment_mode, payment_date, receipt_number, notes, receipt_url')
-    .eq('student_id', s.id)
-    .order('payment_date', { ascending: false }) as { data: Array<{ id: string; amount: number; payment_mode: string; payment_date: string; receipt_number: string | null; notes: string | null; receipt_url: string | null }> | null }
+      const { data: s } = await supabase
+        .from('students')
+        .select('id, full_name, enrollment_number, total_fee, amount_paid')
+        .eq('portal_user_id', user.id)
+        .single()
 
-  const modeLabel: Record<string, string> = {
-    cash: 'Cash', upi: 'UPI', card: 'Card', neft: 'NEFT',
-    rtgs: 'RTGS', cheque: 'Cheque', other: 'Other',
+      if (!s) { window.location.href = '/student/login'; return }
+      setStudent(s)
+
+      const { data: p } = await supabase
+        .from('payments')
+        .select('id, amount, payment_mode, payment_date, receipt_number, notes, receipt_url')
+        .eq('student_id', s.id)
+        .order('payment_date', { ascending: false })
+      setPayments(p ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  function buildShareText() {
+    if (!student) return ''
+    const pending = (student.total_fee ?? 0) - student.amount_paid
+    const lines = [
+      `📋 Payment Summary — Distance Courses Wala`,
+      `Student: ${student.full_name}`,
+      `Enrollment No.: ${student.enrollment_number}`,
+      ``,
+      `💰 Total Fee:  ${fmt(student.total_fee ?? 0)}`,
+      `✅ Paid:       ${fmt(student.amount_paid)}`,
+      `⏳ Pending:    ${pending > 0 ? fmt(pending) : 'Clear'}`,
+      ``,
+    ]
+    if (payments.length > 0) {
+      lines.push(`📝 Payment History:`)
+      payments.forEach((p, i) => {
+        lines.push(`  ${i + 1}. ${fmt(p.amount)} — ${modeLabel[p.payment_mode] ?? p.payment_mode} — ${new Date(p.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${p.receipt_number ? ` (${p.receipt_number})` : ''}`)
+      })
+    }
+    return lines.join('\n')
   }
 
-  const paymentPct = s.total_fee ? Math.min(100, Math.round((s.amount_paid / s.total_fee) * 100)) : 0
+  async function handleShare() {
+    const text = buildShareText()
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Payment Summary — DCW', text })
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast.success('Payment details copied to clipboard!')
+      setTimeout(() => setCopied(false), 2500)
+    }
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+    </div>
+  )
+  if (!student) return null
+
+  const pending = (student.total_fee ?? 0) - student.amount_paid
+  const paymentPct = student.total_fee ? Math.min(100, Math.round((student.amount_paid / student.total_fee) * 100)) : 0
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Accounts & Payments</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Your fee summary and payment history</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Accounts & Payments</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Your fee summary and payment history</p>
+        </div>
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+        >
+          {copied ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
+          {copied ? 'Copied!' : 'Share'}
+        </button>
       </div>
 
       {/* Fee summary */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Fee', value: s.total_fee ? `₹${s.total_fee.toLocaleString('en-IN')}` : '—', icon: Wallet, bg: 'bg-blue-50', color: 'text-blue-700', border: 'border-blue-100' },
-          { label: 'Paid', value: `₹${s.amount_paid.toLocaleString('en-IN')}`, icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-700', border: 'border-green-100' },
-          { label: 'Pending', value: pending > 0 ? `₹${pending.toLocaleString('en-IN')}` : 'Clear', icon: pending > 0 ? AlertCircle : CheckCircle2, bg: pending > 0 ? 'bg-red-50' : 'bg-green-50', color: pending > 0 ? 'text-red-700' : 'text-green-700', border: pending > 0 ? 'border-red-100' : 'border-green-100' },
+          { label: 'Total Fee', value: student.total_fee ? fmt(student.total_fee) : '—', icon: Wallet, bg: 'bg-blue-50', color: 'text-blue-700', border: 'border-blue-100' },
+          { label: 'Paid', value: fmt(student.amount_paid), icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-700', border: 'border-green-100' },
+          { label: 'Pending', value: pending > 0 ? fmt(pending) : 'Clear', icon: pending > 0 ? AlertCircle : CheckCircle2, bg: pending > 0 ? 'bg-red-50' : 'bg-green-50', color: pending > 0 ? 'text-red-700' : 'text-green-700', border: pending > 0 ? 'border-red-100' : 'border-green-100' },
         ].map(({ label, value, icon: Icon, bg, color, border }) => (
           <div key={label} className={`${bg} border ${border} rounded-2xl p-4`}>
             <div className="flex items-center gap-2 mb-2">
@@ -56,7 +123,7 @@ export default async function AccountsPage() {
       </div>
 
       {/* Progress bar */}
-      {s.total_fee && (
+      {student.total_fee && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
           <div className="flex justify-between items-center mb-2">
             <p className="text-sm font-medium text-gray-700">Fee Payment Progress</p>
@@ -67,7 +134,7 @@ export default async function AccountsPage() {
           </div>
           <div className="flex justify-between mt-1.5">
             <span className="text-xs text-gray-400">₹0</span>
-            <span className="text-xs text-gray-400">₹{s.total_fee.toLocaleString('en-IN')}</span>
+            <span className="text-xs text-gray-400">₹{student.total_fee.toLocaleString('en-IN')}</span>
           </div>
         </div>
       )}
@@ -77,7 +144,7 @@ export default async function AccountsPage() {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-red-800">Pending Dues: ₹{pending.toLocaleString('en-IN')}</p>
+            <p className="text-sm font-semibold text-red-800">Pending Dues: {fmt(pending)}</p>
             <p className="text-xs text-red-600 mt-0.5">Please clear your pending dues to avoid any disruption. Contact your counsellor or pay online.</p>
           </div>
         </div>
@@ -88,9 +155,9 @@ export default async function AccountsPage() {
         <div className="px-5 py-4 border-b border-gray-50 flex items-center gap-2">
           <Receipt className="h-4 w-4 text-gray-500" />
           <h2 className="font-semibold text-gray-900">Payment History</h2>
-          {payments && <span className="ml-auto text-xs text-gray-400">{payments.length} transactions</span>}
+          {payments.length > 0 && <span className="ml-auto text-xs text-gray-400">{payments.length} transactions</span>}
         </div>
-        {!payments?.length ? (
+        {!payments.length ? (
           <div className="py-12 text-center text-gray-400 text-sm">No payments recorded yet</div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -100,7 +167,7 @@ export default async function AccountsPage() {
                   #{idx + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-gray-900">₹{p.amount.toLocaleString('en-IN')}</p>
+                  <p className="text-sm font-bold text-gray-900">{fmt(p.amount)}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {modeLabel[p.payment_mode] ?? p.payment_mode}
                     {p.receipt_number && <span className="font-mono"> · {p.receipt_number}</span>}
@@ -112,12 +179,8 @@ export default async function AccountsPage() {
                     {new Date(p.payment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                   {p.receipt_url && (
-                    <a
-                      href={p.receipt_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                    >
+                    <a href={p.receipt_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
                       <Download className="h-3 w-3" /> Receipt
                     </a>
                   )}
@@ -128,11 +191,25 @@ export default async function AccountsPage() {
         )}
       </div>
 
-      {/* Payment note */}
+      {/* Share card */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+          <Share2 className="h-5 w-5 text-blue-600" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-blue-900">Share Payment Summary</p>
+          <p className="text-xs text-blue-600 mt-0.5">Tap Share to send your payment details via WhatsApp, email, or copy to clipboard.</p>
+        </div>
+        <button onClick={handleShare}
+          className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors shrink-0">
+          {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+        </button>
+      </div>
+
       <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
         <p className="text-xs font-semibold text-blue-800 mb-1">💡 How to Pay</p>
         <p className="text-xs text-blue-700">
-          To make a payment, contact your counsellor or visit our office. Online payment link will be available soon. All receipts are issued by Distance Courses Wala.
+          To make a payment, contact your counsellor or visit our office. All receipts are issued by Distance Courses Wala.
         </p>
       </div>
     </div>

@@ -102,6 +102,11 @@ export default function ProfilePage() {
     setOldPass(''); setNewPass(''); setConfirmPass('')
   }
 
+  function fmtEnroll(n: string) {
+    if (n.startsWith('ENR-')) return 'DCW-' + n.slice(4).replace(/[^0-9]/g, '')
+    return n
+  }
+
   if (!student) return (
     <div className="flex items-center justify-center h-48">
       <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -129,9 +134,9 @@ export default function ProfilePage() {
         </div>
         <div>
           <h2 className="text-lg font-bold">{student.full_name}</h2>
-          <p className="text-blue-100 text-sm">{student.enrollment_number}</p>
+          <p className="text-blue-100 text-sm font-mono">{fmtEnroll(student.enrollment_number)}</p>
           {student.portal_username && (
-            <p className="text-blue-200 text-xs mt-0.5">Login ID: {student.portal_username}</p>
+            <p className="text-blue-200 text-xs mt-0.5">Login ID: {fmtEnroll(student.portal_username)}</p>
           )}
         </div>
       </div>
@@ -189,7 +194,7 @@ export default function ProfilePage() {
               { label: 'University Name', value: student.university_name ?? student.sub_section?.name ?? '—' },
               { label: 'Board Name', value: student.board_name ?? '—' },
               { label: 'Session', value: student.session?.name ?? '—' },
-              { label: 'Enrollment No.', value: student.enrollment_number },
+              { label: 'Enrollment No.', value: fmtEnroll(student.enrollment_number) },
             ].map(({ label, value }) => (
               <div key={label}>
                 <p className="text-xs text-gray-400">{label}</p>

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, GraduationCap, Wallet, BookOpen,
-  HelpCircle, User, X, Menu, LogOut,
+  HelpCircle, User, X, Menu, LogOut, Gift,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -23,6 +23,7 @@ const NAV = [
   { label: 'Accounts',       href: '/student/accounts',  icon: Wallet },
   { label: 'Study Materials',href: '/student/materials', icon: BookOpen },
   { label: 'Help & Support', href: '/student/support',   icon: HelpCircle },
+  { label: 'Refer & Earn',   href: '/student/refer',     icon: Gift },
   { label: 'My Profile',     href: '/student/profile',   icon: User },
 ]
 
@@ -34,6 +35,11 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
   async function handleLogout() {
     await supabase.auth.signOut()
     window.location.replace('/student/login')
+  }
+
+  function fmtEnroll(n: string) {
+    if (n.startsWith('ENR-')) return 'DCW-' + n.slice(4).replace(/[^0-9]/g, '')
+    return n
   }
 
   const initials = student.full_name
@@ -53,7 +59,7 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
           </div>
           <div className="min-w-0">
             <p className="font-extrabold text-gray-900 text-[13px] leading-tight">DCW Portal</p>
-            <p className="text-[11px] text-blue-600 font-semibold truncate">{student.enrollment_number}</p>
+            <p className="text-[11px] text-blue-600 font-semibold truncate">{fmtEnroll(student.enrollment_number)}</p>
           </div>
         </div>
       </div>

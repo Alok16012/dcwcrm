@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { HelpCircle, Send, Bell, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock, Paperclip } from 'lucide-react'
+import { HelpCircle, Send, Bell, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock, Paperclip, PhoneCall } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +14,7 @@ interface Notification { id: string; title: string; message: string; type: strin
 interface Announcement { id: string; title: string; body: string; type: string; created_at: string }
 interface FAQ { id: string; question: string; answer: string; category: string }
 interface Dispatch { id: string; document_type: string; courier: string | null; tracking_number: string | null; status: string; dispatch_date: string | null; expected_delivery: string | null }
+interface Mentor { full_name: string; phone: string | null }
 
 const notifTypeColor: Record<string, string> = {
   info: 'border-blue-200 bg-blue-50',
@@ -33,6 +34,7 @@ export default function SupportPage() {
   const supabase = createClient()
   const [studentId, setStudentId] = useState<string | null>(null)
   const [enrollmentNumber, setEnrollmentNumber] = useState<string>('')
+  const [mentor, setMentor] = useState<Mentor | null>(null)
   const [tab, setTab] = useState<'notifications' | 'tickets' | 'dispatch' | 'faqs' | 'announcements'>('notifications')
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -49,13 +51,19 @@ export default function SupportPage() {
 
     const { data: s } = await (supabase as any)
       .from('students')
-      .select('id, enrollment_number')
+      .select('id, enrollment_number, mentor_telecaller_id')
       .eq('portal_user_id', user.id)
-      .single() as { data: { id: string; enrollment_number: string } | null }
+      .single() as { data: { id: string; enrollment_number: string; mentor_telecaller_id: string | null } | null }
     if (!s) return
     setStudentId(s.id)
     setEnrollmentNumber(s.enrollment_number)
     const db = supabase as any
+
+    // Load mentor if assigned
+    if (s.mentor_telecaller_id) {
+      const { data: m } = await db.from('profiles').select('full_name, phone').eq('id', s.mentor_telecaller_id).single()
+      if (m) setMentor(m as Mentor)
+    }
 
     const [notif, annc, tick, faq, disp] = await Promise.all([
       db.from('student_notifications').select('*').eq('student_id', s.id).order('created_at', { ascending: false }).limit(20),
@@ -123,23 +131,55 @@ export default function SupportPage() {
         <p className="text-sm text-gray-500 mt-0.5">Track dispatches, raise tickets, view FAQs and announcements</p>
       </div>
 
-      {/* WhatsApp contact */}
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-4">
-        <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center shrink-0">
-          <Phone className="h-5 w-5 text-white" />
+      {/* Contact cards */}
+      <div className="space-y-3">
+        {/* WhatsApp support */}
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center shrink-0">
+            <Phone className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-green-900">Help & Support</p>
+            <p className="text-xs text-green-700 font-mono">+91 99395 87009</p>
+            <p className="text-xs text-green-600 mt-0.5">Mon–Sat, 9am–6pm</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <a href="tel:+919939587009"
+              className="flex items-center gap-1 bg-white border border-green-300 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-green-50 transition-colors">
+              <PhoneCall className="h-3.5 w-3.5" /> Call
+            </a>
+            <a href="https://wa.me/919939587009" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+              <Phone className="h-3.5 w-3.5" /> WhatsApp
+            </a>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-green-900">WhatsApp Support</p>
-          <p className="text-xs text-green-700">Chat with us on WhatsApp for quick help. Available Mon–Sat, 9am–6pm.</p>
-        </div>
-        <a
-          href="https://wa.me/917827070470"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
-        >
-          Chat Now
-        </a>
+
+        {/* Mentor contact */}
+        {mentor && (
+          <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm">
+              {mentor.full_name.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-0.5">Your Mentor</p>
+              <p className="text-sm font-bold text-violet-900">{mentor.full_name}</p>
+              {mentor.phone && <p className="text-xs text-violet-600 font-mono">{mentor.phone}</p>}
+            </div>
+            {mentor.phone && (
+              <div className="flex gap-2 shrink-0">
+                <a href={`tel:${mentor.phone}`}
+                  className="flex items-center gap-1 bg-white border border-violet-300 text-violet-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-colors">
+                  <PhoneCall className="h-3.5 w-3.5" /> Call
+                </a>
+                <a href={`https://wa.me/91${mentor.phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+                  <Phone className="h-3.5 w-3.5" /> WhatsApp
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tab navigation */}

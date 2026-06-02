@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, GraduationCap, Wallet, BookOpen,
-  HelpCircle, User, X, Menu, LogOut, Gift,
+  HelpCircle, User, X, Menu, LogOut, Gift, Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -22,6 +22,7 @@ const NAV = [
   { label: 'My Admission',   href: '/student/admission', icon: GraduationCap },
   { label: 'Accounts',       href: '/student/accounts',  icon: Wallet },
   { label: 'Study Materials',href: '/student/materials', icon: BookOpen },
+  { label: 'Dispatch',       href: '/student/dispatch',  icon: Package },
   { label: 'Help & Support', href: '/student/support',   icon: HelpCircle },
   { label: 'Refer & Earn',   href: '/student/refer',     icon: Gift },
   { label: 'My Profile',     href: '/student/profile',   icon: User },

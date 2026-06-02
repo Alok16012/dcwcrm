@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import {
   HelpCircle, Plus, CheckCircle2, Clock, MessageSquare, Phone,
-  ChevronDown, ChevronUp, ExternalLink, BookOpen, AlertCircle,
+  ChevronDown, ChevronUp, ExternalLink, BookOpen, AlertCircle, PhoneCall,
 } from 'lucide-react'
 
 interface Ticket {
@@ -107,23 +107,33 @@ export default function AssociateSupportPage() {
         </Button>
       </div>
 
-      {/* Quick Contact */}
-      <div className="grid grid-cols-2 gap-3">
-        <a
-          href="https://wa.me/918800000000"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-emerald-100 transition-colors group"
-        >
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0">
-            <Phone className="w-5 h-5 text-white" />
+      {/* Co-ordinator Card */}
+      <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-sm">
+            <Phone className="w-6 h-6 text-white" />
           </div>
-          <div>
-            <p className="text-sm font-bold text-emerald-800">WhatsApp Support</p>
-            <p className="text-xs text-emerald-600 mt-0.5">Quick help via WhatsApp</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-0.5">WhatsApp Co-ordinator</p>
+            <p className="text-base font-extrabold text-emerald-900">DCW Support Team</p>
+            <p className="text-sm font-bold text-emerald-700 font-mono mt-0.5">+91 99395 87009</p>
+            <p className="text-xs text-emerald-600 mt-0.5">Available Mon–Sat · 9am–6pm</p>
           </div>
-          <ExternalLink className="w-4 h-4 text-emerald-400 ml-auto group-hover:text-emerald-600" />
-        </a>
+          <div className="flex flex-col gap-2 shrink-0">
+            <a href="tel:+919939587009"
+              className="flex items-center gap-1.5 bg-white border border-emerald-300 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-colors">
+              <PhoneCall className="h-3.5 w-3.5" /> Call
+            </a>
+            <a href="https://wa.me/919939587009" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+              <Phone className="h-3.5 w-3.5" /> WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 gap-3">
         <div
           onClick={() => setDialogOpen(true)}
           className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-blue-100 transition-colors group cursor-pointer"
@@ -133,7 +143,7 @@ export default function AssociateSupportPage() {
           </div>
           <div>
             <p className="text-sm font-bold text-blue-800">Raise a Ticket</p>
-            <p className="text-xs text-blue-600 mt-0.5">Response in 24–48 hours</p>
+            <p className="text-xs text-blue-600 mt-0.5">For issues needing admin attention — response in 24–48 hours</p>
           </div>
           <Plus className="w-4 h-4 text-blue-400 ml-auto group-hover:text-blue-600" />
         </div>

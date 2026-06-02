@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import {
   CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee,
   TrendingUp, Bell, Users, Wallet, ArrowRight, AlertCircle, Copy,
-  UserCheck, BarChart2, ChevronRight, Package,
+  UserCheck, BarChart2, ChevronRight, Package, Phone, PhoneCall,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -161,6 +161,28 @@ export default function AssociateClient() {
           color="emerald"
           href="/associate/students"
         />
+      </div>
+
+      {/* Co-ordinator Contact */}
+      <div className="bg-gradient-to-r from-emerald-900/80 to-green-900/80 border border-emerald-700/50 rounded-2xl px-5 py-4 flex items-center gap-4">
+        <div className="w-10 h-10 bg-emerald-400/20 rounded-xl flex items-center justify-center shrink-0">
+          <Phone className="w-5 h-5 text-emerald-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-0.5">WhatsApp Co-ordinator</p>
+          <p className="text-sm font-bold text-white">DCW Support Team</p>
+          <p className="text-xs font-mono text-emerald-300">+91 99395 87009</p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <a href="tel:+919939587009"
+            className="flex items-center gap-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+            <PhoneCall className="h-3.5 w-3.5" /> Call
+          </a>
+          <a href="https://wa.me/919939587009" target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+            <Phone className="h-3.5 w-3.5" /> WhatsApp
+          </a>
+        </div>
       </div>
 
       {/* Quick Actions */}

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,7 +50,16 @@ export default function AssociatesClient() {
   const supabase = createClient()
   const db = supabase as any
 
+  const [isAdmin, setIsAdmin] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'approvals' | 'recharges'>('all')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
+      if (!user) return
+      ;(supabase as any).from('profiles').select('role').eq('id', user.id).single()
+        .then(({ data }: any) => setIsAdmin(data?.role === 'admin'))
+    })
+  }, [supabase])
 
   // ── Associate Approvals state ──
   const [associates, setAssociates] = useState<Associate[]>([])
@@ -195,32 +204,36 @@ export default function AssociatesClient() {
         >
           All Associates
         </button>
-        <button
-          onClick={() => setActiveTab('approvals')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'approvals' ? 'border-amber-500 text-amber-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" /> Approvals
-          {pendingApprovalCount > 0 && (
-            <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {pendingApprovalCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('recharges')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'recharges' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Wallet className="w-4 h-4" /> Wallet Recharges
-          {pendingRechargeCount > 0 && (
-            <span className="bg-green-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {pendingRechargeCount}
-            </span>
-          )}
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'approvals' ? 'border-amber-500 text-amber-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" /> Approvals
+              {pendingApprovalCount > 0 && (
+                <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {pendingApprovalCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('recharges')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'recharges' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Wallet className="w-4 h-4" /> Wallet Recharges
+              {pendingRechargeCount > 0 && (
+                <span className="bg-green-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {pendingRechargeCount}
+                </span>
+              )}
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── ALL ASSOCIATES ── */}

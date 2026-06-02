@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Users, TrendingUp, CheckCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -35,7 +36,17 @@ export function LeadsClient() {
   const [courses, setCourses] = useState<Course[]>([])
   const [telecallers, setTelecallers] = useState<Profile[]>([])
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
-  const { filters } = useLeadStore()
+  const { filters, setFilters } = useLeadStore()
+  const searchParams = useSearchParams()
+
+  // Apply URL params as initial filters (from dashboard quick-cards)
+  useEffect(() => {
+    const status = searchParams.get('status')
+    const followup = searchParams.get('followup')
+    const today = new Date().toISOString().slice(0, 10)
+    if (status) setFilters({ status: [status as any] })
+    if (followup === 'today') setFilters({ followup_from: today, followup_to: today })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const supabase = createClient()
 
   useEffect(() => {

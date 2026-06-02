@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
   ClipboardList, Clock, AlertTriangle, Zap, CheckCircle2, ChevronRight,
-  Phone, MessageCircle,
+  Phone, MessageCircle, FileText, ArrowRight,
 } from 'lucide-react'
 
 interface FollowupLead {
@@ -168,34 +168,41 @@ export default function DashboardClient({
 
           {isLead && (
             <div className="grid grid-cols-3 gap-2.5">
-              <button onClick={() => setActiveTab('interested')} className="rounded-xl border border-yellow-100 bg-yellow-50 p-3.5 hover:bg-yellow-100 transition-all text-left">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Star className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-                  <span className="text-[10px] font-bold text-yellow-700 uppercase tracking-wide">Interested</span>
+              <Link href="/leads?status=interested" className="rounded-xl border border-yellow-100 bg-yellow-50 p-3.5 hover:bg-yellow-100 transition-all text-left group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Star className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                    <span className="text-[10px] font-bold text-yellow-700 uppercase tracking-wide">Interested</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-yellow-400 group-hover:text-yellow-600" />
                 </div>
                 <p className="text-xl font-bold text-yellow-800">{totalInterested}</p>
                 <p className="text-[11px] text-yellow-600 mt-0.5">{monthInterested} this month</p>
-              </button>
+              </Link>
 
-              <button onClick={() => setActiveTab('followups')} className="rounded-xl border border-orange-100 bg-orange-50 p-3.5 hover:bg-orange-100 transition-all text-left">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Bell className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Followups</span>
+              <Link href="/leads?followup=today" className="rounded-xl border border-orange-100 bg-orange-50 p-3.5 hover:bg-orange-100 transition-all text-left group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Followup</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-600" />
                 </div>
                 <p className="text-xl font-bold text-orange-800">{followupsToday.length}</p>
                 <p className="text-[11px] text-orange-600 mt-0.5">Due today</p>
-              </button>
+              </Link>
 
-              <button onClick={() => setActiveTab('incentives')} className="rounded-xl border border-green-100 bg-green-50 p-3.5 hover:bg-green-100 transition-all text-left">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <IndianRupee className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Incentives</span>
+              <Link href="/leads?status=document_received" className="rounded-xl border border-blue-100 bg-blue-50 p-3.5 hover:bg-blue-100 transition-all text-left group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">Doc Received</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-600" />
                 </div>
-                <p className="text-xl font-bold text-green-800">
-                  {incentiveHistory.length > 0 ? fmt(incentiveHistory[0]?.incentive ?? 0) : '—'}
-                </p>
-                <p className="text-[11px] text-green-600 mt-0.5">Last month</p>
-              </button>
+                <p className="text-xl font-bold text-blue-800">{docReceivedCount}</p>
+                <p className="text-[11px] text-blue-600 mt-0.5">Documents in</p>
+              </Link>
             </div>
           )}
         </div>

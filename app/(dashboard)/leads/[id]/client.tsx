@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ArrowLeft, Edit, ArrowRightLeft, ExternalLink, CalendarClock } from 'lucide-react'
@@ -28,6 +28,22 @@ interface LeadDetailClientProps {
 }
 
 export function LeadDetailClient({ lead: initialLead, activities: initialActivities, payments }: LeadDetailClientProps) {
+  const [associates, setAssociates] = useState<{ id: string; name: string; associate_code: string | null }[]>([])
+  const [assigningAssoc, setAssigningAssoc] = useState(false)
+  const supabase2 = createClient()
+
+  useEffect(() => {
+    ;(supabase2 as any).from('associates').select('id, name, associate_code').eq('status', 'approved').order('name')
+      .then(({ data }: any) => setAssociates(data ?? []))
+  }, [supabase2])
+
+  async function assignToAssociate(associateId: string) {
+    setAssigningAssoc(true)
+    const { error } = await (supabase2 as any).from('leads').update({ referred_by_associate: associateId || null }).eq('id', lead.id)
+    setAssigningAssoc(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(associateId ? 'Lead assigned to associate' : 'Associate removed')
+  }
   const router = useRouter()
   const [lead, setLead] = useState(initialLead)
   const [activities, setActivities] = useState(initialActivities)
@@ -229,6 +245,20 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                 <div><p className="text-gray-500">Sub-course</p><p className="font-medium">{lead.sub_course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Source</p><p className="font-medium">{LEAD_SOURCE_LABELS[lead.source]}</p></div>
                 <div><p className="text-gray-500">Assigned To</p><p className="font-medium">{lead.assigned_user?.full_name ?? 'Unassigned'}</p></div>
+                <div>
+                  <p className="text-gray-500 mb-1">Assign to Associate</p>
+                  <select
+                    defaultValue={(lead as any).referred_by_associate ?? ''}
+                    onChange={e => assignToAssociate(e.target.value)}
+                    disabled={assigningAssoc}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  >
+                    <option value="">— None —</option>
+                    {associates.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}{a.associate_code ? ` (${a.associate_code})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <p className="text-gray-500 flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Next Followup</p>
                   <div className="flex items-center gap-1 mt-0.5">

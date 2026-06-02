@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import {
   GraduationCap, BookOpen, ClipboardList, Star, CheckCircle2,
   Clock, XCircle, ChevronDown, ChevronUp, RefreshCw,
+  FileText, Award, Truck, LayoutList, ClipboardCheck,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -20,6 +21,11 @@ interface AssignedStudent {
   course: { name: string } | null
   sub_section: { name: string } | null
   session: { name: string } | null
+  verification_status: string
+  exam_status: string
+  result_status: string
+  admit_card_url: string | null
+  portal_active: boolean
 }
 
 interface TaskDraft {
@@ -51,6 +57,30 @@ const STATUS_CFG: Record<string, { label: string; color: string; icon: React.Ele
   rejected: { label: 'Rejected',         color: 'bg-red-100 text-red-800 border-red-200',        icon: XCircle },
 }
 
+const LIFECYCLE = [
+  { key: 'enrolled',         label: 'Enrolled',          icon: LayoutList },
+  { key: 'docs_submitted',   label: 'Docs Submitted',    icon: FileText },
+  { key: 'verified',         label: 'Verified',          icon: CheckCircle2 },
+  { key: 'enrolled_gen',     label: 'Enrollment ID',     icon: ClipboardCheck },
+  { key: 'exam_scheduled',   label: 'Exam Scheduled',    icon: BookOpen },
+  { key: 'hall_ticket',      label: 'Hall Ticket',       icon: Award },
+  { key: 'result_declared',  label: 'Result',            icon: Star },
+  { key: 'dispatched',       label: 'Dispatched',        icon: Truck },
+] as const
+
+function getLifecycleDone(s: AssignedStudent) {
+  return {
+    enrolled:       true,
+    docs_submitted: ['in_review', 'verified'].includes(s.verification_status),
+    verified:       s.verification_status === 'verified',
+    enrolled_gen:   !!s.enrollment_number || s.portal_active,
+    exam_scheduled: s.exam_status !== 'not_scheduled',
+    hall_ticket:    !!s.admit_card_url,
+    result_declared:['declared', 'passed', 'failed'].includes(s.result_status),
+    dispatched:     false,
+  }
+}
+
 const EMPTY_DRAFT: TaskDraft = {
   work_assignment: { description: '', rating: '' },
   practical:       { description: '', rating: '' },
@@ -78,6 +108,8 @@ export default function MentorshipClient() {
         .from('students')
         .select(`
           id, full_name, enrollment_number, phone,
+          verification_status, exam_status, result_status,
+          admit_card_url, portal_active,
           course:courses(name),
           sub_section:department_sub_sections(name),
           session:sessions(name)
@@ -248,6 +280,40 @@ export default function MentorshipClient() {
                 {/* Expanded work panel */}
                 {isExpanded && (
                   <div className="border-t border-gray-100 px-5 py-5 bg-gray-50/50 space-y-5">
+                    {/* Student Lifecycle */}
+                    {(() => {
+                      const done = getLifecycleDone(s)
+                      const keys = LIFECYCLE.map(l => l.key)
+                      const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
+                      const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
+                      return (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                            <GraduationCap className="w-3.5 h-3.5" /> Student Lifecycle
+                            <span className="ml-auto text-gray-400 font-normal normal-case">{lastIdx + 1}/{LIFECYCLE.length} stages</span>
+                          </p>
+                          <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5 mb-3">
+                            {LIFECYCLE.map((step, i) => {
+                              const isDone = (done as any)[step.key]
+                              const isCurrent = i === lastIdx + 1
+                              const Icon = step.icon
+                              return (
+                                <div key={step.key} className="flex flex-col items-center gap-1 text-center">
+                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-500' : isCurrent ? 'bg-blue-100 border-2 border-blue-400 border-dashed' : 'bg-gray-100'}`}>
+                                    <Icon className={`w-3.5 h-3.5 ${isDone ? 'text-white' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`} />
+                                  </div>
+                                  <p className={`text-[9px] font-semibold leading-tight ${isDone ? 'text-emerald-700' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`}>{step.label}</p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })()}
+
                     {/* Task forms */}
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">

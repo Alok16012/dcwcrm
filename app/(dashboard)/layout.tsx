@@ -42,7 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Topbar user={userProfile} />
         <main className="flex-1 overflow-y-auto flex flex-col">
-          <div className="flex-1 p-4 md:p-6">
+          <div className="flex-1 p-4 md:p-6 overflow-x-hidden">
             {children}
           </div>
           <footer className="w-full py-4 text-center text-sm text-gray-500 border-t border-gray-200 mt-auto">

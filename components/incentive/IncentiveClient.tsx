@@ -133,18 +133,18 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border p-4 bg-purple-50">
-          <p className="text-sm text-purple-700 font-medium">Total Incentive</p>
-          <p className="text-2xl font-bold text-purple-900">{fmt(totalIncentive)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-lg border p-3 sm:p-4 bg-purple-50">
+          <p className="text-xs sm:text-sm text-purple-700 font-medium">Total Incentive</p>
+          <p className="text-lg sm:text-2xl font-bold text-purple-900 break-words">{fmt(totalIncentive)}</p>
         </div>
-        <div className="rounded-lg border p-4 bg-green-50">
-          <p className="text-sm text-green-700 font-medium">Paid</p>
-          <p className="text-2xl font-bold text-green-900">{fmt(paidIncentive)}</p>
+        <div className="rounded-lg border p-3 sm:p-4 bg-green-50">
+          <p className="text-xs sm:text-sm text-green-700 font-medium">Paid</p>
+          <p className="text-lg sm:text-2xl font-bold text-green-900 break-words">{fmt(paidIncentive)}</p>
         </div>
-        <div className="rounded-lg border p-4 bg-amber-50">
-          <p className="text-sm text-amber-700 font-medium">Pending / Not Paid</p>
-          <p className="text-2xl font-bold text-amber-900">{fmt(unpaidIncentive)}</p>
+        <div className="rounded-lg border p-3 sm:p-4 bg-amber-50">
+          <p className="text-xs sm:text-sm text-amber-700 font-medium">Pending / Not Paid</p>
+          <p className="text-lg sm:text-2xl font-bold text-amber-900 break-words">{fmt(unpaidIncentive)}</p>
         </div>
       </div>
 
@@ -159,23 +159,24 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
             {viewEmployeeId ? 'No payroll records found.' : 'No employee record linked to your account. Contact admin.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left px-4 py-2 text-gray-600 font-medium">Month</th>
-                <th className="text-right px-4 py-2 text-gray-600 font-medium">Incentive</th>
-                <th className="text-right px-4 py-2 text-gray-600 font-medium">Net Pay</th>
-                <th className="text-right px-4 py-2 text-gray-600 font-medium">Payment Date</th>
-                <th className="text-right px-4 py-2 text-gray-600 font-medium">Status</th>
+                <th className="text-left px-4 py-2 text-gray-600 font-medium whitespace-nowrap">Month</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium whitespace-nowrap">Incentive</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium whitespace-nowrap">Net Pay</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium whitespace-nowrap">Payment Date</th>
+                <th className="text-right px-4 py-2 text-gray-600 font-medium whitespace-nowrap">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {payrollRows.map((row, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{MONTH_NAMES[row.month - 1]} {row.year}</td>
-                  <td className="px-4 py-3 text-right text-purple-700 font-semibold">{fmt(row.incentive ?? 0)}</td>
-                  <td className="px-4 py-3 text-right">{fmt(row.net ?? 0)}</td>
-                  <td className="px-4 py-3 text-right text-gray-500">
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{MONTH_NAMES[row.month - 1]} {row.year}</td>
+                  <td className="px-4 py-3 text-right text-purple-700 font-semibold whitespace-nowrap">{fmt(row.incentive ?? 0)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(row.net ?? 0)}</td>
+                  <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
                     {row.payment_date ? new Date(row.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -190,6 +191,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -236,28 +238,30 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
                       <span className="font-bold text-purple-700">{fmt(total)}</span>
                     </div>
                     {/* Students in this month */}
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[440px] text-sm">
                       <thead className="bg-gray-50 border-b">
                         <tr>
-                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs">Student</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs">Course</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs">Date</th>
-                          <th className="px-4 py-2 text-right font-medium text-gray-500 text-xs">Incentive</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">Student</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">Course</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">Date</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-500 text-xs whitespace-nowrap">Incentive</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {students.map((s) => (
                           <tr key={s.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2.5 font-medium">{s.full_name}</td>
-                            <td className="px-4 py-2.5 text-gray-600">{s.course_name}</td>
-                            <td className="px-4 py-2.5 text-gray-500 text-xs">
+                            <td className="px-4 py-2.5 font-medium whitespace-nowrap">{s.full_name}</td>
+                            <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{s.course_name}</td>
+                            <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
                               {s.enrollment_date ? format(new Date(s.enrollment_date), 'dd MMM') : '—'}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-semibold text-green-600">{fmt(s.incentive_amount)}</td>
+                            <td className="px-4 py-2.5 text-right font-semibold text-green-600 whitespace-nowrap">{fmt(s.incentive_amount)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 ))}
               </div>

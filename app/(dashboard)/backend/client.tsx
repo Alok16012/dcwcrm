@@ -107,6 +107,7 @@ export function BackendListClient() {
   const [counselors, setCounselors] = useState<FilterOption[]>([])
   const [selectedCounselor, setSelectedCounselor] = useState('')
   const [assigningMentor, setAssigningMentor] = useState(false)
+  const [tableKey, setTableKey] = useState(0)
   const supabase = createClient()
 
   function scrollTabs(dir: 'left' | 'right') {
@@ -124,7 +125,7 @@ export function BackendListClient() {
         supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).order('full_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
-        supabase.from('profiles').select('id, full_name').eq('role', 'counselor').order('full_name'),
+        supabase.from('profiles').select('id, full_name').in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
       ])
       setCourses((coursesRes.data ?? []) as FilterOption[])
       setSessions((sessionsRes.data ?? []) as FilterOption[])
@@ -288,11 +289,12 @@ export function BackendListClient() {
       if (error) throw error
       toast.success(`Mentor assigned to ${ids.length} student${ids.length !== 1 ? 's' : ''}`)
       setShowMentorAssign(false)
-      setSelectedStudents([])
       setSelectedCounselor('')
+      setSelectedStudents([])
+      setTableKey(k => k + 1) // remount DataTable so checkboxes reset
       fetchStudents()
-    } catch {
-      toast.error('Failed to assign mentor')
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Failed to assign mentor')
     } finally {
       setAssigningMentor(false)
     }
@@ -785,7 +787,7 @@ export function BackendListClient() {
             <Award className="w-3.5 h-3.5" /> Assign Mentor
           </Button>
           <button
-            onClick={() => setSelectedStudents([])}
+            onClick={() => { setSelectedStudents([]); setTableKey(k => k + 1) }}
             className="text-gray-400 hover:text-white text-xs underline"
           >
             Clear
@@ -794,6 +796,7 @@ export function BackendListClient() {
       )}
 
       <DataTable
+        key={tableKey}
         data={students}
         columns={columns}
         isLoading={loading}

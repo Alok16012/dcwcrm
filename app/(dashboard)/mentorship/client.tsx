@@ -361,9 +361,9 @@ export default function MentorshipClient() {
           <p className="font-semibold text-gray-500">No students found</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <table className="text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   {['S.No', 'Student', 'Enrollment No', "Father's Name", 'Phone', 'City', 'Course', 'Board', 'Session', 'Fee', 'Paid', 'Progress', 'Records', 'Actions'].map(h => (

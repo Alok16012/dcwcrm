@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'DCW CRM',
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
   },
 }
 

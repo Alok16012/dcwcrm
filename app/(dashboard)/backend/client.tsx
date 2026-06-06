@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useTransition, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock, XCircle, GraduationCap } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock, XCircle, GraduationCap, Award } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -102,6 +102,11 @@ export function BackendListClient() {
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const tabScrollRef = useRef<HTMLDivElement>(null)
+  const [selectedStudents, setSelectedStudents] = useState<Student[]>([])
+  const [showMentorAssign, setShowMentorAssign] = useState(false)
+  const [counselors, setCounselors] = useState<FilterOption[]>([])
+  const [selectedCounselor, setSelectedCounselor] = useState('')
+  const [assigningMentor, setAssigningMentor] = useState(false)
   const supabase = createClient()
 
   function scrollTabs(dir: 'left' | 'right') {
@@ -113,17 +118,19 @@ export function BackendListClient() {
   // Load filter options once
   useEffect(() => {
     async function loadOptions() {
-      const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes] = await Promise.all([
+      const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes, counselorRes] = await Promise.all([
         supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
         supabase.from('sessions').select('id, name').order('name'),
         supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).order('full_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
+        supabase.from('profiles').select('id, full_name').eq('role', 'counselor').order('full_name'),
       ])
       setCourses((coursesRes.data ?? []) as FilterOption[])
       setSessions((sessionsRes.data ?? []) as FilterOption[])
       setCounsellors(((counsellorsRes.data ?? []) as { id: string; full_name: string }[]).map(p => ({ id: p.id, name: p.full_name })))
       setDepartments((deptRes.data ?? []) as FilterOption[])
+      setCounselors(((counselorRes.data ?? []) as { id: string; full_name: string }[]).map(p => ({ id: p.id, name: p.full_name })))
       const allB = (boardRes.data ?? []) as BoardOption[]
       setAllBoards(allB)
       setBoards(allB)
@@ -267,6 +274,28 @@ export function BackendListClient() {
       console.error(err)
     }
     setDeleteStudent(null)
+  }
+
+  async function bulkAssignMentor() {
+    if (!selectedCounselor || selectedStudents.length === 0) return
+    setAssigningMentor(true)
+    try {
+      const ids = selectedStudents.map(s => s.id)
+      const { error } = await supabase
+        .from('students')
+        .update({ mentor_telecaller_id: selectedCounselor } as never)
+        .in('id', ids)
+      if (error) throw error
+      toast.success(`Mentor assigned to ${ids.length} student${ids.length !== 1 ? 's' : ''}`)
+      setShowMentorAssign(false)
+      setSelectedStudents([])
+      setSelectedCounselor('')
+      fetchStudents()
+    } catch {
+      toast.error('Failed to assign mentor')
+    } finally {
+      setAssigningMentor(false)
+    }
   }
 
   const handleExport = async () => {
@@ -744,11 +773,32 @@ export function BackendListClient() {
         </Select>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedStudents.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-gray-700">
+          <span className="text-sm font-semibold">{selectedStudents.length} selected</span>
+          <Button
+            size="sm"
+            onClick={() => { setSelectedCounselor(''); setShowMentorAssign(true) }}
+            className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5 h-8"
+          >
+            <Award className="w-3.5 h-3.5" /> Assign Mentor
+          </Button>
+          <button
+            onClick={() => setSelectedStudents([])}
+            className="text-gray-400 hover:text-white text-xs underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       <DataTable
         data={students}
         columns={columns}
         isLoading={loading}
         onRowClick={(s) => router.push(`/backend/${s.id}`)}
+        onSelectionChange={(rows) => setSelectedStudents(rows)}
       />
 
       <Dialog open={!!editStudent} onOpenChange={(open) => !open && setEditStudent(null)}>
@@ -792,6 +842,48 @@ export function BackendListClient() {
         onConfirm={() => deleteStudent && handleDeleteStudent(deleteStudent.id)}
         destructive
       />
+
+      {/* Bulk Mentor Assign Dialog */}
+      <Dialog open={showMentorAssign} onOpenChange={setShowMentorAssign}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-violet-600" /> Assign Mentor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-gray-600">
+              Assign a counselor as mentor to <span className="font-bold text-gray-900">{selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600">Select Counselor / Mentor</label>
+              <Select value={selectedCounselor} onValueChange={setSelectedCounselor}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose counselor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {counselors.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowMentorAssign(false)}>Cancel</Button>
+              <Button
+                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={bulkAssignMentor}
+                disabled={!selectedCounselor || assigningMentor}
+              >
+                {assigningMentor
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Assigning...</>
+                  : 'Assign'
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       </> /* end students tab */}
 

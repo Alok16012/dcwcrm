@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect } from 'react'
 
 interface DataTableProps<T> {
   data: T[]
@@ -42,6 +42,12 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
     getCoreRowModel: getCoreRowModel(),
     enableRowSelection: true,
   })
+
+  useEffect(() => {
+    if (onSelectionChange) {
+      onSelectionChange(table.getSelectedRowModel().rows.map(r => r.original))
+    }
+  }, [rowSelection]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading) {
     return (

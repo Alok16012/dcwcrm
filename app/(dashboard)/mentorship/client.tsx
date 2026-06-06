@@ -9,8 +9,8 @@ import {
   GraduationCap, BookOpen, ClipboardList, Star, CheckCircle2,
   Clock, XCircle, ChevronDown, ChevronUp, RefreshCw,
   FileText, Award, Truck, LayoutList, ClipboardCheck,
-  Upload, X, IndianRupee, BookMarked, Phone, MapPin,
-  Users, TrendingUp,
+  Upload, X, IndianRupee, BookMarked, Phone, Users, TrendingUp, Search,
+  Eye,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
@@ -62,9 +62,9 @@ const RECORD_TYPES = [
 ] as const
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string; border: string; icon: React.ElementType }> = {
-  pending:  { label: 'Pending',  bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200', icon: Clock },
-  approved: { label: 'Approved', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2 },
-  rejected: { label: 'Rejected', bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-200',    icon: XCircle },
+  pending:  { label: 'Pending',  bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',  icon: Clock },
+  approved: { label: 'Approved', bg: 'bg-emerald-50',  text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2 },
+  rejected: { label: 'Rejected', bg: 'bg-red-50',      text: 'text-red-600',     border: 'border-red-200',    icon: XCircle },
 }
 
 const TYPE_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
@@ -98,23 +98,20 @@ function getLifecycleDone(s: AssignedStudent) {
 }
 
 function fmtEnroll(n: string | null | undefined) {
-  if (!n) return null
+  if (!n) return '—'
   if (n.startsWith('ENR-')) return 'DCW-' + n.slice(4).replace(/[^0-9]/g, '')
   return n
 }
 
-const BOARD_COLORS: Record<string, { from: string; to: string; badge: string; text: string }> = {
-  NIOS:  { from: 'from-blue-500',   to: 'to-blue-700',   badge: 'bg-blue-100 text-blue-800 border-blue-200',    text: 'text-blue-600' },
-  BOSSE: { from: 'from-violet-500', to: 'to-violet-700', badge: 'bg-violet-100 text-violet-800 border-violet-200', text: 'text-violet-600' },
-  BBOSE: { from: 'from-violet-500', to: 'to-violet-700', badge: 'bg-violet-100 text-violet-800 border-violet-200', text: 'text-violet-600' },
+const BOARD_BADGE: Record<string, string> = {
+  NIOS:  'bg-blue-100 text-blue-800 border-blue-200',
+  BOSSE: 'bg-violet-100 text-violet-800 border-violet-200',
+  BBOSE: 'bg-violet-100 text-violet-800 border-violet-200',
 }
-
-function getBoardColors(name: string) {
-  const upper = name.toUpperCase()
-  for (const key of Object.keys(BOARD_COLORS)) {
-    if (upper.includes(key)) return BOARD_COLORS[key]
-  }
-  return { from: 'from-gray-500', to: 'to-gray-700', badge: 'bg-gray-100 text-gray-700 border-gray-200', text: 'text-gray-600' }
+function boardBadge(name: string) {
+  const u = name.toUpperCase()
+  for (const k of Object.keys(BOARD_BADGE)) if (u.includes(k)) return BOARD_BADGE[k]
+  return 'bg-gray-100 text-gray-700 border-gray-200'
 }
 
 const AVATAR_PALETTES = [
@@ -135,9 +132,12 @@ export default function MentorshipClient() {
   const [students, setStudents] = useState<AssignedStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [boardFilter, setBoardFilter] = useState('all')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
   const [history, setHistory] = useState<Record<string, MentorRecord[]>>({})
-  const [histLoading, setHistLoading] = useState<string | null>(null)
+  const [detailStudent, setDetailStudent] = useState<AssignedStudent | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
   const [showAdd, setShowAdd] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -158,7 +158,7 @@ export default function MentorshipClient() {
       const { data, error } = await (supabase as any)
         .from('students')
         .select(`
-          id, full_name, enrollment_number, phone, email, city,
+          id, full_name, enrollment_number, phone, email, father_name, city,
           verification_status, exam_status, result_status,
           admit_card_url, portal_active, total_fee, amount_paid,
           course:courses(name),
@@ -180,8 +180,23 @@ export default function MentorshipClient() {
 
   useEffect(() => { load() }, [load])
 
+  async function openDetail(s: AssignedStudent) {
+    setDetailStudent(s)
+    if (history[s.id]) return
+    setDetailLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await (supabase as any)
+      .from('student_mentorships')
+      .select('id, task_type, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, salary_percentage, created_at')
+      .eq('student_id', s.id)
+      .eq('telecaller_id', user.id)
+      .order('created_at', { ascending: false })
+    setHistory(prev => ({ ...prev, [s.id]: (data ?? []) as MentorRecord[] }))
+    setDetailLoading(false)
+  }
+
   async function loadHistory(studentId: string) {
-    setHistLoading(studentId)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data } = await (supabase as any)
@@ -191,16 +206,6 @@ export default function MentorshipClient() {
       .eq('telecaller_id', user.id)
       .order('created_at', { ascending: false })
     setHistory(prev => ({ ...prev, [studentId]: (data ?? []) as MentorRecord[] }))
-    setHistLoading(null)
-  }
-
-  function toggleExpand(id: string) {
-    if (expandedId === id) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(id)
-      loadHistory(id)
-    }
   }
 
   function openAddRecord(studentId: string) {
@@ -244,6 +249,9 @@ export default function MentorshipClient() {
       toast.success('Record submitted for approval')
       setShowAdd(null)
       loadHistory(showAdd)
+      if (detailStudent?.id === showAdd) {
+        loadHistory(showAdd)
+      }
     } catch (err: any) {
       toast.error(err?.message ?? 'Failed to submit record')
     } finally {
@@ -252,10 +260,15 @@ export default function MentorshipClient() {
   }
 
   const boards = ['all', ...Array.from(new Set(students.map(s => s.sub_section?.name).filter(Boolean) as string[]))]
-  const filteredStudents = boardFilter === 'all' ? students : students.filter(s => s.sub_section?.name === boardFilter)
+
+  const filtered = students
+    .filter(s => boardFilter === 'all' || s.sub_section?.name === boardFilter)
+    .filter(s => !search || s.full_name.toLowerCase().includes(search.toLowerCase()) || s.phone.includes(search) || fmtEnroll(s.enrollment_number).toLowerCase().includes(search.toLowerCase()))
 
   const totalPending = Object.values(history).flat().filter(r => r.status === 'pending').length
   const totalRecords = Object.values(history).flat().length
+
+  const detailRecords = detailStudent ? (history[detailStudent.id] ?? []) : []
 
   if (loading) {
     return (
@@ -279,9 +292,7 @@ export default function MentorshipClient() {
               </div>
               <h1 className="text-xl font-bold tracking-tight">Mentorship</h1>
             </div>
-            <p className="text-violet-200 text-sm mt-1">
-              Manage your assigned students and track their progress
-            </p>
+            <p className="text-violet-200 text-sm mt-1">Manage your assigned students and track their progress</p>
           </div>
           <button
             onClick={load}
@@ -290,15 +301,13 @@ export default function MentorshipClient() {
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
         </div>
-
-        {/* Stats row */}
         <div className="relative grid grid-cols-3 gap-3 mt-5">
           {[
-            { icon: Users,     label: 'Assigned',      value: students.length,    bg: 'bg-white/15' },
-            { icon: TrendingUp, label: 'Total Records', value: totalRecords,       bg: 'bg-white/15' },
-            { icon: Clock,     label: 'Pending Review', value: totalPending,       bg: 'bg-amber-400/30' },
+            { icon: Users,      label: 'Assigned',       value: students.length },
+            { icon: TrendingUp, label: 'Total Records',  value: totalRecords },
+            { icon: Clock,      label: 'Pending Review', value: totalPending },
           ].map(stat => (
-            <div key={stat.label} className={`${stat.bg} rounded-xl px-3 py-3 backdrop-blur-sm`}>
+            <div key={stat.label} className="bg-white/15 rounded-xl px-3 py-3 backdrop-blur-sm">
               <stat.icon className="w-4 h-4 text-white/70 mb-1" />
               <p className="text-2xl font-bold text-white">{stat.value}</p>
               <p className="text-[11px] text-white/70 font-medium">{stat.label}</p>
@@ -307,299 +316,332 @@ export default function MentorshipClient() {
         </div>
       </div>
 
-      {/* Board filter tabs */}
-      {boards.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Board tabs */}
+        <div className="flex gap-1.5 flex-wrap">
           {boards.map(b => {
-            const clrs = b !== 'all' ? getBoardColors(b) : null
-            const isActive = boardFilter === b
             const count = b === 'all' ? students.length : students.filter(s => s.sub_section?.name === b).length
             return (
               <button
                 key={b}
                 onClick={() => setBoardFilter(b)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${
-                  isActive
-                    ? b === 'all'
-                      ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                      : `bg-gradient-to-r ${clrs?.from} ${clrs?.to} text-white border-transparent shadow-md`
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  boardFilter === b
+                    ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
                 }`}
               >
-                {b === 'all' ? 'All Students' : b}
-                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
-                  isActive ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
+                {b === 'all' ? 'All' : b}
+                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${boardFilter === b ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
                   {count}
                 </span>
               </button>
             )
           })}
         </div>
-      )}
 
-      {/* Student list */}
-      {filteredStudents.length === 0 ? (
-        <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-          <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <GraduationCap className="w-8 h-8 text-violet-400" />
-          </div>
-          <p className="font-bold text-gray-600 text-lg">No students assigned</p>
-          <p className="text-sm text-gray-400 mt-1">Admin will assign students to you for mentorship</p>
+        {/* Search */}
+        <div className="relative ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search name, phone..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 pr-3 h-8 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 w-52"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-gray-200">
+          <GraduationCap className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-semibold text-gray-500">No students found</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredStudents.map((s, idx) => {
-            const isExpanded = expandedId === s.id
-            const records = history[s.id] ?? []
-            const pendingCount = records.filter(r => r.status === 'pending').length
-            const done = getLifecycleDone(s)
-            const keys = LIFECYCLE.map(l => l.key)
-            const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
-            const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
-            const boardName = s.sub_section?.name ?? ''
-            const boardClrs = boardName ? getBoardColors(boardName) : null
-            const palette = avatarPalette(s.full_name)
-            const initials = s.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-            const enrolled = fmtEnroll(s.enrollment_number)
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {['S.No', 'Student', 'Enrollment No', "Father's Name", 'Phone', 'City', 'Course', 'Board', 'Session', 'Fee', 'Paid', 'Progress', 'Records', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((s, idx) => {
+                  const done = getLifecycleDone(s)
+                  const keys = LIFECYCLE.map(l => l.key)
+                  const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
+                  const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
+                  const palette = avatarPalette(s.full_name)
+                  const initials = s.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+                  const recs = history[s.id] ?? []
+                  const pending = recs.filter(r => r.status === 'pending').length
+                  const approved = recs.filter(r => r.status === 'approved').length
+                  const boardName = s.sub_section?.name ?? ''
 
-            return (
-              <div
-                key={s.id}
-                className={`bg-white rounded-2xl border overflow-hidden shadow-sm transition-all duration-200 ${
-                  isExpanded ? 'border-violet-200 shadow-violet-100 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                }`}
-              >
-                {/* Collapsed row */}
-                <button
-                  onClick={() => toggleExpand(s.id)}
-                  className="w-full flex items-center gap-4 px-5 py-4 text-left"
-                >
-                  {/* Serial */}
-                  <span className="text-xs font-bold text-gray-300 w-5 flex-shrink-0 tabular-nums">{idx + 1}</span>
+                  return (
+                    <tr key={s.id} className="hover:bg-violet-50/30 transition-colors group">
+                      {/* S.No */}
+                      <td className="px-3 py-3 text-gray-400 text-xs tabular-nums font-medium">{idx + 1}</td>
 
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${palette} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
-                    {initials}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-gray-900 text-sm">{s.full_name}</span>
-                      {enrolled && (
-                        <span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg">
-                          {enrolled}
-                        </span>
-                      )}
-                      {pendingCount > 0 && (
-                        <span className="text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
-                          {pendingCount} pending
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {s.course && <span className="text-xs text-gray-500">{s.course.name}</span>}
-                      {boardName && (
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${boardClrs?.badge}`}>
-                          {boardName}
-                        </span>
-                      )}
-                      {s.session && <span className="text-xs text-gray-400">· {s.session.name}</span>}
-                      {s.phone && (
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Phone className="w-3 h-3" />{s.phone}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Progress pill */}
-                  <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-xs font-bold text-gray-400">{pct}%</span>
-                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-gray-400">{records.length} records</span>
-                  </div>
-
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isExpanded ? 'bg-violet-100' : 'bg-gray-100'
-                  }`}>
-                    {isExpanded
-                      ? <ChevronUp className="w-4 h-4 text-violet-600" />
-                      : <ChevronDown className="w-4 h-4 text-gray-500" />
-                    }
-                  </div>
-                </button>
-
-                {/* Expanded panel */}
-                {isExpanded && (
-                  <div className="border-t border-violet-100 bg-gradient-to-b from-violet-50/40 to-white px-5 py-5 space-y-6">
-
-                    {/* Info grid */}
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Student Information</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {[
-                          { label: 'Phone',       value: s.phone,                icon: Phone },
-                          { label: 'City',        value: s.city || '—',          icon: MapPin },
-                          { label: 'Course',      value: s.course?.name || '—',  icon: BookOpen },
-                          { label: 'Board',       value: s.sub_section?.name || '—', icon: Award },
-                          { label: 'Sub Course',  value: s.sub_course?.name || '—',  icon: GraduationCap },
-                          { label: 'Department',  value: s.department?.name || '—',  icon: ClipboardList },
-                          { label: 'Total Fee',   value: s.total_fee ? `₹${Number(s.total_fee).toLocaleString('en-IN')}` : '—', icon: IndianRupee },
-                          { label: 'Amount Paid', value: s.amount_paid ? `₹${Number(s.amount_paid).toLocaleString('en-IN')}` : '—', icon: CheckCircle2 },
-                        ].map(({ label, value, icon: Icon }) => (
-                          <div key={label} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 shadow-sm">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <Icon className="w-3 h-3 text-gray-400" />
-                              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
-                            </div>
-                            <p className="text-xs font-bold text-gray-800 truncate">{value}</p>
+                      {/* Student */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2.5 min-w-[140px]">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${palette} flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+                            {initials}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm leading-tight whitespace-nowrap">{s.full_name}</p>
+                          </div>
+                        </div>
+                      </td>
 
-                    {/* Lifecycle */}
-                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-                          <TrendingUp className="w-3.5 h-3.5" /> Student Progress
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-24 bg-gray-100 rounded-full overflow-hidden">
+                      {/* Enrollment */}
+                      <td className="px-3 py-3">
+                        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">
+                          {fmtEnroll(s.enrollment_number)}
+                        </span>
+                      </td>
+
+                      {/* Father */}
+                      <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.father_name || '—'}</td>
+
+                      {/* Phone */}
+                      <td className="px-3 py-3">
+                        <span className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                          <Phone className="w-3 h-3 text-gray-400" />{s.phone}
+                        </span>
+                      </td>
+
+                      {/* City */}
+                      <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.city || '—'}</td>
+
+                      {/* Course */}
+                      <td className="px-3 py-3">
+                        <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">
+                          {s.course?.name ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Board */}
+                      <td className="px-3 py-3">
+                        {boardName ? (
+                          <span className={`text-xs px-2 py-0.5 rounded-lg font-bold border whitespace-nowrap ${boardBadge(boardName)}`}>
+                            {boardName}
+                          </span>
+                        ) : <span className="text-gray-400 text-xs">—</span>}
+                      </td>
+
+                      {/* Session */}
+                      <td className="px-3 py-3">
+                        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">
+                          {s.session?.name ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Fee */}
+                      <td className="px-3 py-3 text-xs font-semibold text-gray-700 whitespace-nowrap tabular-nums">
+                        {s.total_fee ? `₹${Number(s.total_fee).toLocaleString('en-IN')}` : '—'}
+                      </td>
+
+                      {/* Paid */}
+                      <td className="px-3 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap tabular-nums">
+                        {s.amount_paid ? `₹${Number(s.amount_paid).toLocaleString('en-IN')}` : '—'}
+                      </td>
+
+                      {/* Progress */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-1 min-w-[80px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-500">{pct}%</span>
+                            <span className="text-[10px] text-gray-400">{lastIdx + 1}/{LIFECYCLE.length}</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full"
+                              className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="text-xs font-bold text-emerald-600">{pct}%</span>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-                        {LIFECYCLE.map((step, i) => {
-                          const isDone = (done as any)[step.key]
-                          const isCurrent = i === lastIdx + 1
-                          const Icon = step.icon
-                          return (
-                            <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${
-                                isDone    ? 'bg-emerald-500 shadow-emerald-100' :
-                                isCurrent ? 'bg-blue-50 border-2 border-blue-400 border-dashed' :
-                                            'bg-gray-50 border border-gray-200'
-                              }`}>
-                                <Icon className={`w-4 h-4 ${isDone ? 'text-white' : isCurrent ? 'text-blue-500' : 'text-gray-300'}`} />
-                              </div>
-                              <p className={`text-[9px] font-bold leading-tight ${
-                                isDone ? 'text-emerald-600' : isCurrent ? 'text-blue-500' : 'text-gray-300'
-                              }`}>
-                                {step.label}
-                              </p>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                      </td>
 
-                    {/* Action bar */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {records.length > 0 && (
-                          <>
-                            <span className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg font-medium">
-                              <ClipboardList className="w-3.5 h-3.5" />
-                              {records.length} record{records.length !== 1 ? 's' : ''}
+                      {/* Records */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1 flex-wrap min-w-[70px]">
+                          {approved > 0 && (
+                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                              ✓{approved}
                             </span>
-                            {pendingCount > 0 && (
-                              <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg font-medium">
-                                <Clock className="w-3.5 h-3.5" />
-                                {pendingCount} pending
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => openAddRecord(s.id)}
-                        className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white gap-2 h-9 px-4 shadow-md shadow-violet-200"
-                      >
-                        <BookMarked className="w-3.5 h-3.5" />
-                        Add Record
-                      </Button>
-                    </div>
+                          )}
+                          {pending > 0 && (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                              ⏳{pending}
+                            </span>
+                          )}
+                          {recs.length === 0 && <span className="text-xs text-gray-400">—</span>}
+                        </div>
+                      </td>
 
-                    {/* History */}
-                    {histLoading === s.id ? (
-                      <div className="flex items-center justify-center py-6">
-                        <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    ) : records.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
-                          <FileText className="w-3.5 h-3.5" /> Submission History
-                        </p>
-                        {records.map(r => {
-                          const statusCfg = STATUS_CFG[r.status] ?? STATUS_CFG.pending
-                          const StatusIcon = statusCfg.icon
-                          const typeCfg = TYPE_BADGE[r.task_type] ?? TYPE_BADGE.assignment
-                          const typeLabel = RECORD_TYPES.find(t => t.value === r.task_type)?.label ?? r.task_type
-                          return (
-                            <div key={r.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm flex items-start gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <span className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg ${typeCfg.bg} ${typeCfg.text}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${typeCfg.dot}`} />
-                                    {typeLabel}
-                                  </span>
-                                  {r.subject_name && (
-                                    <span className="text-sm font-semibold text-gray-800">{r.subject_name}</span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
-                                  {r.total_amount != null && (
-                                    <span className="flex items-center gap-0.5 font-medium">
-                                      <IndianRupee className="w-3 h-3" /> Total: ₹{r.total_amount}
-                                    </span>
-                                  )}
-                                  {r.student_paid_amount != null && (
-                                    <span className="text-emerald-600 font-semibold">Paid: ₹{r.student_paid_amount}</span>
-                                  )}
-                                  {r.status === 'approved' && r.salary_percentage != null && (
-                                    <span className="text-violet-600 font-semibold">+{r.salary_percentage}% bonus</span>
-                                  )}
-                                  <span className="text-gray-400">{format(new Date(r.created_at), 'dd MMM yyyy')}</span>
-                                </div>
-                                {r.admin_remarks && (
-                                  <p className="text-xs text-gray-400 italic mt-1">"{r.admin_remarks}"</p>
-                                )}
-                                {r.screenshot_url && (
-                                  <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer"
-                                    className="text-xs text-blue-500 hover:text-blue-700 mt-1 flex items-center gap-1 font-medium">
-                                    <FileText className="w-3 h-3" /> View Screenshot
-                                  </a>
-                                )}
-                              </div>
-                              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border flex-shrink-0 ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
-                                <StatusIcon className="w-3 h-3" /> {statusCfg.label}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                      {/* Actions */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            onClick={() => openAddRecord(s.id)}
+                            className="h-7 px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white gap-1"
+                          >
+                            <BookMarked className="w-3 h-3" /> Add
+                          </Button>
+                          <button
+                            onClick={() => openDetail(s)}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-gray-500" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 font-medium">
+            {filtered.length} student{filtered.length !== 1 ? 's' : ''} {boardFilter !== 'all' ? `· ${boardFilter}` : ''}
+          </div>
         </div>
       )}
+
+      {/* Detail Modal — lifecycle + history */}
+      <Dialog open={!!detailStudent} onOpenChange={open => !open && setDetailStudent(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {detailStudent && (() => {
+            const done = getLifecycleDone(detailStudent)
+            const keys = LIFECYCLE.map(l => l.key)
+            const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
+            const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
+            const palette = avatarPalette(detailStudent.full_name)
+            const initials = detailStudent.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+            const recs = detailRecords
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${palette} flex items-center justify-center text-white font-bold flex-shrink-0`}>
+                        {initials}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{detailStudent.full_name}</p>
+                        <p className="text-xs text-gray-400 font-normal">{fmtEnroll(detailStudent.enrollment_number)} · {detailStudent.phone}</p>
+                      </div>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-5 mt-2">
+                  {/* Lifecycle */}
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Student Progress</p>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-24 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-600">{pct}%</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                      {LIFECYCLE.map((step, i) => {
+                        const isDone = (done as any)[step.key]
+                        const isCurrent = i === lastIdx + 1
+                        const Icon = step.icon
+                        return (
+                          <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${isDone ? 'bg-emerald-500' : isCurrent ? 'bg-blue-50 border-2 border-blue-400 border-dashed' : 'bg-white border border-gray-200'}`}>
+                              <Icon className={`w-4 h-4 ${isDone ? 'text-white' : isCurrent ? 'text-blue-500' : 'text-gray-300'}`} />
+                            </div>
+                            <p className={`text-[9px] font-bold leading-tight ${isDone ? 'text-emerald-600' : isCurrent ? 'text-blue-500' : 'text-gray-300'}`}>{step.label}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Add record */}
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={() => { openAddRecord(detailStudent.id); setDetailStudent(null) }}
+                      className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5 h-8"
+                    >
+                      <BookMarked className="w-3.5 h-3.5" /> Add Record
+                    </Button>
+                  </div>
+
+                  {/* Records */}
+                  {detailLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : recs.length === 0 ? (
+                    <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-xl">
+                      <BookMarked className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm text-gray-400">No records submitted yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Submission History ({recs.length})</p>
+                      {recs.map(r => {
+                        const sc = STATUS_CFG[r.status] ?? STATUS_CFG.pending
+                        const SIcon = sc.icon
+                        const tb = TYPE_BADGE[r.task_type] ?? TYPE_BADGE.assignment
+                        const tl = RECORD_TYPES.find(t => t.value === r.task_type)?.label ?? r.task_type
+                        return (
+                          <div key={r.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-start gap-3 shadow-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 ${tb.bg} ${tb.text}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${tb.dot}`} />{tl}
+                                </span>
+                                {r.subject_name && <span className="text-sm font-semibold text-gray-800">{r.subject_name}</span>}
+                              </div>
+                              <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
+                                {r.total_amount != null && <span>Total: ₹{r.total_amount}</span>}
+                                {r.student_paid_amount != null && <span className="text-emerald-600 font-semibold">Paid: ₹{r.student_paid_amount}</span>}
+                                {r.status === 'approved' && r.salary_percentage != null && <span className="text-violet-600 font-semibold">+{r.salary_percentage}% bonus</span>}
+                                <span>{format(new Date(r.created_at), 'dd MMM yyyy')}</span>
+                              </div>
+                              {r.admin_remarks && <p className="text-xs text-gray-400 italic mt-1">"{r.admin_remarks}"</p>}
+                              {r.screenshot_url && (
+                                <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 flex items-center gap-1">
+                                  <FileText className="w-3 h-3" /> View Screenshot
+                                </a>
+                              )}
+                            </div>
+                            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border flex-shrink-0 ${sc.bg} ${sc.text} ${sc.border}`}>
+                              <SIcon className="w-3 h-3" /> {sc.label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Add Record Modal */}
       <Dialog open={!!showAdd} onOpenChange={open => !open && setShowAdd(null)}>
@@ -610,10 +652,14 @@ export default function MentorshipClient() {
                 <BookMarked className="w-4 h-4 text-violet-600" />
               </div>
               Add Mentorship Record
+              {showAdd && (
+                <span className="text-sm font-normal text-gray-500 ml-1">
+                  — {students.find(s => s.id === showAdd)?.full_name}
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-1">
-            {/* Type selector */}
             <div className="grid grid-cols-3 gap-2">
               {RECORD_TYPES.map(t => (
                 <button
@@ -621,9 +667,9 @@ export default function MentorshipClient() {
                   onClick={() => setFormType(t.value)}
                   className={`py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${
                     formType === t.value
-                      ? t.color === 'emerald' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-100'
-                      : t.color === 'blue' ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-100'
-                      : 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-100'
+                      ? t.color === 'emerald' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+                      : t.color === 'blue' ? 'bg-blue-500 text-white border-blue-500 shadow-md'
+                      : 'bg-purple-500 text-white border-purple-500 shadow-md'
                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -631,46 +677,34 @@ export default function MentorshipClient() {
                 </button>
               ))}
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subject Name <span className="text-red-500">*</span></Label>
-              <Input
-                placeholder="e.g. Mathematics, English, Physics..."
-                value={formSubject}
-                onChange={e => setFormSubject(e.target.value)}
-                className="h-10"
-              />
+              <Input placeholder="e.g. Mathematics, English..." value={formSubject} onChange={e => setFormSubject(e.target.value)} className="h-10" />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total Amount (₹) <span className="text-red-500">*</span></Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
                   <Input type="number" placeholder="100" value={formTotal} onChange={e => setFormTotal(e.target.value)} className="h-10 pl-7" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Student Paid (₹)</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
                   <Input type="number" placeholder="20" value={formPaid} onChange={e => setFormPaid(e.target.value)} className="h-10 pl-7" />
                 </div>
               </div>
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Screenshot / Proof</Label>
               <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
               {formFile ? (
                 <div className="flex items-center gap-3 bg-violet-50 border-2 border-violet-200 rounded-xl px-4 py-3">
-                  <div className="w-8 h-8 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-4 h-4 text-violet-700" />
-                  </div>
+                  <FileText className="w-4 h-4 text-violet-600 flex-shrink-0" />
                   <span className="text-sm text-violet-800 font-medium flex-1 truncate">{formFile.name}</span>
-                  <button onClick={() => setFormFile(null)}>
-                    <X className="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" />
-                  </button>
+                  <button onClick={() => setFormFile(null)}><X className="w-4 h-4 text-gray-400 hover:text-red-500" /></button>
                 </div>
               ) : (
                 <button
@@ -681,13 +715,12 @@ export default function MentorshipClient() {
                     <Upload className="w-5 h-5 text-gray-400 group-hover:text-violet-500 transition-colors" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-500 group-hover:text-violet-600 transition-colors">Upload screenshot</p>
+                    <p className="text-sm font-semibold text-gray-500 group-hover:text-violet-600">Upload screenshot</p>
                     <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or PDF</p>
                   </div>
                 </button>
               )}
             </div>
-
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1 h-10" onClick={() => setShowAdd(null)}>Cancel</Button>
               <Button
@@ -695,9 +728,7 @@ export default function MentorshipClient() {
                 onClick={submitRecord}
                 disabled={submitting}
               >
-                {submitting ? (
-                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Submitting...</>
-                ) : 'Submit for Approval'}
+                {submitting ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Submitting...</> : 'Submit for Approval'}
               </Button>
             </div>
           </div>

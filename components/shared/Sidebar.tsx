@@ -46,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
   { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Mentorship',          href: '/mentorship',          icon: Award, roles: ['lead', 'counselor'] },
-  { label: 'Mentorship Approvals',href: '/mentorship-approvals',icon: Award, roles: ['admin'] },
+  { label: 'Mentorship',          href: '/mentorship-approvals',icon: Award, roles: ['admin'] },
   { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Tasks', href: '/tasks', icon: ClipboardList, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Student Portal', href: '/student-portal', icon: School, roles: ['admin', 'backend'] },

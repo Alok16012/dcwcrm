@@ -278,16 +278,24 @@ export function BackendListClient() {
   }
 
   async function bulkAssignMentor() {
-    if (!selectedCounselor || selectedStudents.length === 0) return
+    if (!selectedCounselor) { toast.error('Pehle mentor select karo'); return }
+    if (selectedStudents.length === 0) { toast.error('Koi student selected nahi hai'); return }
     setAssigningMentor(true)
     try {
       const ids = selectedStudents.map(s => s.id)
-      const { error } = await supabase
+      // .select() returns the rows actually updated — lets us detect silent
+      // no-ops (RLS / missing column) instead of showing a false success.
+      const { data, error } = await supabase
         .from('students')
         .update({ mentor_telecaller_id: selectedCounselor } as never)
         .in('id', ids)
+        .select('id')
       if (error) throw error
-      toast.success(`Mentor assigned to ${ids.length} student${ids.length !== 1 ? 's' : ''}`)
+      const updated = (data as { id: string }[] | null)?.length ?? 0
+      if (updated === 0) {
+        throw new Error('0 students update hue — permission ya mentor_telecaller_id column missing ho sakta hai')
+      }
+      toast.success(`Mentor assigned to ${updated} student${updated !== 1 ? 's' : ''}`)
       setShowMentorAssign(false)
       setSelectedCounselor('')
       setSelectedStudents([])
@@ -777,18 +785,21 @@ export function BackendListClient() {
 
       {/* Bulk action bar */}
       {selectedStudents.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-gray-700">
-          <span className="text-sm font-semibold">{selectedStudents.length} selected</span>
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 bg-gray-900 text-white px-4 sm:px-5 py-3 rounded-2xl shadow-2xl border border-gray-700 w-[calc(100%-1.5rem)] sm:w-auto max-w-md justify-center"
+          style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <span className="text-xs sm:text-sm font-semibold whitespace-nowrap">{selectedStudents.length} selected</span>
           <Button
             size="sm"
             onClick={() => { setSelectedCounselor(''); setShowMentorAssign(true) }}
-            className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5 h-8"
+            className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5 h-8 whitespace-nowrap"
           >
             <Award className="w-3.5 h-3.5" /> Assign Mentor
           </Button>
           <button
             onClick={() => { setSelectedStudents([]); setTableKey(k => k + 1) }}
-            className="text-gray-400 hover:text-white text-xs underline"
+            className="text-gray-400 hover:text-white text-xs underline whitespace-nowrap"
           >
             Clear
           </button>
@@ -805,7 +816,7 @@ export function BackendListClient() {
       />
 
       <Dialog open={!!editStudent} onOpenChange={(open) => !open && setEditStudent(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle>Update Student Details</DialogTitle>
           </DialogHeader>
@@ -823,7 +834,7 @@ export function BackendListClient() {
       </Dialog>
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle>Add New Student</DialogTitle>
           </DialogHeader>
@@ -848,7 +859,7 @@ export function BackendListClient() {
 
       {/* Bulk Mentor Assign Dialog */}
       <Dialog open={showMentorAssign} onOpenChange={setShowMentorAssign}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-5 h-5 text-violet-600" /> Assign Mentor
@@ -892,7 +903,7 @@ export function BackendListClient() {
 
       {/* Reject Student Dialog */}
       <Dialog open={!!rejectTarget} onOpenChange={open => !open && setRejectTarget(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="w-5 h-5" /> Reject Student

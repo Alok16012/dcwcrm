@@ -364,6 +364,7 @@ export function BackendListClient() {
             if (el) el.indeterminate = table.getIsSomePageRowsSelected()
           }}
           onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
           aria-label="Select all"
         />
       ),
@@ -373,6 +374,7 @@ export function BackendListClient() {
           className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
           checked={row.getIsSelected()}
           onChange={(e) => row.toggleSelected(e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
           aria-label="Select row"
         />
       ),

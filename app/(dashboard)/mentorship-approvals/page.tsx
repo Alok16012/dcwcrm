@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import {
-  CheckCircle2, XCircle, GraduationCap, RefreshCw, IndianRupee, Star,
-  Users, Search, Award, UserCog, Clock, ClipboardList, Wand2,
+  CheckCircle2, XCircle, GraduationCap, RefreshCw, IndianRupee,
+  Users, Search, Award, UserCog, Clock, ClipboardList, Download,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -20,13 +20,20 @@ interface Counselor { id: string; full_name: string }
 interface StudentRow {
   id: string
   full_name: string
+  guardian_name: string | null
   enrollment_number: string | null
   phone: string | null
+  mode: string | null
   mentor_telecaller_id: string | null
   course: { name: string } | null
   department: { name: string } | null
   sub_section: { name: string } | null
   session: { name: string } | null
+}
+
+const MODE_CLS: Record<string, string> = {
+  attending: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'non-attending': 'bg-orange-50 text-orange-700 border-orange-200',
 }
 
 const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
@@ -47,7 +54,6 @@ export default function MentorshipDashboardPage() {
   const [tab, setTab] = useState<'students' | 'approvals'>('students')
   const [students, setStudents] = useState<StudentRow[]>([])
   const [counselors, setCounselors] = useState<Counselor[]>([])
-  const [recordCounts, setRecordCounts] = useState<Record<string, { total: number; pending: number }>>({})
   const [loading, setLoading] = useState(true)
   const [changingId, setChangingId] = useState<string | null>(null)
 
@@ -66,15 +72,14 @@ export default function MentorshipDashboardPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [studRes, conRes, recRes, pendRes] = await Promise.all([
+      const [studRes, conRes, pendRes] = await Promise.all([
         (supabase as any).from('students')
-          .select(`id, full_name, enrollment_number, phone, mentor_telecaller_id,
+          .select(`id, full_name, guardian_name, enrollment_number, phone, mode, mentor_telecaller_id,
             course:courses(name), department:departments(name),
             sub_section:department_sub_sections(name), session:sessions(name)`)
           .neq('status', 'dropped').order('full_name'),
         (supabase as any).from('profiles').select('id, full_name')
           .in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
-        (supabase as any).from('student_mentorships').select('student_id, status'),
         (supabase as any).from('student_mentorships')
           .select(`*, student:students(id, full_name, enrollment_number, phone),
             telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)`)
@@ -82,13 +87,6 @@ export default function MentorshipDashboardPage() {
       ])
       setStudents((studRes.data ?? []) as StudentRow[])
       setCounselors((conRes.data ?? []) as Counselor[])
-      const counts: Record<string, { total: number; pending: number }> = {}
-      ;((recRes.data ?? []) as { student_id: string; status: string }[]).forEach(r => {
-        if (!counts[r.student_id]) counts[r.student_id] = { total: 0, pending: 0 }
-        counts[r.student_id].total++
-        if (r.status === 'pending') counts[r.student_id].pending++
-      })
-      setRecordCounts(counts)
       setMentorships(pendRes.data ?? [])
     } catch {
       toast.error('Failed to load mentorship data')
@@ -98,6 +96,32 @@ export default function MentorshipDashboardPage() {
   }, [supabase])
 
   useEffect(() => { load() }, [load])
+
+  async function exportExcel() {
+    try {
+      const xlsx = await import('xlsx')
+      const rows = filtered.map((s, i) => ({
+        'S.No': i + 1,
+        Name: s.full_name,
+        "Father's Name": s.guardian_name || '-',
+        Enrollment: fmtEnroll(s.enrollment_number),
+        Phone: s.phone || '-',
+        Mode: s.mode || '-',
+        Department: s.department?.name || '-',
+        Course: s.course?.name || '-',
+        Board: s.sub_section?.name || '-',
+        Session: s.session?.name || '-',
+        Mentor: s.mentor_telecaller_id ? (conName[s.mentor_telecaller_id] ?? '-') : 'Unassigned',
+      }))
+      const ws = xlsx.utils.json_to_sheet(rows)
+      const wb = xlsx.utils.book_new()
+      xlsx.utils.book_append_sheet(wb, ws, 'Mentorship')
+      xlsx.writeFile(wb, `mentorship-students-${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+      toast.success('Exported successfully')
+    } catch {
+      toast.error('Export failed')
+    }
+  }
 
   async function changeMentor(studentId: string, value: string) {
     const newMentor = value === 'none' ? null : value
@@ -263,6 +287,9 @@ export default function MentorshipDashboardPage() {
             {(courseFilter!=='all' || boardFilter!=='all' || search || counselorFilter!=='all') && (
               <button onClick={() => { setCourseFilter('all'); setBoardFilter('all'); setSearch(''); setCounselorFilter('all') }} className="text-xs text-violet-600 hover:underline">Clear</button>
             )}
+            <Button variant="outline" size="sm" onClick={exportExcel} className="gap-1.5 h-9 ml-auto" disabled={filtered.length === 0}>
+              <Download className="w-3.5 h-3.5" /> Export Excel
+            </Button>
           </div>
 
           {/* Table */}
@@ -277,14 +304,13 @@ export default function MentorshipDashboardPage() {
                 <table className="text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {['S.No','Student','Enrollment','Phone','Course','Board','Session','Records','Mentor (change)'].map(h => (
+                      {['S.No','Student',"Father's Name",'Enrollment','Phone','Mode','Department','Course','Board','Session','Mentor (change)'].map(h => (
                         <th key={h} className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filtered.map((s, idx) => {
-                      const rc = recordCounts[s.id]
                       return (
                         <tr key={s.id} className="hover:bg-violet-50/30 transition-colors">
                           <td className="px-3 py-3 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
@@ -294,19 +320,14 @@ export default function MentorshipDashboardPage() {
                               <span className="font-semibold text-gray-900 text-sm whitespace-nowrap">{s.full_name}</span>
                             </div>
                           </td>
+                          <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{s.guardian_name ?? '—'}</td>
                           <td className="px-3 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">{fmtEnroll(s.enrollment_number)}</span></td>
                           <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{s.phone ?? '—'}</td>
+                          <td className="px-3 py-3">{s.mode ? <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold border whitespace-nowrap ${MODE_CLS[s.mode] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>{s.mode === 'attending' ? 'Attending' : 'Non-Attending'}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
+                          <td className="px-3 py-3">{s.department?.name ? <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.department.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3"><span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.course?.name ?? '—'}</span></td>
                           <td className="px-3 py-3">{s.sub_section?.name ? <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-lg font-bold whitespace-nowrap">{s.sub_section.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.session?.name ?? '—'}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-1 whitespace-nowrap">
-                              {rc ? (<>
-                                <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{rc.total} rec</span>
-                                {rc.pending > 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">{rc.pending} pend</span>}
-                              </>) : <span className="text-gray-300 text-xs">—</span>}
-                            </div>
-                          </td>
                           <td className="px-3 py-3">
                             <div className="min-w-[170px]">
                               <Select value={s.mentor_telecaller_id ?? 'none'} onValueChange={(v) => changeMentor(s.id, v)} disabled={changingId === s.id}>

@@ -59,8 +59,10 @@ export default function MentorshipDashboardPage() {
 
   // filters
   const [counselorFilter, setCounselorFilter] = useState<string>('all') // 'all' | id | 'unassigned'
+  const [departmentFilter, setDepartmentFilter] = useState('all')
   const [courseFilter, setCourseFilter] = useState('all')
   const [boardFilter, setBoardFilter] = useState('all')
+  const [sessionFilter, setSessionFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   // approvals
@@ -102,9 +104,9 @@ export default function MentorshipDashboardPage() {
       const xlsx = await import('xlsx')
       const rows = filtered.map((s, i) => ({
         'S.No': i + 1,
+        Enrollment: fmtEnroll(s.enrollment_number),
         Name: s.full_name,
         "Father's Name": s.guardian_name || '-',
-        Enrollment: fmtEnroll(s.enrollment_number),
         Phone: s.phone || '-',
         Mode: s.mode || '-',
         Department: s.department?.name || '-',
@@ -171,8 +173,10 @@ export default function MentorshipDashboardPage() {
 
   // derived
   const conName = useMemo(() => Object.fromEntries(counselors.map(c => [c.id, c.full_name])), [counselors])
+  const departmentOptions = useMemo(() => Array.from(new Set(students.map(s => s.department?.name).filter(Boolean) as string[])).sort(), [students])
   const courseOptions = useMemo(() => Array.from(new Set(students.map(s => s.course?.name).filter(Boolean) as string[])).sort(), [students])
   const boardOptions = useMemo(() => Array.from(new Set(students.map(s => s.sub_section?.name).filter(Boolean) as string[])).sort(), [students])
+  const sessionOptions = useMemo(() => Array.from(new Set(students.map(s => s.session?.name).filter(Boolean) as string[])).sort(), [students])
 
   const counselorCounts = useMemo(() => {
     const m: Record<string, number> = {}
@@ -186,14 +190,16 @@ export default function MentorshipDashboardPage() {
   const filtered = useMemo(() => students.filter(s => {
     if (counselorFilter === 'unassigned' && s.mentor_telecaller_id) return false
     if (counselorFilter !== 'all' && counselorFilter !== 'unassigned' && s.mentor_telecaller_id !== counselorFilter) return false
+    if (departmentFilter !== 'all' && s.department?.name !== departmentFilter) return false
     if (courseFilter !== 'all' && s.course?.name !== courseFilter) return false
     if (boardFilter !== 'all' && s.sub_section?.name !== boardFilter) return false
+    if (sessionFilter !== 'all' && s.session?.name !== sessionFilter) return false
     if (search) {
       const q = search.toLowerCase()
       if (!s.full_name.toLowerCase().includes(q) && !(s.phone ?? '').includes(search) && !fmtEnroll(s.enrollment_number).toLowerCase().includes(q)) return false
     }
     return true
-  }), [students, counselorFilter, courseFilter, boardFilter, search])
+  }), [students, counselorFilter, departmentFilter, courseFilter, boardFilter, sessionFilter, search])
 
   return (
     <div className="space-y-5">
@@ -270,22 +276,44 @@ export default function MentorshipDashboardPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, phone, enroll…"
                 className="w-full pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400" />
             </div>
-            <Select value={courseFilter} onValueChange={setCourseFilter}>
-              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Course" /></SelectTrigger>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-auto min-w-[150px] h-9 text-xs gap-1">
+                <span className="text-gray-400 font-semibold">Department:</span><SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Courses</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                {departmentOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={courseFilter} onValueChange={setCourseFilter}>
+              <SelectTrigger className="w-auto min-w-[140px] h-9 text-xs gap-1">
+                <span className="text-gray-400 font-semibold">Course:</span><SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
                 {courseOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={boardFilter} onValueChange={setBoardFilter}>
-              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Board / Category" /></SelectTrigger>
+              <SelectTrigger className="w-auto min-w-[120px] h-9 text-xs gap-1">
+                <span className="text-gray-400 font-semibold">Board:</span><SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Boards</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 {boardOptions.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
               </SelectContent>
             </Select>
-            {(courseFilter!=='all' || boardFilter!=='all' || search || counselorFilter!=='all') && (
-              <button onClick={() => { setCourseFilter('all'); setBoardFilter('all'); setSearch(''); setCounselorFilter('all') }} className="text-xs text-violet-600 hover:underline">Clear</button>
+            <Select value={sessionFilter} onValueChange={setSessionFilter}>
+              <SelectTrigger className="w-auto min-w-[120px] h-9 text-xs gap-1">
+                <span className="text-gray-400 font-semibold">Session:</span><SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {sessionOptions.map(se => <SelectItem key={se} value={se}>{se}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {(departmentFilter!=='all' || courseFilter!=='all' || boardFilter!=='all' || sessionFilter!=='all' || search || counselorFilter!=='all') && (
+              <button onClick={() => { setDepartmentFilter('all'); setCourseFilter('all'); setBoardFilter('all'); setSessionFilter('all'); setSearch(''); setCounselorFilter('all') }} className="text-xs text-violet-600 hover:underline">Clear</button>
             )}
             <Button variant="outline" size="sm" onClick={exportExcel} className="gap-1.5 h-9 ml-auto" disabled={filtered.length === 0}>
               <Download className="w-3.5 h-3.5" /> Export Excel
@@ -304,7 +332,7 @@ export default function MentorshipDashboardPage() {
                 <table className="text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {['S.No','Student',"Father's Name",'Enrollment','Phone','Mode','Department','Course','Board','Session','Mentor (change)'].map(h => (
+                      {['S.No','Enrollment','Student',"Father's Name",'Phone','Mode','Department','Course','Board','Session','Mentor (change)'].map(h => (
                         <th key={h} className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -314,6 +342,7 @@ export default function MentorshipDashboardPage() {
                       return (
                         <tr key={s.id} className="hover:bg-violet-50/30 transition-colors">
                           <td className="px-3 py-3 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
+                          <td className="px-3 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">{fmtEnroll(s.enrollment_number)}</span></td>
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2.5 min-w-[150px]">
                               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${pal(s.full_name)} flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>{inits(s.full_name)}</div>
@@ -321,7 +350,6 @@ export default function MentorshipDashboardPage() {
                             </div>
                           </td>
                           <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{s.guardian_name ?? '—'}</td>
-                          <td className="px-3 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">{fmtEnroll(s.enrollment_number)}</span></td>
                           <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">{s.phone ?? '—'}</td>
                           <td className="px-3 py-3">{s.mode ? <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold border whitespace-nowrap ${MODE_CLS[s.mode] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>{s.mode === 'attending' ? 'Attending' : 'Non-Attending'}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3">{s.department?.name ? <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.department.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>

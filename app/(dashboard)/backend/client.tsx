@@ -369,14 +369,16 @@ export function BackendListClient() {
         />
       ),
       cell: ({ row }) => (
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
-          checked={row.getIsSelected()}
-          onChange={(e) => row.toggleSelected(e.target.checked)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Select row"
-        />
+        <div className="flex items-center justify-center p-1.5 -m-1.5" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="h-5 w-5 rounded border-gray-300 accent-primary cursor-pointer"
+            checked={row.getIsSelected()}
+            onChange={(e) => row.toggleSelected(e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Select row"
+          />
+        </div>
       ),
       enableSorting: false,
       enableHiding: false,

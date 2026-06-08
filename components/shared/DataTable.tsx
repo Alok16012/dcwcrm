@@ -106,11 +106,20 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, onSelection
                     : 'hover:bg-gray-50'
                 }`}
               >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+                {row.getVisibleCells().map((cell) => {
+                  // Select / actions columns must never trigger row navigation —
+                  // stop the click on the whole cell (covers taps near, not just
+                  // on, the checkbox/button), which matters most on mobile.
+                  const isInteractive = cell.column.id === 'select' || cell.column.id === 'actions'
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      onClick={isInteractive ? (e) => e.stopPropagation() : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  )
+                })}
               </TableRow>
             ))
           ) : (

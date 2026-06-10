@@ -156,7 +156,7 @@ export default function LoginPage() {
                 </label>
               </div>
 
-              <Button type="submit" className="w-full rounded-xl h-11 shadow-md bg-gray-900 hover:bg-black text-white transition-all font-semibold" disabled={loading}>
+              <Button type="submit" className="w-full rounded-xl h-12 shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-700 text-white transition-all font-semibold" disabled={loading}>
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (

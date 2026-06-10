@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { Topbar } from '@/components/shared/Topbar'
+import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import type { UserRole, Profile } from '@/types/app.types'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -37,19 +38,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen overflow-clip bg-gray-50">
+    <div className="flex h-screen overflow-clip app-bg">
       <Sidebar role={userProfile.role} />
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Topbar user={userProfile} />
         <main className="flex-1 overflow-y-auto flex flex-col">
-          <div className="flex-1 p-4 md:p-6 overflow-x-hidden">
+          <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden">
             {children}
           </div>
-          <footer className="w-full py-4 text-center text-sm text-gray-500 border-t border-gray-200 mt-auto">
+          <footer className="w-full py-4 pb-24 md:pb-4 text-center text-sm text-gray-500 border-t border-gray-200/70 mt-auto">
             Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">Blinks AI</a>
           </footer>
         </main>
       </div>
+      <MobileBottomNav role={userProfile.role} />
     </div>
   )
 }

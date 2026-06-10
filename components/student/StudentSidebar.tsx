@@ -6,8 +6,8 @@ import {
   HelpCircle, User, X, Menu, LogOut, Gift, Package, Award,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useUIStore } from '@/store/useUIStore'
 
 interface StudentInfo {
   id: string
@@ -31,7 +31,7 @@ const NAV = [
 
 export function StudentSidebar({ student }: { student: StudentInfo }) {
   const pathname = usePathname()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const { mobileSidebarOpen: mobileOpen, setMobileSidebarOpen: setMobileOpen } = useUIStore()
   const supabase = createClient()
 
   async function handleLogout() {
@@ -123,7 +123,7 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
       {/* Mobile toggle */}
       <button
         className="md:hidden fixed top-3 left-3 z-50 bg-white border border-gray-200 rounded-xl p-2 shadow-sm"
-        onClick={() => setMobileOpen(v => !v)}
+        onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>

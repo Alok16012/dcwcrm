@@ -49,10 +49,13 @@ interface Associate {
   status: AssociateStatus
   associate_code: string | null
   wallet_balance: number
+  coordinator_id: string | null
   coordinator_name: string | null
   temp_password: string | null
   created_at: string
 }
+
+interface CounselorOpt { id: string; full_name: string }
 
 export function AssociateManager() {
   const supabase = createClient()
@@ -69,6 +72,8 @@ export function AssociateManager() {
   const [selected, setSelected] = useState<Associate | null>(null)
   const [detailStudents, setDetailStudents] = useState<any[]>([])
   const [detailStudentsLoading, setDetailStudentsLoading] = useState(false)
+  const [counselorOpts, setCounselorOpts] = useState<CounselorOpt[]>([])
+  const [changingCoord, setChangingCoord] = useState(false)
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
@@ -94,13 +99,34 @@ export function AssociateManager() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await db
-      .from('associates')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const [{ data }, { data: cons }] = await Promise.all([
+      db.from('associates').select('*').order('created_at', { ascending: false }),
+      db.from('profiles').select('id, full_name').in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
+    ])
     setAssociates((data ?? []) as Associate[])
+    setCounselorOpts((cons ?? []) as CounselorOpt[])
     setLoading(false)
   }, [db])
+
+  async function changeCoordinator(counselorId: string) {
+    if (!selected) return
+    const newId = counselorId === 'none' ? null : counselorId
+    const newName = newId ? (counselorOpts.find(c => c.id === newId)?.full_name ?? null) : null
+    setChangingCoord(true)
+    try {
+      const { error } = await db.from('associates')
+        .update({ coordinator_id: newId, coordinator_name: newName, updated_at: new Date().toISOString() })
+        .eq('id', selected.id)
+      if (error) throw error
+      setSelected({ ...selected, coordinator_id: newId, coordinator_name: newName })
+      setAssociates(prev => prev.map(a => a.id === selected.id ? { ...a, coordinator_id: newId, coordinator_name: newName } : a))
+      toast.success(newName ? `Counselor set to ${newName}` : 'Counselor removed')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to update counselor')
+    } finally {
+      setChangingCoord(false)
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -110,7 +136,8 @@ export function AssociateManager() {
     setDetailStudents([])
     setDetailStudentsLoading(true)
     const FIELDS = `
-      id, full_name, total_fee, verification_status, exam_status, result_status,
+      id, full_name, total_fee, amount_paid, status, enrollment_date,
+      verification_status, exam_status, result_status,
       enrollment_number, portal_active, admit_card_url,
       sub_section:department_sub_sections(name),
       counsellor:profiles!students_assigned_counsellor_fkey(full_name)
@@ -422,11 +449,28 @@ export function AssociateManager() {
                 </>
               )}
 
-              {/* ── Students breakdown ── */}
-              <div className="col-span-2 border-t pt-3 mt-1">
-                <div className="flex items-center gap-2 mb-3">
+              {/* ── Associate Performance ── */}
+              <div className="col-span-2 border-t pt-3 mt-1 space-y-4">
+                {/* Counselor / Coordinator — changeable from admin */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> Counselor / Coordinator</p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selected.coordinator_id ?? 'none'}
+                      onChange={e => changeCoordinator(e.target.value)}
+                      disabled={changingCoord}
+                      className="flex-1 border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="none">— Not assigned —</option>
+                      {counselorOpts.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                    </select>
+                    {changingCoord && <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <span className="font-semibold text-slate-700">Referred Students</span>
+                  <span className="font-semibold text-slate-700">Students &amp; Admissions</span>
                   <span className="text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">{detailStudents.length}</span>
                 </div>
 
@@ -435,14 +479,45 @@ export function AssociateManager() {
                 ) : detailStudents.length === 0 ? (
                   <p className="text-xs text-slate-400 py-3 text-center">No students referred yet</p>
                 ) : (() => {
+                  const totalRevenue = detailStudents.reduce((sum: number, s: any) => sum + (s.total_fee ?? 0), 0)
+                  const received = detailStudents.reduce((sum: number, s: any) => sum + (s.amount_paid ?? 0), 0)
+                  const activeCount = detailStudents.filter((s: any) => s.status === 'active').length
                   const byBoard = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
                     const b = s.sub_section?.name ?? 'Unassigned'; acc[b] = (acc[b] ?? 0) + 1; return acc
                   }, {})).sort((a, b) => b[1] - a[1])
                   const byCounselor = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
                     const c = s.counsellor?.full_name ?? 'Not Assigned'; acc[c] = (acc[c] ?? 0) + 1; return acc
                   }, {})).sort((a, b) => b[1] - a[1])
+                  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                  const byMonth = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
+                    if (!s.enrollment_date) { acc['Unknown'] = (acc['Unknown'] ?? 0) + 1; return acc }
+                    const d = new Date(s.enrollment_date)
+                    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`
+                    acc[key] = (acc[key] ?? 0) + 1; return acc
+                  }, {})).sort((a, b) => b[0].localeCompare(a[0]))
+                  const monthLabel = (k: string) => k === 'Unknown' ? 'Unknown' : `${MONTHS[parseInt(k.split('-')[1])]} ${k.split('-')[0]}`
+                  const fmtMoney = (n: number) => `₹${n.toLocaleString('en-IN')}`
                   return (
                     <div className="space-y-3">
+                      {/* Stat cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 text-center">
+                          <p className="text-lg font-bold text-indigo-700">{detailStudents.length}</p>
+                          <p className="text-[10px] text-indigo-600 font-semibold">Total Admissions</p>
+                        </div>
+                        <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-center">
+                          <p className="text-lg font-bold text-green-700">{activeCount}</p>
+                          <p className="text-[10px] text-green-600 font-semibold">Active</p>
+                        </div>
+                        <div className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 text-center">
+                          <p className="text-sm font-bold text-purple-700">{fmtMoney(totalRevenue)}</p>
+                          <p className="text-[10px] text-purple-600 font-semibold">Total Fee</p>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-center">
+                          <p className="text-sm font-bold text-emerald-700">{fmtMoney(received)}</p>
+                          <p className="text-[10px] text-emerald-600 font-semibold">Received</p>
+                        </div>
+                      </div>
                       {/* Board chips */}
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><School className="w-3 h-3" /> By Board</p>
@@ -454,10 +529,19 @@ export function AssociateManager() {
                       </div>
                       {/* Counselor chips */}
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> By Counselor</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> Students by Counselor</p>
                         <div className="flex flex-wrap gap-1.5">
                           {byCounselor.map(([c, n]) => (
                             <span key={c} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-blue-500">· {n}</span></span>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Month-wise admissions */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> Month-wise Admissions</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {byMonth.map(([k, n]) => (
+                            <span key={k} className="text-xs bg-amber-50 border border-amber-100 text-amber-700 rounded-lg px-2 py-1 font-semibold">{monthLabel(k)} <span className="text-amber-500">· {n}</span></span>
                           ))}
                         </div>
                       </div>

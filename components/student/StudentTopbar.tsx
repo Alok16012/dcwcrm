@@ -1,9 +1,10 @@
 'use client'
-import { Bell } from 'lucide-react'
+import { Bell, Menu } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useUIStore } from '@/store/useUIStore'
 
 interface StudentInfo {
   id: string
@@ -25,6 +26,7 @@ const PAGE_TITLES: Record<string, string> = {
 export function StudentTopbar({ student }: { student: StudentInfo }) {
   const supabase = createClient()
   const pathname = usePathname()
+  const { setMobileSidebarOpen } = useUIStore()
   const [unreadCount, setUnreadCount] = useState(0)
 
   const title = PAGE_TITLES[pathname] ?? 'Portal'
@@ -48,9 +50,15 @@ export function StudentTopbar({ student }: { student: StudentInfo }) {
   }, [student.id, supabase])
 
   return (
-    <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="md:hidden w-6" /> {/* space for mobile menu button */}
+    <header className="h-14 bg-white/75 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-3 md:px-6 shrink-0 z-20">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setMobileSidebarOpen(true)}
+          className="md:hidden p-2 -ml-1 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5 text-gray-600" />
+        </button>
         <div>
           <h2 className="text-[15px] font-bold text-gray-900 leading-tight">{title}</h2>
           <p className="text-[11px] text-gray-400 hidden md:block">

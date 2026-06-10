@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, GraduationCap, Wallet, BookOpen,
-  HelpCircle, User, X, Menu, LogOut, Gift, Package, Award,
+  HelpCircle, User, LogOut, Gift, Package, Award,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -120,15 +120,7 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
         <SidebarContent />
       </div>
 
-      {/* Mobile toggle */}
-      <button
-        className="md:hidden fixed top-3 left-3 z-50 bg-white border border-gray-200 rounded-xl p-2 shadow-sm"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
-
-      {/* Mobile drawer */}
+      {/* Mobile drawer (opened from the topbar hamburger / bottom-nav More) */}
       {mobileOpen && (
         <>
           <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setMobileOpen(false)} />

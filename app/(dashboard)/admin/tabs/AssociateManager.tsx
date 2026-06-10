@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,12 +9,10 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
-  ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search,
-  School, UserCog, GraduationCap,
+  ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search, UserCog,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
-import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
 type AssociateStatus = 'pending' | 'approved' | 'rejected'
 
@@ -55,9 +54,8 @@ interface Associate {
   created_at: string
 }
 
-interface CounselorOpt { id: string; full_name: string }
-
 export function AssociateManager() {
+  const router = useRouter()
   const supabase = createClient()
   const db = supabase as any
   const [isAdmin, setIsAdmin] = useState(false)
@@ -68,12 +66,6 @@ export function AssociateManager() {
   const [filterState, setFilterState] = useState('')
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [detailOpen, setDetailOpen] = useState(false)
-  const [selected, setSelected] = useState<Associate | null>(null)
-  const [detailStudents, setDetailStudents] = useState<any[]>([])
-  const [detailStudentsLoading, setDetailStudentsLoading] = useState(false)
-  const [counselorOpts, setCounselorOpts] = useState<CounselorOpt[]>([])
-  const [changingCoord, setChangingCoord] = useState(false)
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
@@ -99,76 +91,12 @@ export function AssociateManager() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data }, { data: cons }] = await Promise.all([
-      db.from('associates').select('*').order('created_at', { ascending: false }),
-      db.from('profiles').select('id, full_name').in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
-    ])
+    const { data } = await db.from('associates').select('*').order('created_at', { ascending: false })
     setAssociates((data ?? []) as Associate[])
-    setCounselorOpts((cons ?? []) as CounselorOpt[])
     setLoading(false)
   }, [db])
 
-  async function changeCoordinator(counselorId: string) {
-    if (!selected) return
-    const newId = counselorId === 'none' ? null : counselorId
-    const newName = newId ? (counselorOpts.find(c => c.id === newId)?.full_name ?? null) : null
-    setChangingCoord(true)
-    try {
-      const { error } = await db.from('associates')
-        .update({ coordinator_id: newId, coordinator_name: newName, updated_at: new Date().toISOString() })
-        .eq('id', selected.id)
-      if (error) throw error
-      setSelected({ ...selected, coordinator_id: newId, coordinator_name: newName })
-      setAssociates(prev => prev.map(a => a.id === selected.id ? { ...a, coordinator_id: newId, coordinator_name: newName } : a))
-      toast.success(newName ? `Counselor set to ${newName}` : 'Counselor removed')
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to update counselor')
-    } finally {
-      setChangingCoord(false)
-    }
-  }
-
   useEffect(() => { load() }, [load])
-
-  async function openDetail(a: Associate) {
-    setSelected(a)
-    setDetailOpen(true)
-    setDetailStudents([])
-    setDetailStudentsLoading(true)
-    const FIELDS = `
-      id, full_name, total_fee, amount_paid, status, enrollment_date,
-      verification_status, exam_status, result_status,
-      enrollment_number, portal_active, admit_card_url,
-      sub_section:department_sub_sections(name),
-      counsellor:profiles!students_assigned_counsellor_fkey(full_name)
-    `
-    // direct + via leads + via code, deduped
-    const { data: direct } = await db.from('students').select(FIELDS).eq('referred_by_associate', a.id)
-    const { data: assocLeads } = await db.from('leads').select('id').eq('referred_by_associate', a.id)
-    const leadIds = ((assocLeads ?? []) as any[]).map(l => l.id)
-    let viaLeads: any[] = []
-    if (leadIds.length > 0) {
-      const { data } = await db.from('students').select(FIELDS).in('lead_id', leadIds)
-      viaLeads = data ?? []
-    }
-    let viaCode: any[] = []
-    if (a.associate_code) {
-      const { data } = await db.from('students').select(FIELDS).eq('referred_by_associate', a.associate_code)
-      viaCode = data ?? []
-    }
-    const seen = new Set<string>()
-    const merged = [...(direct ?? []), ...viaLeads, ...viaCode].filter((s: any) => {
-      if (seen.has(s.id)) return false; seen.add(s.id); return true
-    })
-    let dispatchMap: Record<string, boolean> = {}
-    if (merged.length > 0) {
-      const { data: disp } = await db.from('student_dispatches').select('student_id, status')
-        .in('student_id', merged.map((s: any) => s.id)).eq('status', 'delivered')
-      ;(disp ?? []).forEach((d: any) => { dispatchMap[d.student_id] = true })
-    }
-    setDetailStudents(merged.map((s: any) => ({ ...s, dispatched: !!dispatchMap[s.id] })))
-    setDetailStudentsLoading(false)
-  }
 
   function openEdit(a: Associate) {
     setEditTarget(a)
@@ -328,32 +256,32 @@ export function AssociateManager() {
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">State / District</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Institution</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Coordinator</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">State / District</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {filtered.map(a => (
-                <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={a.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/associates/${a.id}`)}>
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {a.name}
                     {a.associate_code && <span className="ml-1.5 text-[10px] font-mono text-slate-400">{a.associate_code}</span>}
                   </td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{a.phone}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
+                    {a.coordinator_name
+                      ? <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full"><UserCog className="w-3 h-3" />{a.coordinator_name}</span>
+                      : <span className="text-slate-400 text-xs">— Not set —</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
                     {a.state ? <p className="text-xs font-medium text-slate-700">{a.state}</p> : null}
                     {a.district ? <p className="text-[11px] text-slate-400">{a.district}</p> : null}
                     {!a.state && !a.district && <span className="text-slate-400 text-xs">—</span>}
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    {a.institution_name
-                      ? <p className="text-xs text-slate-700 truncate max-w-36">{a.institution_name}</p>
-                      : <span className="text-slate-400 text-xs">—</span>}
-                  </td>
                   <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       {a.status === 'approved' && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
@@ -362,7 +290,7 @@ export function AssociateManager() {
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
-                        onClick={() => openDetail(a)}>
+                        onClick={() => router.push(`/associates/${a.id}`)}>
                         <Eye className="w-3.5 h-3.5" /> View <ChevronRight className="w-3 h-3" />
                       </Button>
                       {isAdmin && (
@@ -388,193 +316,6 @@ export function AssociateManager() {
           </div>
         </div>
       )}
-
-      {/* Detail Dialog */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Associate Details — {selected?.name}
-              {selected && statusBadge(selected.status)}
-            </DialogTitle>
-          </DialogHeader>
-          {selected && (
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
-              <Detail label="Name" value={selected.name} />
-              <Detail label="Phone" value={selected.phone} />
-              <Detail label="Father's Phone" value={selected.father_phone} />
-              <Detail label="Email" value={selected.email} />
-              <Detail label="Aadhaar Number" value={selected.aadhar_number} />
-              <Detail label="PAN Number" value={selected.pan_number} />
-              <Detail label="State" value={selected.state} />
-              <Detail label="District" value={selected.district} />
-              <Detail label="City" value={selected.city} />
-              {(selected.institution_name || selected.institution_address) && (
-                <>
-                  <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Institution</div>
-                  <Detail label="Institution Name" value={selected.institution_name} />
-                  <Detail label="Institution Address" value={selected.institution_address} />
-                </>
-              )}
-              <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Current Address</div>
-              <Detail label="Address" value={selected.current_address} />
-              <Detail label="City" value={selected.current_city} />
-              <Detail label="State" value={selected.current_state} />
-              <Detail label="Pincode" value={selected.current_pincode} />
-              <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">
-                Permanent Address {selected.same_as_current && <span className="text-xs font-normal text-green-600">(Same as current)</span>}
-              </div>
-              <Detail label="Address" value={selected.permanent_address} />
-              <Detail label="City" value={selected.permanent_city} />
-              <Detail label="State" value={selected.permanent_state} />
-              <Detail label="Pincode" value={selected.permanent_pincode} />
-              <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Bank Details</div>
-              <Detail label="Bank Name" value={selected.bank_name} />
-              <Detail label="Account Holder" value={selected.account_holder_name} />
-              <Detail label="Account Number" value={selected.account_number} />
-              <Detail label="IFSC Code" value={selected.ifsc_code} />
-              {(selected.aadhar_doc_url || selected.pan_doc_url || selected.cheque_doc_url) && (
-                <>
-                  <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Documents</div>
-                  {selected.aadhar_doc_url && <DocLink label="Aadhaar Card" url={selected.aadhar_doc_url} />}
-                  {selected.pan_doc_url && <DocLink label="PAN Card" url={selected.pan_doc_url} />}
-                  {selected.cheque_doc_url && <DocLink label="Cancelled Cheque" url={selected.cheque_doc_url} />}
-                </>
-              )}
-              {selected.associate_code && (
-                <>
-                  <div className="col-span-2 border-t pt-2 mt-1 font-semibold text-slate-600">Login Info</div>
-                  <Detail label="Associate Code" value={selected.associate_code} />
-                  <Detail label="Wallet Balance" value={`₹${selected.wallet_balance.toLocaleString('en-IN')}`} />
-                </>
-              )}
-
-              {/* ── Associate Performance ── */}
-              <div className="col-span-2 border-t pt-3 mt-1 space-y-4">
-                {/* Counselor / Coordinator — changeable from admin */}
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> Counselor / Coordinator</p>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selected.coordinator_id ?? 'none'}
-                      onChange={e => changeCoordinator(e.target.value)}
-                      disabled={changingCoord}
-                      className="flex-1 border rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="none">— Not assigned —</option>
-                      {counselorOpts.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-                    </select>
-                    {changingCoord && <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <span className="font-semibold text-slate-700">Students &amp; Admissions</span>
-                  <span className="text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">{detailStudents.length}</span>
-                </div>
-
-                {detailStudentsLoading ? (
-                  <div className="flex justify-center py-6"><div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /></div>
-                ) : detailStudents.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-3 text-center">No students referred yet</p>
-                ) : (() => {
-                  const totalRevenue = detailStudents.reduce((sum: number, s: any) => sum + (s.total_fee ?? 0), 0)
-                  const received = detailStudents.reduce((sum: number, s: any) => sum + (s.amount_paid ?? 0), 0)
-                  const activeCount = detailStudents.filter((s: any) => s.status === 'active').length
-                  const byBoard = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
-                    const b = s.sub_section?.name ?? 'Unassigned'; acc[b] = (acc[b] ?? 0) + 1; return acc
-                  }, {})).sort((a, b) => b[1] - a[1])
-                  const byCounselor = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
-                    const c = s.counsellor?.full_name ?? 'Not Assigned'; acc[c] = (acc[c] ?? 0) + 1; return acc
-                  }, {})).sort((a, b) => b[1] - a[1])
-                  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                  const byMonth = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
-                    if (!s.enrollment_date) { acc['Unknown'] = (acc['Unknown'] ?? 0) + 1; return acc }
-                    const d = new Date(s.enrollment_date)
-                    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`
-                    acc[key] = (acc[key] ?? 0) + 1; return acc
-                  }, {})).sort((a, b) => b[0].localeCompare(a[0]))
-                  const monthLabel = (k: string) => k === 'Unknown' ? 'Unknown' : `${MONTHS[parseInt(k.split('-')[1])]} ${k.split('-')[0]}`
-                  const fmtMoney = (n: number) => `₹${n.toLocaleString('en-IN')}`
-                  return (
-                    <div className="space-y-3">
-                      {/* Stat cards */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-lg font-bold text-indigo-700">{detailStudents.length}</p>
-                          <p className="text-[10px] text-indigo-600 font-semibold">Total Admissions</p>
-                        </div>
-                        <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-lg font-bold text-green-700">{activeCount}</p>
-                          <p className="text-[10px] text-green-600 font-semibold">Active</p>
-                        </div>
-                        <div className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-sm font-bold text-purple-700">{fmtMoney(totalRevenue)}</p>
-                          <p className="text-[10px] text-purple-600 font-semibold">Total Fee</p>
-                        </div>
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-sm font-bold text-emerald-700">{fmtMoney(received)}</p>
-                          <p className="text-[10px] text-emerald-600 font-semibold">Received</p>
-                        </div>
-                      </div>
-                      {/* Board chips */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><School className="w-3 h-3" /> By Board</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {byBoard.map(([b, c]) => (
-                            <span key={b} className="text-xs bg-violet-50 border border-violet-100 text-violet-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-violet-500">· {c}</span></span>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Counselor chips */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> Students by Counselor</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {byCounselor.map(([c, n]) => (
-                            <span key={c} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-blue-500">· {n}</span></span>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Month-wise admissions */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> Month-wise Admissions</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {byMonth.map(([k, n]) => (
-                            <span key={k} className="text-xs bg-amber-50 border border-amber-100 text-amber-700 rounded-lg px-2 py-1 font-semibold">{monthLabel(k)} <span className="text-amber-500">· {n}</span></span>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Per-student lifecycle */}
-                      <div className="space-y-2">
-                        {detailStudents.map((s: any) => {
-                          const done = getLifecycleStage(s)
-                          const { pct } = lifecycleProgress(s)
-                          return (
-                            <div key={s.id} className="border border-gray-100 rounded-xl px-3 py-2">
-                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="text-xs font-semibold text-gray-800">{s.full_name}</span>
-                                {s.sub_section?.name && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-bold">{s.sub_section.name}</span>}
-                                {s.counsellor?.full_name && <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{s.counsellor.full_name}</span>}
-                                <span className="ml-auto text-[10px] font-bold text-emerald-600">{pct}%</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {STUDENT_LIFECYCLE.map(step => (
-                                  <div key={step.key} className={`flex-1 h-1.5 rounded-full ${done[step.key] ? 'bg-emerald-500' : 'bg-gray-200'}`} title={step.label} />
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Dialog — admin only */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -753,27 +494,6 @@ function F({ label, children, className }: { label: string; children: React.Reac
     <div className={`space-y-1.5 ${className ?? ''}`}>
       <Label className="text-xs font-medium text-slate-600">{label}</Label>
       {children}
-    </div>
-  )
-}
-
-function Detail({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium text-gray-900 mt-0.5">{value || '—'}</p>
-    </div>
-  )
-}
-
-function DocLink({ label, url }: { label: string; url: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <a href={url} target="_blank" rel="noopener noreferrer"
-        className="text-sm font-medium text-blue-600 hover:underline mt-0.5 block">
-        View Document ↗
-      </a>
     </div>
   )
 }

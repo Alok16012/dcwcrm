@@ -19,6 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
 interface AssignedStudent {
   id: string
@@ -73,29 +74,6 @@ const TYPE_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
   theory:     { bg: 'bg-purple-100',  text: 'text-purple-800',  dot: 'bg-purple-500' },
 }
 
-const LIFECYCLE = [
-  { key: 'enrolled',         label: 'Enrolled',    icon: LayoutList },
-  { key: 'docs_submitted',   label: 'Docs',        icon: FileText },
-  { key: 'verified',         label: 'Verified',    icon: CheckCircle2 },
-  { key: 'enrolled_gen',     label: 'Enroll ID',   icon: ClipboardCheck },
-  { key: 'exam_scheduled',   label: 'Exam',        icon: BookOpen },
-  { key: 'hall_ticket',      label: 'Hall Ticket', icon: Award },
-  { key: 'result_declared',  label: 'Result',      icon: Star },
-  { key: 'dispatched',       label: 'Dispatched',  icon: Truck },
-] as const
-
-function getLifecycleDone(s: AssignedStudent) {
-  return {
-    enrolled:       true,
-    docs_submitted: ['in_review', 'verified'].includes(s.verification_status),
-    verified:       s.verification_status === 'verified',
-    enrolled_gen:   !!s.enrollment_number || s.portal_active,
-    exam_scheduled: s.exam_status !== 'not_scheduled',
-    hall_ticket:    !!s.admit_card_url,
-    result_declared:['declared', 'passed', 'failed'].includes(s.result_status),
-    dispatched:     false,
-  }
-}
 
 function fmtEnroll(n: string | null | undefined) {
   if (!n) return '—'
@@ -375,10 +353,7 @@ export default function MentorshipClient() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((s, idx) => {
-                  const done = getLifecycleDone(s)
-                  const keys = LIFECYCLE.map(l => l.key)
-                  const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
-                  const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
+                  const { lastIdx, pct, total } = lifecycleProgress(s)
                   const palette = avatarPalette(s.full_name)
                   const initials = s.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
                   const recs = history[s.id] ?? []
@@ -461,7 +436,7 @@ export default function MentorshipClient() {
                         <div className="flex flex-col gap-1 min-w-[80px]">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-gray-500">{pct}%</span>
-                            <span className="text-[10px] text-gray-400">{lastIdx + 1}/{LIFECYCLE.length}</span>
+                            <span className="text-[10px] text-gray-400">{lastIdx + 1}/{total}</span>
                           </div>
                           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div
@@ -524,10 +499,6 @@ export default function MentorshipClient() {
       <Dialog open={!!detailStudent} onOpenChange={open => !open && setDetailStudent(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           {detailStudent && (() => {
-            const done = getLifecycleDone(detailStudent)
-            const keys = LIFECYCLE.map(l => l.key)
-            const lastIdx = keys.reduce((acc, k, i) => (done as any)[k] ? i : acc, -1)
-            const pct = Math.round(((lastIdx + 1) / LIFECYCLE.length) * 100)
             const palette = avatarPalette(detailStudent.full_name)
             const initials = detailStudent.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
             const recs = detailRecords
@@ -549,32 +520,9 @@ export default function MentorshipClient() {
                 </DialogHeader>
 
                 <div className="space-y-5 mt-2">
-                  {/* Lifecycle */}
+                  {/* Lifecycle (shared, admin-driven) */}
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Student Progress</p>
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-24 bg-gray-200 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-xs font-bold text-gray-600">{pct}%</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-                      {LIFECYCLE.map((step, i) => {
-                        const isDone = (done as any)[step.key]
-                        const isCurrent = i === lastIdx + 1
-                        const Icon = step.icon
-                        return (
-                          <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${isDone ? 'bg-emerald-500' : isCurrent ? 'bg-blue-50 border-2 border-blue-400 border-dashed' : 'bg-white border border-gray-200'}`}>
-                              <Icon className={`w-4 h-4 ${isDone ? 'text-white' : isCurrent ? 'text-blue-500' : 'text-gray-300'}`} />
-                            </div>
-                            <p className={`text-[9px] font-bold leading-tight ${isDone ? 'text-emerald-600' : isCurrent ? 'text-blue-500' : 'text-gray-300'}`}>{step.label}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    <StudentLifecycle student={detailStudent} title="Student Progress" />
                   </div>
 
                   {/* Add record */}

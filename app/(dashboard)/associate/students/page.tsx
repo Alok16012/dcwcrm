@@ -3,10 +3,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import {
-  Search, GraduationCap, CheckCircle2, Clock, ChevronDown, ChevronUp,
-  IndianRupee, FileText, Award, Truck, BookOpen, ClipboardCheck,
-  LayoutList, AlertCircle,
+  Search, GraduationCap, ChevronDown, ChevronUp,
+  FileText, Award,
 } from 'lucide-react'
+import { STUDENT_LIFECYCLE, getLifecycleStage, StudentLifecycle } from '@/components/shared/StudentLifecycle'
 
 interface Student {
   id: string
@@ -26,74 +26,6 @@ interface Student {
   course?: { name: string } | null
   lead?: { created_at: string; status: string } | null
   dispatched?: boolean
-}
-
-const LIFECYCLE = [
-  { key: 'lead_received',      label: 'Lead Received',        icon: LayoutList },
-  { key: 'docs_submitted',     label: 'Docs Submitted',       icon: FileText },
-  { key: 'admission_confirmed',label: 'Admission Confirmed',  icon: GraduationCap },
-  { key: 'enrollment_generated',label: 'Enrollment Generated',icon: ClipboardCheck },
-  { key: 'exam_form_filled',   label: 'Exam Form Filled',     icon: BookOpen },
-  { key: 'hall_ticket_released',label: 'Hall Ticket Released',icon: Award },
-  { key: 'result_declared',    label: 'Result Declared',      icon: CheckCircle2 },
-  { key: 'marksheet_dispatched',label: 'Marksheet Dispatched',icon: Truck },
-]
-
-function getLifecycleStage(student: Student): Record<string, boolean> {
-  return {
-    lead_received:       true,
-    docs_submitted:      ['in_review', 'verified'].includes(student.verification_status),
-    admission_confirmed: !!student.enrollment_number,
-    enrollment_generated:student.portal_active || !!student.enrollment_number,
-    exam_form_filled:    student.exam_status !== 'not_scheduled',
-    hall_ticket_released:!!student.admit_card_url,
-    result_declared:     ['declared', 'passed', 'failed'].includes(student.result_status),
-    marksheet_dispatched:!!student.dispatched,
-  }
-}
-
-function LifecycleTracker({ student }: { student: Student }) {
-  const done = getLifecycleStage(student)
-  const keys = LIFECYCLE.map(l => l.key)
-  const lastDoneIdx = keys.reduce((acc, k, i) => done[k] ? i : acc, -1)
-
-  return (
-    <div className="mt-4 px-4 pb-4">
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Student Progress Lifecycle</p>
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5">
-        {LIFECYCLE.map((step, i) => {
-          const isDone = done[step.key]
-          const isCurrent = i === lastDoneIdx + 1
-          const Icon = step.icon
-          return (
-            <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                isDone
-                  ? 'bg-emerald-500 shadow-sm shadow-emerald-200'
-                  : isCurrent
-                    ? 'bg-blue-100 border-2 border-blue-400 border-dashed'
-                    : 'bg-gray-100 border border-gray-200'
-              }`}>
-                <Icon className={`w-4 h-4 ${isDone ? 'text-white' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`} />
-              </div>
-              <p className={`text-[9px] font-semibold leading-tight ${isDone ? 'text-emerald-700' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`}>
-                {step.label}
-              </p>
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all"
-          style={{ width: `${Math.round(((lastDoneIdx + 1) / LIFECYCLE.length) * 100)}%` }}
-        />
-      </div>
-      <p className="text-[10px] text-gray-400 mt-1 text-right font-medium">
-        {lastDoneIdx + 1} / {LIFECYCLE.length} stages complete
-      </p>
-    </div>
-  )
 }
 
 export default function AssociateStudentsPage() {
@@ -220,7 +152,7 @@ export default function AssociateStudentsPage() {
             const isExpanded = expanded === s.id
             const pending = (s.total_fee ?? 0) - s.amount_paid
             const done = getLifecycleStage(s)
-            const keys = LIFECYCLE.map(l => l.key)
+            const keys = STUDENT_LIFECYCLE.map(l => l.key)
             const stagesDone = keys.filter(k => done[k]).length
 
             return (
@@ -242,14 +174,14 @@ export default function AssociateStudentsPage() {
                   <div className="flex items-center gap-3 shrink-0">
                     {/* Mini lifecycle bar */}
                     <div className="hidden md:flex items-center gap-1">
-                      {LIFECYCLE.map((step, i) => (
+                      {STUDENT_LIFECYCLE.map((step) => (
                         <div
                           key={step.key}
                           className={`w-2 h-2 rounded-full ${done[step.key] ? 'bg-emerald-500' : 'bg-gray-200'}`}
                           title={step.label}
                         />
                       ))}
-                      <span className="text-[10px] text-gray-400 ml-1">{stagesDone}/{LIFECYCLE.length}</span>
+                      <span className="text-[10px] text-gray-400 ml-1">{stagesDone}/{STUDENT_LIFECYCLE.length}</span>
                     </div>
                     {pending > 0 && (
                       <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
@@ -318,8 +250,8 @@ export default function AssociateStudentsPage() {
                       </div>
                     )}
 
-                    {/* Lifecycle Tracker */}
-                    <LifecycleTracker student={s} />
+                    {/* Lifecycle Tracker (shared, admin-driven) */}
+                    <StudentLifecycle student={s} title="Student Progress Lifecycle" className="mt-4 px-4 pb-4" />
                   </div>
                 )}
               </div>

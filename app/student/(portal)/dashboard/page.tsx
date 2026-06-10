@@ -7,6 +7,7 @@ import {
   FileText, IndianRupee, ArrowRight, Paperclip, TrendingUp,
   CircleDot, Circle,
 } from 'lucide-react'
+import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
 const VER: Record<string, { label: string; color: string; bg: string; border: string; done: boolean; active: boolean }> = {
   pending:   { label: 'Pending',   color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200', done: false, active: true },
@@ -94,6 +95,7 @@ export default async function StudentDashboardPage() {
     .select(`
       id, full_name, enrollment_number, status,
       verification_status, exam_status, result_status, admission_progress,
+      portal_active, admit_card_url,
       total_fee, amount_paid, enrollment_date,
       course:courses(name), department:departments(name)
     `)
@@ -106,14 +108,14 @@ export default async function StudentDashboardPage() {
     id: string; full_name: string; enrollment_number: string; status: string;
     verification_status: string; exam_status: string; result_status: string;
     admission_progress: number; total_fee: number | null; amount_paid: number;
-    enrollment_date: string | null;
+    enrollment_date: string | null; portal_active: boolean; admit_card_url: string | null;
     course: { name: string } | null; department: { name: string } | null;
   }
 
   const pending = (s.total_fee ?? 0) - s.amount_paid
 
   const db = supabase as any
-  const [{ data: notifs }, { data: announcements }] = await Promise.all([
+  const [{ data: notifs }, { data: announcements }, { data: dispatches }] = await Promise.all([
     db.from('student_notifications')
       .select('id, title, message, type, category, file_url, is_read, created_at')
       .eq('student_id', s.id)
@@ -124,7 +126,13 @@ export default async function StudentDashboardPage() {
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(3),
+    db.from('student_dispatches')
+      .select('id')
+      .eq('student_id', s.id)
+      .eq('status', 'delivered')
+      .limit(1),
   ])
+  const isDispatched = ((dispatches as any[]) ?? []).length > 0
 
   const verDone    = s.verification_status === 'verified'
   const verActive  = ['pending', 'in_review'].includes(s.verification_status)
@@ -133,16 +141,16 @@ export default async function StudentDashboardPage() {
   const resultDone = ['declared', 'passed', 'failed'].includes(s.result_status)
   const resultActive = s.result_status === 'awaited' && examDone
 
-  // Auto-compute progress if DB field is 0
-  const computedProgress = (() => {
-    if (s.admission_progress > 0) return s.admission_progress
-    if (resultDone) return 100
-    if (examDone) return 75
-    if (examActive) return 60
-    if (verDone) return 50
-    if (verActive) return 25
-    return 20 // enrolled
-  })()
+  // Progress from the shared lifecycle (same logic everywhere)
+  const lifecyclePct = lifecycleProgress({
+    verification_status: s.verification_status,
+    exam_status: s.exam_status,
+    result_status: s.result_status,
+    enrollment_number: s.enrollment_number,
+    portal_active: s.portal_active,
+    admit_card_url: s.admit_card_url,
+    dispatched: isDispatched,
+  }).pct
 
   const verCfg  = VER[s.verification_status]  ?? VER['pending']!
   const examCfg = EXAM[s.exam_status]         ?? EXAM['not_scheduled']!
@@ -195,26 +203,23 @@ export default async function StudentDashboardPage() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-gray-400">{computedProgress}% complete</p>
-          <p className="text-xs font-semibold text-blue-600">{computedProgress === 100 ? 'Completed!' : 'In Progress'}</p>
+          <p className="text-xs text-gray-400">{lifecyclePct}% complete</p>
+          <p className="text-xs font-semibold text-blue-600">{lifecyclePct === 100 ? 'Completed!' : 'In Progress'}</p>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-6">
-          <div
-            className="h-full bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-500 rounded-full transition-all duration-500"
-            style={{ width: `${computedProgress}%` }}
-          />
-        </div>
-
-        {/* Timeline */}
-        <div className="flex items-start px-2">
-          <TimelineStep step={1} label="Enrolled"    sub="Confirmed"       done={true}        active={false} />
-          <TimelineStep step={2} label="Docs Review" sub={verCfg.label}    done={verDone}     active={verActive} />
-          <TimelineStep step={3} label="Verified"    sub={verDone ? 'Done' : '—'} done={verDone} active={false} />
-          <TimelineStep step={4} label="Examination" sub={examCfg.label}   done={examDone}    active={examActive} />
-          <TimelineStep step={5} label="Result"      sub={resCfg.label}    done={resultDone}  active={resultActive} last />
-        </div>
+        {/* Unified lifecycle — same on student, associate & counselor pages */}
+        <StudentLifecycle
+          student={{
+            verification_status: s.verification_status,
+            exam_status: s.exam_status,
+            result_status: s.result_status,
+            enrollment_number: s.enrollment_number,
+            portal_active: s.portal_active,
+            admit_card_url: s.admit_card_url,
+            dispatched: isDispatched,
+          }}
+          title="Admission Journey"
+        />
       </div>
 
       {/* Status Cards */}

@@ -61,6 +61,7 @@ export function AssociateManager() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [associates, setAssociates] = useState<Associate[]>([])
+  const [aggStudents, setAggStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterState, setFilterState] = useState('')
@@ -91,8 +92,14 @@ export function AssociateManager() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await db.from('associates').select('*').order('created_at', { ascending: false })
+    const [{ data }, { data: studs }] = await Promise.all([
+      db.from('associates').select('*').order('created_at', { ascending: false }),
+      db.from('students')
+        .select('id, total_fee, amount_paid, status, referred_by_associate, sub_section:department_sub_sections(name)')
+        .not('referred_by_associate', 'is', null),
+    ])
     setAssociates((data ?? []) as Associate[])
+    setAggStudents((studs ?? []) as any[])
     setLoading(false)
   }, [db])
 
@@ -171,6 +178,40 @@ export function AssociateManager() {
   const pending = associates.filter(a => a.status === 'pending').length
   const approved = associates.filter(a => a.status === 'approved').length
 
+  // ── Aggregate dashboard across all associates ──
+  // Map associate id + code → coordinator name (referred_by_associate can be either)
+  const coordMap: Record<string, string> = {}
+  associates.forEach(a => {
+    const name = a.coordinator_name ?? 'Unassigned'
+    if (a.id) coordMap[a.id] = name
+    if (a.associate_code) coordMap[a.associate_code] = name
+  })
+  const totalStudents = aggStudents.length
+  const totalRevenue = aggStudents.reduce((s, x) => s + (x.total_fee ?? 0), 0)
+  const totalReceived = aggStudents.reduce((s, x) => s + (x.amount_paid ?? 0), 0)
+  const fmtAgg = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`
+
+  const studentsByCoordinator = Object.entries(
+    aggStudents.reduce((acc: Record<string, number>, x: any) => {
+      const c = coordMap[x.referred_by_associate] ?? 'Unassigned'
+      acc[c] = (acc[c] ?? 0) + 1; return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
+
+  const studentsByBoard = Object.entries(
+    aggStudents.reduce((acc: Record<string, number>, x: any) => {
+      const b = x.sub_section?.name ?? 'Unassigned'
+      acc[b] = (acc[b] ?? 0) + 1; return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
+
+  const associatesByCoordinator = Object.entries(
+    associates.reduce((acc: Record<string, number>, a: any) => {
+      const c = a.coordinator_name ?? 'Unassigned'
+      acc[c] = (acc[c] ?? 0) + 1; return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
+
   const ef = (k: keyof typeof editForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setEditForm(p => ({ ...p, [k]: e.target.value }))
 
@@ -186,30 +227,66 @@ export function AssociateManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3">
-          <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 sm:px-4 py-2 text-center">
-            <p className="text-lg sm:text-xl font-bold text-amber-700">{pending}</p>
-            <p className="text-[11px] sm:text-xs text-amber-600">Pending</p>
-          </div>
-          <div className="bg-green-50 border border-green-100 rounded-xl px-3 sm:px-4 py-2 text-center">
-            <p className="text-lg sm:text-xl font-bold text-green-700">{approved}</p>
-            <p className="text-[11px] sm:text-xs text-green-600">Approved</p>
-          </div>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 sm:px-4 py-2 text-center">
-            <p className="text-lg sm:text-xl font-bold text-blue-700">{associates.length}</p>
-            <p className="text-[11px] sm:text-xs text-blue-600">Total</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-bold text-slate-700">Associates Overview</h2>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5 h-8 flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" onClick={load} className="gap-1.5 h-8">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 h-8 flex-1 sm:flex-none">
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 h-8">
             <UserPlus className="w-3.5 h-3.5" /> Add Associate
           </Button>
         </div>
       </div>
+
+      {/* ── Total Dashboard ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        {[
+          { label: 'Total Associates', value: associates.length.toString(), cls: 'bg-blue-50 border-blue-100 text-blue-700' },
+          { label: 'Approved',         value: approved.toString(),          cls: 'bg-green-50 border-green-100 text-green-700' },
+          { label: 'Pending',          value: pending.toString(),           cls: 'bg-amber-50 border-amber-100 text-amber-700' },
+          { label: 'Students Referred',value: totalStudents.toString(),     cls: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
+          { label: 'Total Fee',        value: fmtAgg(totalRevenue),         cls: 'bg-purple-50 border-purple-100 text-purple-700' },
+          { label: 'Received',         value: fmtAgg(totalReceived),        cls: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+        ].map(s => (
+          <div key={s.label} className={`border rounded-xl px-3 py-2.5 ${s.cls}`}>
+            <p className="text-base sm:text-lg font-extrabold leading-tight truncate">{s.value}</p>
+            <p className="text-[10px] font-semibold opacity-70 mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {(studentsByCoordinator.length > 0 || studentsByBoard.length > 0) && (
+        <div className="grid md:grid-cols-3 gap-3">
+          {/* Associates by Coordinator */}
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><UserCog className="w-3.5 h-3.5" /> Associates by Coordinator</p>
+            <div className="flex flex-wrap gap-1.5">
+              {associatesByCoordinator.map(([c, n]) => (
+                <span key={c} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-blue-500">· {n}</span></span>
+              ))}
+            </div>
+          </div>
+          {/* Students by Coordinator */}
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Coordinator</p>
+            <div className="flex flex-wrap gap-1.5">
+              {studentsByCoordinator.length === 0 ? <span className="text-xs text-gray-300">—</span> : studentsByCoordinator.map(([c, n]) => (
+                <span key={c} className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-indigo-500">· {n}</span></span>
+              ))}
+            </div>
+          </div>
+          {/* Students by Board */}
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Board</p>
+            <div className="flex flex-wrap gap-1.5">
+              {studentsByBoard.length === 0 ? <span className="text-xs text-gray-300">—</span> : studentsByBoard.map(([b, n]) => (
+                <span key={b} className="text-xs bg-violet-50 border border-violet-100 text-violet-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-violet-500">· {n}</span></span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white border rounded-xl p-3 flex flex-wrap gap-2">

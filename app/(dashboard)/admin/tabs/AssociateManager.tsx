@@ -9,9 +9,11 @@ import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
   ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search,
+  School, UserCog, GraduationCap,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
+import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
 type AssociateStatus = 'pending' | 'approved' | 'rejected'
 
@@ -65,6 +67,8 @@ export function AssociateManager() {
   const [filterStatus, setFilterStatus] = useState('')
   const [detailOpen, setDetailOpen] = useState(false)
   const [selected, setSelected] = useState<Associate | null>(null)
+  const [detailStudents, setDetailStudents] = useState<any[]>([])
+  const [detailStudentsLoading, setDetailStudentsLoading] = useState(false)
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
@@ -99,6 +103,45 @@ export function AssociateManager() {
   }, [db])
 
   useEffect(() => { load() }, [load])
+
+  async function openDetail(a: Associate) {
+    setSelected(a)
+    setDetailOpen(true)
+    setDetailStudents([])
+    setDetailStudentsLoading(true)
+    const FIELDS = `
+      id, full_name, total_fee, verification_status, exam_status, result_status,
+      enrollment_number, portal_active, admit_card_url,
+      sub_section:department_sub_sections(name),
+      counsellor:profiles!students_assigned_counsellor_fkey(full_name)
+    `
+    // direct + via leads + via code, deduped
+    const { data: direct } = await db.from('students').select(FIELDS).eq('referred_by_associate', a.id)
+    const { data: assocLeads } = await db.from('leads').select('id').eq('referred_by_associate', a.id)
+    const leadIds = ((assocLeads ?? []) as any[]).map(l => l.id)
+    let viaLeads: any[] = []
+    if (leadIds.length > 0) {
+      const { data } = await db.from('students').select(FIELDS).in('lead_id', leadIds)
+      viaLeads = data ?? []
+    }
+    let viaCode: any[] = []
+    if (a.associate_code) {
+      const { data } = await db.from('students').select(FIELDS).eq('referred_by_associate', a.associate_code)
+      viaCode = data ?? []
+    }
+    const seen = new Set<string>()
+    const merged = [...(direct ?? []), ...viaLeads, ...viaCode].filter((s: any) => {
+      if (seen.has(s.id)) return false; seen.add(s.id); return true
+    })
+    let dispatchMap: Record<string, boolean> = {}
+    if (merged.length > 0) {
+      const { data: disp } = await db.from('student_dispatches').select('student_id, status')
+        .in('student_id', merged.map((s: any) => s.id)).eq('status', 'delivered')
+      ;(disp ?? []).forEach((d: any) => { dispatchMap[d.student_id] = true })
+    }
+    setDetailStudents(merged.map((s: any) => ({ ...s, dispatched: !!dispatchMap[s.id] })))
+    setDetailStudentsLoading(false)
+  }
 
   function openEdit(a: Associate) {
     setEditTarget(a)
@@ -292,7 +335,7 @@ export function AssociateManager() {
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
-                        onClick={() => { setSelected(a); setDetailOpen(true) }}>
+                        onClick={() => openDetail(a)}>
                         <Eye className="w-3.5 h-3.5" /> View <ChevronRight className="w-3 h-3" />
                       </Button>
                       {isAdmin && (
@@ -378,6 +421,72 @@ export function AssociateManager() {
                   <Detail label="Wallet Balance" value={`₹${selected.wallet_balance.toLocaleString('en-IN')}`} />
                 </>
               )}
+
+              {/* ── Students breakdown ── */}
+              <div className="col-span-2 border-t pt-3 mt-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <span className="font-semibold text-slate-700">Referred Students</span>
+                  <span className="text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">{detailStudents.length}</span>
+                </div>
+
+                {detailStudentsLoading ? (
+                  <div className="flex justify-center py-6"><div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /></div>
+                ) : detailStudents.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3 text-center">No students referred yet</p>
+                ) : (() => {
+                  const byBoard = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
+                    const b = s.sub_section?.name ?? 'Unassigned'; acc[b] = (acc[b] ?? 0) + 1; return acc
+                  }, {})).sort((a, b) => b[1] - a[1])
+                  const byCounselor = Object.entries(detailStudents.reduce((acc: Record<string, number>, s: any) => {
+                    const c = s.counsellor?.full_name ?? 'Not Assigned'; acc[c] = (acc[c] ?? 0) + 1; return acc
+                  }, {})).sort((a, b) => b[1] - a[1])
+                  return (
+                    <div className="space-y-3">
+                      {/* Board chips */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><School className="w-3 h-3" /> By Board</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {byBoard.map(([b, c]) => (
+                            <span key={b} className="text-xs bg-violet-50 border border-violet-100 text-violet-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-violet-500">· {c}</span></span>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Counselor chips */}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5 flex items-center gap-1"><UserCog className="w-3 h-3" /> By Counselor</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {byCounselor.map(([c, n]) => (
+                            <span key={c} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-blue-500">· {n}</span></span>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Per-student lifecycle */}
+                      <div className="space-y-2">
+                        {detailStudents.map((s: any) => {
+                          const done = getLifecycleStage(s)
+                          const { pct } = lifecycleProgress(s)
+                          return (
+                            <div key={s.id} className="border border-gray-100 rounded-xl px-3 py-2">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span className="text-xs font-semibold text-gray-800">{s.full_name}</span>
+                                {s.sub_section?.name && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-bold">{s.sub_section.name}</span>}
+                                {s.counsellor?.full_name && <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{s.counsellor.full_name}</span>}
+                                <span className="ml-auto text-[10px] font-bold text-emerald-600">{pct}%</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {STUDENT_LIFECYCLE.map(step => (
+                                  <div key={step.key} className={`flex-1 h-1.5 rounded-full ${done[step.key] ? 'bg-emerald-500' : 'bg-gray-200'}`} title={step.label} />
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           )}
         </DialogContent>

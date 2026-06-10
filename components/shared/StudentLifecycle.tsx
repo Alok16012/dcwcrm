@@ -69,14 +69,14 @@ export function StudentLifecycle({
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{title}</p>
         <span className="text-[10px] font-bold text-emerald-600">{pct}% · {lastIdx + 1}/{total}</span>
       </div>
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-x-1 gap-y-2">
         {STUDENT_LIFECYCLE.map((step, i) => {
           const isDone = done[step.key]
           const isCurrent = i === lastIdx + 1
           const Icon = step.icon
           return (
-            <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+            <div key={step.key} className="flex flex-col items-center gap-1.5 text-center min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
                 isDone
                   ? 'bg-emerald-500 shadow-sm shadow-emerald-200'
                   : isCurrent
@@ -85,7 +85,7 @@ export function StudentLifecycle({
               }`}>
                 <Icon className={`w-4 h-4 ${isDone ? 'text-white' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`} />
               </div>
-              <p className={`text-[9px] font-semibold leading-tight ${isDone ? 'text-emerald-700' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`}>
+              <p className={`text-[9px] font-semibold leading-tight break-words hyphens-auto w-full px-0.5 ${isDone ? 'text-emerald-700' : isCurrent ? 'text-blue-600' : 'text-gray-400'}`}>
                 {step.label}
               </p>
             </div>

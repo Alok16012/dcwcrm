@@ -7,9 +7,11 @@ import {
   CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee,
   TrendingUp, Bell, Users, Wallet, ArrowRight, AlertCircle, Copy,
   UserCheck, BarChart2, ChevronRight, Package, Phone, PhoneCall,
+  School, UserCog,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -36,6 +38,7 @@ export default function AssociateClient() {
   const [recentLeads, setRecentLeads] = useState<any[]>([])
   const [recentTxns, setRecentTxns] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -47,24 +50,58 @@ export default function AssociateClient() {
     if (!assoc) { setLoading(false); return }
     setAssociate(assoc)
 
+    const STUDENT_FIELDS = `
+      id, full_name, total_fee, verification_status, exam_status, result_status,
+      enrollment_number, portal_active, admit_card_url,
+      sub_section:department_sub_sections(name),
+      counsellor:profiles!students_assigned_counsellor_fkey(full_name)
+    `
+
     const [
-      leadRes, studentRes, txnRes, notifRes,
+      leadRes, directRes, assocLeadsRes, txnRes, notifRes,
     ] = await Promise.all([
       supabase.from('leads').select('id, full_name, phone, status, created_at, course:courses(name)').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }),
-      db.from('students').select('id, total_fee').eq('referred_by_associate', assoc.id),
+      db.from('students').select(STUDENT_FIELDS).eq('referred_by_associate', assoc.id),
+      supabase.from('leads').select('id').eq('referred_by_associate', assoc.id),
       db.from('associate_wallet_txns').select('id, type, amount, reason, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
       db.from('associate_notifications').select('id, title, message, type, is_read, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
     ])
 
+    // Students: merge direct + via leads + via associate_code, dedup by id
+    const leadIds = ((assocLeadsRes.data ?? []) as any[]).map(l => l.id)
+    let viaLeads: any[] = []
+    if (leadIds.length > 0) {
+      const { data } = await db.from('students').select(STUDENT_FIELDS).in('lead_id', leadIds)
+      viaLeads = data ?? []
+    }
+    let viaCode: any[] = []
+    if (assoc.associate_code) {
+      const { data } = await db.from('students').select(STUDENT_FIELDS).eq('referred_by_associate', assoc.associate_code)
+      viaCode = data ?? []
+    }
+    const seen = new Set<string>()
+    const allStudents = [...(directRes.data ?? []), ...viaLeads, ...viaCode].filter((s: any) => {
+      if (seen.has(s.id)) return false; seen.add(s.id); return true
+    })
+
+    // Mark dispatched students
+    let dispatchMap: Record<string, boolean> = {}
+    if (allStudents.length > 0) {
+      const { data: disp } = await db.from('student_dispatches').select('student_id, status')
+        .in('student_id', allStudents.map((s: any) => s.id)).eq('status', 'delivered')
+      ;(disp ?? []).forEach((d: any) => { dispatchMap[d.student_id] = true })
+    }
+    const studentsWithDispatch = allStudents.map((s: any) => ({ ...s, dispatched: !!dispatchMap[s.id] }))
+
     const allLeads = (leadRes.data ?? []) as any[]
-    const allStudents = (studentRes.data ?? []) as any[]
     const allTxns = (txnRes.data ?? []) as any[]
     const commissionEarned = allTxns.filter((t: any) => t.type === 'credit').reduce((s: number, t: any) => s + t.amount, 0)
-    const totalRevenue = allStudents.reduce((s: number, st: any) => s + (st.total_fee ?? 0), 0)
+    const totalRevenue = studentsWithDispatch.reduce((s: number, st: any) => s + (st.total_fee ?? 0), 0)
 
+    setStudents(studentsWithDispatch)
     setStats({
       totalLeads: allLeads.length,
-      totalStudents: allStudents.length,
+      totalStudents: studentsWithDispatch.length,
       commissionEarned,
       totalRevenue,
     })
@@ -95,6 +132,24 @@ export default function AssociateClient() {
   }
 
   const unread = notifications.filter(n => !n.is_read).length
+
+  // Board-wise breakdown (NIOS / BBOSE / …)
+  const boardBreakdown = Object.entries(
+    students.reduce((acc: Record<string, number>, s: any) => {
+      const b = s.sub_section?.name ?? 'Unassigned'
+      acc[b] = (acc[b] ?? 0) + 1
+      return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
+
+  // Counselor-wise breakdown
+  const counselorBreakdown = Object.entries(
+    students.reduce((acc: Record<string, number>, s: any) => {
+      const c = s.counsellor?.full_name ?? 'Not Assigned'
+      acc[c] = (acc[c] ?? 0) + 1
+      return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -208,6 +263,86 @@ export default function AssociateClient() {
           </Link>
         ))}
       </div>
+
+      {/* Board + Counselor breakdown */}
+      {students.length > 0 && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Board-wise */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-50">
+              <School className="h-4 w-4 text-violet-500" />
+              <span className="font-semibold text-gray-900 text-sm">Students by Board</span>
+            </div>
+            <div className="p-4 flex flex-wrap gap-2">
+              {boardBreakdown.map(([board, count]) => (
+                <div key={board} className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
+                  <span className="text-sm font-bold text-violet-700">{board}</span>
+                  <span className="text-xs font-bold bg-violet-600 text-white rounded-full px-2 py-0.5">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Counselor-wise */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-50">
+              <UserCog className="h-4 w-4 text-blue-500" />
+              <span className="font-semibold text-gray-900 text-sm">Counselors Attached</span>
+            </div>
+            <div className="p-4 flex flex-wrap gap-2">
+              {counselorBreakdown.map(([cName, count]) => (
+                <div key={cName} className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                  <span className="text-sm font-semibold text-blue-700">{cName}</span>
+                  <span className="text-xs font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Students Progress (lifecycle) */}
+      {students.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4 text-emerald-500" />
+              <span className="font-semibold text-gray-900 text-sm">Students Progress</span>
+            </div>
+            <Link href="/associate/students" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              View all <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {students.slice(0, 6).map((s: any) => {
+              const done = getLifecycleStage(s)
+              const { pct } = lifecycleProgress(s)
+              return (
+                <div key={s.id} className="px-5 py-3">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900">{s.full_name}</p>
+                    {s.sub_section?.name && (
+                      <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{s.sub_section.name}</span>
+                    )}
+                    {s.counsellor?.full_name && (
+                      <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">{s.counsellor.full_name}</span>
+                    )}
+                    <span className="ml-auto text-[10px] font-bold text-emerald-600">{pct}%</span>
+                  </div>
+                  {/* Mini lifecycle dots */}
+                  <div className="flex items-center gap-1">
+                    {STUDENT_LIFECYCLE.map((step) => (
+                      <div key={step.key} className="flex-1 flex flex-col items-center gap-1">
+                        <div className={`w-full h-1.5 rounded-full ${done[step.key] ? 'bg-emerald-500' : 'bg-gray-200'}`} title={step.label} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Content Grid */}
       <div className="grid lg:grid-cols-2 gap-4">

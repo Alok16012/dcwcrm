@@ -50,3 +50,9 @@ next-env.d.ts
 /android/local.properties
 /android/.idea
 *.apk
+
+# Android release signing (keep secret, never commit)
+/android/key.properties
+/android/dcw-release.keystore
+*.keystore
+*.aab

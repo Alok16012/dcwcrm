@@ -409,12 +409,20 @@ export default function MentorshipDashboardPage() {
                           <span className="text-sm font-bold text-gray-800">{m.student?.full_name ?? '—'}</span>
                           {m.student?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(m.student.enrollment_number)}</span>}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.cls}`}>{t.label}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>
+                            {m.managed_by === 'self' ? 'By Self' : 'DCW'}
+                          </span>
+                          {m.work_status && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.work_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : m.work_status === 'not_started' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>
+                              {m.work_status === 'completed' ? 'Completed' : m.work_status === 'not_started' ? 'Not Started' : 'In Progress'}
+                            </span>
+                          )}
                           {m.subject_name && <span className="text-xs font-semibold text-gray-700">{m.subject_name}</span>}
                         </div>
                         <p className="text-xs text-gray-500">
                           Mentor: <span className="font-semibold text-gray-700">{m.telecaller?.full_name ?? '—'}</span>
-                          {m.total_amount != null && <> · Total ₹{m.total_amount}</>}
-                          {m.student_paid_amount != null && <> · Paid ₹{m.student_paid_amount}</>}
+                          {m.managed_by !== 'self' && m.total_amount != null && <> · Total ₹{m.total_amount}</>}
+                          {m.managed_by !== 'self' && m.student_paid_amount != null && <> · Paid ₹{m.student_paid_amount}</>}
                           <> · {format(new Date(m.created_at), 'dd MMM yyyy')}</>
                         </p>
                         {m.screenshot_url && <a href={m.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">View proof</a>}

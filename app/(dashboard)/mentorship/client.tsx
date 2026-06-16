@@ -46,6 +46,8 @@ interface AssignedStudent {
 interface MentorRecord {
   id: string
   task_type: string
+  managed_by: string | null
+  work_status: string | null
   subject_name: string | null
   total_amount: number | null
   student_paid_amount: number | null
@@ -54,6 +56,12 @@ interface MentorRecord {
   admin_remarks: string | null
   salary_percentage: number | null
   created_at: string
+}
+
+const WORK_STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  not_started: { label: 'Not Started', cls: 'bg-gray-100 text-gray-600' },
+  in_progress: { label: 'In Progress', cls: 'bg-amber-100 text-amber-700' },
+  completed:   { label: 'Completed',   cls: 'bg-emerald-100 text-emerald-700' },
 }
 
 const RECORD_TYPES = [
@@ -120,11 +128,21 @@ export default function MentorshipClient() {
   const [submitting, setSubmitting] = useState(false)
 
   const [formType, setFormType] = useState<string>('practical')
-  const [formSubject, setFormSubject] = useState('')
+  const [formManagedBy, setFormManagedBy] = useState<'dcw' | 'self'>('dcw')
+  const [formStatus, setFormStatus] = useState<'not_started' | 'in_progress' | 'completed'>('in_progress')
+  const [formSubjects, setFormSubjects] = useState<string[]>([])
+  const [formSubjectInput, setFormSubjectInput] = useState('')
   const [formTotal, setFormTotal] = useState('')
   const [formPaid, setFormPaid] = useState('')
   const [formFile, setFormFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function addSubject() {
+    const v = formSubjectInput.trim()
+    if (!v) return
+    if (!formSubjects.includes(v)) setFormSubjects(prev => [...prev, v])
+    setFormSubjectInput('')
+  }
 
   const supabase = createClient()
 
@@ -166,7 +184,7 @@ export default function MentorshipClient() {
     if (!user) return
     const { data } = await (supabase as any)
       .from('student_mentorships')
-      .select('id, task_type, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, salary_percentage, created_at')
+      .select('id, task_type, managed_by, work_status, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, salary_percentage, created_at')
       .eq('student_id', s.id)
       .eq('telecaller_id', user.id)
       .order('created_at', { ascending: false })
@@ -179,7 +197,7 @@ export default function MentorshipClient() {
     if (!user) return
     const { data } = await (supabase as any)
       .from('student_mentorships')
-      .select('id, task_type, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, salary_percentage, created_at')
+      .select('id, task_type, managed_by, work_status, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, salary_percentage, created_at')
       .eq('student_id', studentId)
       .eq('telecaller_id', user.id)
       .order('created_at', { ascending: false })
@@ -188,7 +206,10 @@ export default function MentorshipClient() {
 
   function openAddRecord(studentId: string) {
     setFormType('practical')
-    setFormSubject('')
+    setFormManagedBy('dcw')
+    setFormStatus('in_progress')
+    setFormSubjects([])
+    setFormSubjectInput('')
     setFormTotal('')
     setFormPaid('')
     setFormFile(null)
@@ -197,14 +218,18 @@ export default function MentorshipClient() {
 
   async function submitRecord() {
     if (!showAdd) return
-    if (!formSubject.trim()) { toast.error('Subject name is required'); return }
-    if (!formTotal) { toast.error('Total amount is required'); return }
+    // include a subject still being typed
+    const subjects = formSubjectInput.trim() && !formSubjects.includes(formSubjectInput.trim())
+      ? [...formSubjects, formSubjectInput.trim()]
+      : formSubjects
+    if (subjects.length === 0) { toast.error('Add at least one subject'); return }
+    if (formManagedBy === 'dcw' && !formTotal) { toast.error('Total amount is required for DCW-managed'); return }
     setSubmitting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
       let screenshotUrl: string | null = null
-      if (formFile) {
+      if (formManagedBy === 'dcw' && formFile) {
         const ext = formFile.name.split('.').pop()
         const path = `mentorship/${user.id}/${showAdd}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from('student-documents').upload(path, formFile, { upsert: true })
@@ -212,15 +237,18 @@ export default function MentorshipClient() {
         const { data: urlData } = supabase.storage.from('student-documents').getPublicUrl(path)
         screenshotUrl = urlData.publicUrl
       }
+      const isDcw = formManagedBy === 'dcw'
       const { error } = await (supabase as any).from('student_mentorships').insert({
         student_id: showAdd,
         telecaller_id: user.id,
         created_by: user.id,
         task_type: formType,
-        subject_name: formSubject.trim(),
-        total_amount: parseFloat(formTotal) || null,
-        student_paid_amount: formPaid ? parseFloat(formPaid) : null,
-        screenshot_url: screenshotUrl,
+        managed_by: formManagedBy,
+        work_status: formStatus,
+        subject_name: subjects.join(', '),
+        total_amount: isDcw ? (parseFloat(formTotal) || null) : null,
+        student_paid_amount: isDcw && formPaid ? parseFloat(formPaid) : null,
+        screenshot_url: isDcw ? screenshotUrl : null,
         status: 'pending',
       })
       if (error) throw error
@@ -567,11 +595,19 @@ export default function MentorshipClient() {
                                 <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 ${tb.bg} ${tb.text}`}>
                                   <span className={`w-1.5 h-1.5 rounded-full ${tb.dot}`} />{tl}
                                 </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>
+                                  {r.managed_by === 'self' ? 'By Self' : 'DCW'}
+                                </span>
+                                {r.work_status && (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(WORK_STATUS_CFG[r.work_status] ?? WORK_STATUS_CFG.in_progress).cls}`}>
+                                    {(WORK_STATUS_CFG[r.work_status] ?? WORK_STATUS_CFG.in_progress).label}
+                                  </span>
+                                )}
                                 {r.subject_name && <span className="text-sm font-semibold text-gray-800">{r.subject_name}</span>}
                               </div>
                               <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
-                                {r.total_amount != null && <span>Total: ₹{r.total_amount}</span>}
-                                {r.student_paid_amount != null && <span className="text-emerald-600 font-semibold">Paid: ₹{r.student_paid_amount}</span>}
+                                {r.managed_by !== 'self' && r.total_amount != null && <span>Total: ₹{r.total_amount}</span>}
+                                {r.managed_by !== 'self' && r.student_paid_amount != null && <span className="text-emerald-600 font-semibold">Paid: ₹{r.student_paid_amount}</span>}
                                 {r.status === 'approved' && r.salary_percentage != null && <span className="text-violet-600 font-semibold">+{r.salary_percentage}% bonus</span>}
                                 <span>{format(new Date(r.created_at), 'dd MMM yyyy')}</span>
                               </div>
@@ -631,50 +667,120 @@ export default function MentorshipClient() {
                 </button>
               ))}
             </div>
+            {/* Managed by: Self vs DCW */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subject Name <span className="text-red-500">*</span></Label>
-              <Input placeholder="e.g. Mathematics, English..." value={formSubject} onChange={e => setFormSubject(e.target.value)} className="h-10" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total Amount (₹) <span className="text-red-500">*</span></Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
-                  <Input type="number" placeholder="100" value={formTotal} onChange={e => setFormTotal(e.target.value)} className="h-10 pl-7" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Student Paid (₹)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
-                  <Input type="number" placeholder="20" value={formPaid} onChange={e => setFormPaid(e.target.value)} className="h-10 pl-7" />
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Screenshot / Proof</Label>
-              <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
-              {formFile ? (
-                <div className="flex items-center gap-3 bg-violet-50 border-2 border-violet-200 rounded-xl px-4 py-3">
-                  <FileText className="w-4 h-4 text-violet-600 flex-shrink-0" />
-                  <span className="text-sm text-violet-800 font-medium flex-1 truncate">{formFile.name}</span>
-                  <button onClick={() => setFormFile(null)}><X className="w-4 h-4 text-gray-400 hover:text-red-500" /></button>
-                </div>
-              ) : (
+              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Managed By</Label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => fileRef.current?.click()}
-                  className="w-full flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 hover:border-violet-300 rounded-xl px-4 py-5 transition-colors group"
+                  onClick={() => setFormManagedBy('dcw')}
+                  className={`py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${formManagedBy === 'dcw' ? 'bg-violet-600 text-white border-violet-600 shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-violet-100 flex items-center justify-center transition-colors">
-                    <Upload className="w-5 h-5 text-gray-400 group-hover:text-violet-500 transition-colors" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-500 group-hover:text-violet-600">Upload screenshot</p>
-                    <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or PDF</p>
-                  </div>
+                  Managed by DCW
                 </button>
+                <button
+                  onClick={() => setFormManagedBy('self')}
+                  className={`py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${formManagedBy === 'self' ? 'bg-gray-800 text-white border-gray-800 shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                >
+                  By Self
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                {formManagedBy === 'dcw' ? 'DCW handles the work — payment details required.' : 'Student does it himself — only subjects, no payment.'}
+              </p>
+            </div>
+
+            {/* Subjects — add one by one */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subjects <span className="text-red-500">*</span></Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Type a subject, press Enter"
+                  value={formSubjectInput}
+                  onChange={e => setFormSubjectInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubject() } }}
+                  className="h-10 flex-1"
+                />
+                <Button type="button" variant="outline" className="h-10 px-4" onClick={addSubject}>Add</Button>
+              </div>
+              {formSubjects.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {formSubjects.map(sub => (
+                    <span key={sub} className="inline-flex items-center gap-1 bg-violet-100 text-violet-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                      {sub}
+                      <button onClick={() => setFormSubjects(prev => prev.filter(x => x !== sub))}>
+                        <X className="w-3 h-3 hover:text-red-500" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
+
+            {/* Work status */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Status</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'not_started', label: 'Not Started', cls: 'bg-gray-500 border-gray-500' },
+                  { value: 'in_progress', label: 'In Progress', cls: 'bg-amber-500 border-amber-500' },
+                  { value: 'completed',   label: 'Completed',   cls: 'bg-emerald-500 border-emerald-500' },
+                ] as const).map(st => (
+                  <button
+                    key={st.value}
+                    onClick={() => setFormStatus(st.value)}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all border-2 ${formStatus === st.value ? `${st.cls} text-white shadow-md` : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment — only for DCW-managed */}
+            {formManagedBy === 'dcw' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total Amount (₹) <span className="text-red-500">*</span></Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
+                      <Input type="number" placeholder="100" value={formTotal} onChange={e => setFormTotal(e.target.value)} className="h-10 pl-7" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Student Paid (₹)</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
+                      <Input type="number" placeholder="20" value={formPaid} onChange={e => setFormPaid(e.target.value)} className="h-10 pl-7" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Screenshot / Proof</Label>
+                  <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
+                  {formFile ? (
+                    <div className="flex items-center gap-3 bg-violet-50 border-2 border-violet-200 rounded-xl px-4 py-3">
+                      <FileText className="w-4 h-4 text-violet-600 flex-shrink-0" />
+                      <span className="text-sm text-violet-800 font-medium flex-1 truncate">{formFile.name}</span>
+                      <button onClick={() => setFormFile(null)}><X className="w-4 h-4 text-gray-400 hover:text-red-500" /></button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="w-full flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 hover:border-violet-300 rounded-xl px-4 py-5 transition-colors group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-violet-100 flex items-center justify-center transition-colors">
+                        <Upload className="w-5 h-5 text-gray-400 group-hover:text-violet-500 transition-colors" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-gray-500 group-hover:text-violet-600">Upload screenshot</p>
+                        <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or PDF</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1 h-10" onClick={() => setShowAdd(null)}>Cancel</Button>
               <Button

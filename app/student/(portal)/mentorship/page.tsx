@@ -16,6 +16,8 @@ interface MentorProfile {
 interface MentorRecord {
   id: string
   task_type: string
+  managed_by: string | null
+  work_status: string | null
   subject_name: string | null
   total_amount: number | null
   student_paid_amount: number | null
@@ -23,6 +25,12 @@ interface MentorRecord {
   status: string
   admin_remarks: string | null
   created_at: string
+}
+
+const WORK_STATUS_CFG: Record<string, { label: string; color: string }> = {
+  not_started: { label: 'Not Started', color: 'bg-gray-100 text-gray-600' },
+  in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-700' },
+  completed:   { label: 'Completed',   color: 'bg-emerald-100 text-emerald-700' },
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -77,7 +85,7 @@ export default function StudentMentorshipPage() {
         // Fetch mentorship records
         const { data: recs } = await (supabase as any)
           .from('student_mentorships')
-          .select('id, task_type, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, created_at')
+          .select('id, task_type, managed_by, work_status, subject_name, total_amount, student_paid_amount, screenshot_url, status, admin_remarks, created_at')
           .eq('student_id', student.id)
           .order('created_at', { ascending: false })
 
@@ -188,17 +196,25 @@ export default function StudentMentorshipPage() {
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${typeCfg.color}`}>
                               {typeCfg.label}
                             </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>
+                              {r.managed_by === 'self' ? 'By Self' : 'Managed by DCW'}
+                            </span>
+                            {r.work_status && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(WORK_STATUS_CFG[r.work_status] ?? WORK_STATUS_CFG.in_progress).color}`}>
+                                {(WORK_STATUS_CFG[r.work_status] ?? WORK_STATUS_CFG.in_progress).label}
+                              </span>
+                            )}
                             {r.subject_name && (
                               <span className="text-sm font-semibold text-gray-800">{r.subject_name}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
-                            {r.total_amount != null && (
+                            {r.managed_by !== 'self' && r.total_amount != null && (
                               <span className="flex items-center gap-0.5">
                                 <IndianRupee className="w-3 h-3" /> Total: ₹{r.total_amount}
                               </span>
                             )}
-                            {r.student_paid_amount != null && (
+                            {r.managed_by !== 'self' && r.student_paid_amount != null && (
                               <span className="text-emerald-600 font-medium">
                                 Paid: ₹{r.student_paid_amount}
                               </span>

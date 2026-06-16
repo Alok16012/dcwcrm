@@ -344,7 +344,7 @@ export default function MentorshipClient() {
             <table className="text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['S.No', 'Student', 'Enrollment No', "Father's Name", 'Phone', 'City', 'Course', 'Board', 'Session', 'Fee', 'Paid', 'Progress', 'Records', 'Actions'].map(h => (
+                  {['S.No', 'Enrollment No', 'Student', "Father's Name", 'Phone', 'City', 'Course', 'Board', 'Session', 'Fee', 'Paid', 'Progress', 'Records', 'Actions'].map(h => (
                     <th key={h} className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
                       {h}
                     </th>
@@ -366,6 +366,13 @@ export default function MentorshipClient() {
                       {/* S.No */}
                       <td className="px-3 py-3 text-gray-400 text-xs tabular-nums font-medium">{idx + 1}</td>
 
+                      {/* Enrollment */}
+                      <td className="px-3 py-3">
+                        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">
+                          {fmtEnroll(s.enrollment_number)}
+                        </span>
+                      </td>
+
                       {/* Student */}
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5 min-w-[140px]">
@@ -378,21 +385,20 @@ export default function MentorshipClient() {
                         </div>
                       </td>
 
-                      {/* Enrollment */}
-                      <td className="px-3 py-3">
-                        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">
-                          {fmtEnroll(s.enrollment_number)}
-                        </span>
-                      </td>
-
                       {/* Father */}
                       <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.father_name || '—'}</td>
 
-                      {/* Phone */}
+                      {/* Phone — tap to call */}
                       <td className="px-3 py-3">
-                        <span className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
-                          <Phone className="w-3 h-3 text-gray-400" />{s.phone}
-                        </span>
+                        {s.phone ? (
+                          <a
+                            href={`tel:${s.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap"
+                          >
+                            <Phone className="w-3 h-3" />{s.phone}
+                          </a>
+                        ) : <span className="text-gray-400 text-xs">—</span>}
                       </td>
 
                       {/* City */}

@@ -635,7 +635,7 @@ export default function MentorshipClient() {
 
       {/* Add Record Modal */}
       <Dialog open={!!showAdd} onOpenChange={open => !open && setShowAdd(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-md max-h-[88vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-gray-900">
               <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">

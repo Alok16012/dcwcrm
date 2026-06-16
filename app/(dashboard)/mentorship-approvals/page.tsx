@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, GraduationCap, RefreshCw, IndianRupee,
-  Users, Search, Award, UserCog, Clock, ClipboardList, Download,
+  Users, Search, Award, UserCog, Clock, ClipboardList, Download, FileText, X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -70,6 +70,9 @@ export default function MentorshipDashboardPage() {
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [salaryPct, setSalaryPct] = useState<Record<string, string>>({})
   const [adminRemarks, setAdminRemarks] = useState<Record<string, string>>({})
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [previewImg, setPreviewImg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -168,7 +171,50 @@ export default function MentorshipDashboardPage() {
       if (error) throw error
       toast.success('Mentorship rejected')
       setMentorships(prev => prev.filter(m => m.id !== id))
+      setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
     } catch { toast.error('Failed to reject') } finally { setApprovingId(null) }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.size === mentorships.length ? new Set() : new Set(mentorships.map(m => m.id)))
+  }
+
+  async function bulkApprove() {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const ids = Array.from(selectedIds)
+      // per-record salary% / remarks if set; otherwise plain approve
+      await Promise.all(ids.map(id =>
+        (supabase as any).from('student_mentorships').update({
+          status: 'approved',
+          salary_percentage: salaryPct[id] ? parseFloat(salaryPct[id]) : null,
+          admin_remarks: adminRemarks[id] || null,
+          approved_by: user?.id ?? null, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', id)
+      ))
+      toast.success(`Approved ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
+      setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
+      setSelectedIds(new Set())
+    } catch { toast.error('Bulk approve failed') } finally { setBulkBusy(false) }
+  }
+
+  async function bulkReject() {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const { error } = await (supabase as any).from('student_mentorships')
+        .update({ status: 'rejected', updated_at: new Date().toISOString() }).in('id', ids)
+      if (error) throw error
+      toast.success(`Rejected ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
+      setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
+      setSelectedIds(new Set())
+    } catch { toast.error('Bulk reject failed') } finally { setBulkBusy(false) }
   }
 
   // derived
@@ -394,16 +440,43 @@ export default function MentorshipDashboardPage() {
           </div>
         ) : (
           <div className="rounded-xl border overflow-hidden bg-white">
-            <div className="px-4 py-2.5 bg-violet-50 border-b flex items-center justify-between">
-              <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Pending Approvals</p>
-              <span className="text-xs text-violet-600">{mentorships.length} pending</span>
+            <div className="px-4 py-2.5 bg-violet-50 border-b flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 accent-violet-600 cursor-pointer"
+                  checked={mentorships.length > 0 && selectedIds.size === mentorships.length}
+                  ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < mentorships.length }}
+                  onChange={toggleSelectAll}
+                />
+                <span className="text-xs font-bold text-violet-700 uppercase tracking-wider">Pending Approvals</span>
+              </label>
+              {selectedIds.size > 0 ? (
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-xs font-semibold text-violet-700">{selectedIds.size} selected</span>
+                  <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700" disabled={bulkBusy} onClick={bulkApprove}>
+                    {bulkBusy ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve {selectedIds.size}</>}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50" disabled={bulkBusy} onClick={bulkReject}>
+                    <XCircle className="w-3.5 h-3.5" /> Reject
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-xs text-violet-600 ml-auto">{mentorships.length} pending</span>
+              )}
             </div>
             <div className="divide-y">
               {mentorships.map((m: any) => {
                 const t = TYPE_LABELS[m.task_type] ?? { label: m.task_type, cls: 'bg-gray-100 text-gray-700' }
                 return (
-                  <div key={m.id} className="px-4 py-4">
-                    <div className="flex items-start gap-4 flex-wrap sm:flex-nowrap">
+                  <div key={m.id} className={`px-4 py-4 ${selectedIds.has(m.id) ? 'bg-violet-50/40' : ''}`}>
+                    <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 mt-1 rounded border-gray-300 accent-violet-600 cursor-pointer flex-shrink-0"
+                        checked={selectedIds.has(m.id)}
+                        onChange={() => toggleSelect(m.id)}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-bold text-gray-800">{m.student?.full_name ?? '—'}</span>
@@ -425,7 +498,20 @@ export default function MentorshipDashboardPage() {
                           {m.managed_by !== 'self' && m.student_paid_amount != null && <> · Paid ₹{m.student_paid_amount}</>}
                           <> · {format(new Date(m.created_at), 'dd MMM yyyy')}</>
                         </p>
-                        {m.screenshot_url && <a href={m.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">View proof</a>}
+                        {m.managed_by !== 'self' && (
+                          m.screenshot_url ? (
+                            <button
+                              onClick={() => setPreviewImg(m.screenshot_url)}
+                              className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-100"
+                            >
+                              <FileText className="w-3.5 h-3.5" /> View Screenshot / Proof
+                            </button>
+                          ) : (
+                            <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                              <XCircle className="w-3 h-3" /> No screenshot uploaded
+                            </p>
+                          )
+                        )}
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                           <div className="flex items-center gap-1.5">
                             <IndianRupee className="w-3.5 h-3.5 text-green-600" />
@@ -453,6 +539,27 @@ export default function MentorshipDashboardPage() {
             </div>
           </div>
         )
+      )}
+
+      {/* Screenshot preview */}
+      {previewImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewImg(null)}
+        >
+          <button
+            onClick={() => setPreviewImg(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white"
+          >
+            <X className="w-5 h-5 text-gray-700" />
+          </button>
+          {/\.pdf($|\?)/i.test(previewImg) ? (
+            <iframe src={previewImg} className="w-full max-w-3xl h-[80vh] rounded-xl bg-white" onClick={e => e.stopPropagation()} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewImg} alt="Proof" className="max-w-full max-h-[85vh] rounded-xl object-contain" onClick={e => e.stopPropagation()} />
+          )}
+        </div>
       )}
     </div>
   )

@@ -233,9 +233,13 @@ export default function MentorshipClient() {
         const ext = formFile.name.split('.').pop()
         const path = `mentorship/${user.id}/${showAdd}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from('student-documents').upload(path, formFile, { upsert: true })
-        if (upErr) throw upErr
-        const { data: urlData } = supabase.storage.from('student-documents').getPublicUrl(path)
-        screenshotUrl = urlData.publicUrl
+        if (upErr) {
+          // Don't abort the whole record — save it without the screenshot and warn.
+          toast.warning('Screenshot upload failed — record saved without it. (Ask admin to create the storage bucket)')
+        } else {
+          const { data: urlData } = supabase.storage.from('student-documents').getPublicUrl(path)
+          screenshotUrl = urlData.publicUrl
+        }
       }
       const isDcw = formManagedBy === 'dcw'
       const { error } = await (supabase as any).from('student_mentorships').insert({

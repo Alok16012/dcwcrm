@@ -85,9 +85,12 @@ export default function MentorshipDashboardPage() {
           .neq('status', 'dropped').order('full_name'),
         (supabase as any).from('profiles').select('id, full_name')
           .in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
-        (supabase as any).from('student_mentorships')
-          .select(`*, student:students(id, full_name, enrollment_number, phone),
-            telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)`)
+        (supabase as any).from('mentorship_payments')
+          .select(`*, mentorship:student_mentorships!mentorship_payments_mentorship_id_fkey(
+            managed_by, total_amount,
+            student:students(id, full_name, enrollment_number, phone),
+            telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)
+          )`)
           .eq('status', 'pending').order('created_at', { ascending: false }),
       ])
       setStudents((studRes.data ?? []) as StudentRow[])
@@ -153,7 +156,7 @@ export default function MentorshipDashboardPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const pct = salaryPct[id] ? parseFloat(salaryPct[id]) : null
-      const { error } = await (supabase as any).from('student_mentorships').update({
+      const { error } = await (supabase as any).from('mentorship_payments').update({
         status: 'approved', salary_percentage: pct, admin_remarks: adminRemarks[id] || null,
         approved_by: user?.id ?? null, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       }).eq('id', id)
@@ -166,7 +169,7 @@ export default function MentorshipDashboardPage() {
   async function reject(id: string) {
     setApprovingId(id)
     try {
-      const { error } = await (supabase as any).from('student_mentorships')
+      const { error } = await (supabase as any).from('mentorship_payments')
         .update({ status: 'rejected', admin_remarks: adminRemarks[id] || null, updated_at: new Date().toISOString() }).eq('id', id)
       if (error) throw error
       toast.success('Mentorship rejected')
@@ -190,7 +193,7 @@ export default function MentorshipDashboardPage() {
       const ids = Array.from(selectedIds)
       // per-record salary% / remarks if set; otherwise plain approve
       await Promise.all(ids.map(id =>
-        (supabase as any).from('student_mentorships').update({
+        (supabase as any).from('mentorship_payments').update({
           status: 'approved',
           salary_percentage: salaryPct[id] ? parseFloat(salaryPct[id]) : null,
           admin_remarks: adminRemarks[id] || null,
@@ -208,7 +211,7 @@ export default function MentorshipDashboardPage() {
     setBulkBusy(true)
     try {
       const ids = Array.from(selectedIds)
-      const { error } = await (supabase as any).from('student_mentorships')
+      const { error } = await (supabase as any).from('mentorship_payments')
         .update({ status: 'rejected', updated_at: new Date().toISOString() }).in('id', ids)
       if (error) throw error
       toast.success(`Rejected ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
@@ -467,7 +470,8 @@ export default function MentorshipDashboardPage() {
             </div>
             <div className="divide-y">
               {mentorships.map((m: any) => {
-                const t = TYPE_LABELS[m.task_type] ?? { label: m.task_type, cls: 'bg-gray-100 text-gray-700' }
+                const stu = m.mentorship?.student
+                const mentorName = m.mentorship?.telecaller?.full_name
                 return (
                   <div key={m.id} className={`px-4 py-4 ${selectedIds.has(m.id) ? 'bg-violet-50/40' : ''}`}>
                     <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
@@ -479,38 +483,29 @@ export default function MentorshipDashboardPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-bold text-gray-800">{m.student?.full_name ?? '—'}</span>
-                          {m.student?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(m.student.enrollment_number)}</span>}
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.cls}`}>{t.label}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>
-                            {m.managed_by === 'self' ? 'By Self' : 'DCW'}
+                          <span className="text-sm font-bold text-gray-800">{stu?.full_name ?? '—'}</span>
+                          {stu?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</span>}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 flex items-center gap-0.5">
+                            <IndianRupee className="w-2.5 h-2.5" />{Number(m.amount).toLocaleString('en-IN')} payment
                           </span>
-                          {m.work_status && (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.work_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : m.work_status === 'not_started' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>
-                              {m.work_status === 'completed' ? 'Completed' : m.work_status === 'not_started' ? 'Not Started' : 'In Progress'}
-                            </span>
-                          )}
-                          {m.subject_name && <span className="text-xs font-semibold text-gray-700">{m.subject_name}</span>}
+                          {m.note && <span className="text-xs font-semibold text-gray-700">{m.note}</span>}
                         </div>
                         <p className="text-xs text-gray-500">
-                          Mentor: <span className="font-semibold text-gray-700">{m.telecaller?.full_name ?? '—'}</span>
-                          {m.managed_by !== 'self' && m.total_amount != null && <> · Total ₹{m.total_amount}</>}
-                          {m.managed_by !== 'self' && m.student_paid_amount != null && <> · Paid ₹{m.student_paid_amount}</>}
+                          Mentor: <span className="font-semibold text-gray-700">{mentorName ?? '—'}</span>
+                          {m.mentorship?.total_amount != null && <> · Case total ₹{m.mentorship.total_amount}</>}
                           <> · {format(new Date(m.created_at), 'dd MMM yyyy')}</>
                         </p>
-                        {m.managed_by !== 'self' && (
-                          m.screenshot_url ? (
-                            <button
-                              onClick={() => setPreviewImg(m.screenshot_url)}
-                              className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-100"
-                            >
-                              <FileText className="w-3.5 h-3.5" /> View Screenshot / Proof
-                            </button>
-                          ) : (
-                            <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                              <XCircle className="w-3 h-3" /> No screenshot uploaded
-                            </p>
-                          )
+                        {m.screenshot_url ? (
+                          <button
+                            onClick={() => setPreviewImg(m.screenshot_url)}
+                            className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-100"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> View Screenshot / Proof
+                          </button>
+                        ) : (
+                          <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                            <XCircle className="w-3 h-3" /> No screenshot uploaded
+                          </p>
                         )}
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                           <div className="flex items-center gap-1.5">

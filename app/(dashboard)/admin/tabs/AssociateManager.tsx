@@ -226,34 +226,43 @@ export function AssociateManager() {
   ]
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-slate-700">Associates Overview</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5 h-8">
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 h-8">
-            <UserPlus className="w-3.5 h-3.5" /> Add Associate
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Total Dashboard ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        {[
-          { label: 'Total Associates', value: associates.length.toString(), cls: 'bg-blue-50 border-blue-100 text-blue-700' },
-          { label: 'Approved',         value: approved.toString(),          cls: 'bg-green-50 border-green-100 text-green-700' },
-          { label: 'Pending',          value: pending.toString(),           cls: 'bg-amber-50 border-amber-100 text-amber-700' },
-          { label: 'Students Referred',value: totalStudents.toString(),     cls: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
-          { label: 'Total Fee',        value: fmtAgg(totalRevenue),         cls: 'bg-purple-50 border-purple-100 text-purple-700' },
-          { label: 'Received',         value: fmtAgg(totalReceived),        cls: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-        ].map(s => (
-          <div key={s.label} className={`border rounded-xl px-3 py-2.5 ${s.cls}`}>
-            <p className="text-base sm:text-lg font-extrabold leading-tight truncate">{s.value}</p>
-            <p className="text-[10px] font-semibold opacity-70 mt-0.5">{s.label}</p>
+    <div className="space-y-5">
+      {/* ── Hero Dashboard ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+        <div className="absolute bottom-0 left-1/3 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Users className="w-4 h-4" /></div>
+              <h1 className="text-xl font-bold tracking-tight">Associates Overview</h1>
+            </div>
+            <p className="text-violet-200 text-sm mt-1">Associates, coordinators, referred students & revenue</p>
           </div>
-        ))}
+          <div className="flex gap-2">
+            <button onClick={load} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium">
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-1.5 bg-white text-violet-700 hover:bg-violet-50 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">
+              <UserPlus className="w-3.5 h-3.5" /> Add Associate
+            </button>
+          </div>
+        </div>
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+          {[
+            { label: 'Total Associates', value: associates.length.toString() },
+            { label: 'Approved',         value: approved.toString() },
+            { label: 'Pending',          value: pending.toString() },
+            { label: 'Students Referred',value: totalStudents.toString() },
+            { label: 'Total Fee',        value: fmtAgg(totalRevenue) },
+            { label: 'Received',         value: fmtAgg(totalReceived) },
+          ].map(s => (
+            <div key={s.label} className="bg-white/15 rounded-xl px-3 py-3 backdrop-blur-sm">
+              <p className="text-lg font-bold text-white leading-tight truncate">{s.value}</p>
+              <p className="text-[11px] text-white/70 font-medium mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {(studentsByCoordinator.length > 0 || studentsByBoard.length > 0) && (

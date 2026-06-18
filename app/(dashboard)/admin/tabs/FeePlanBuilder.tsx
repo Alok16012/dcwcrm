@@ -76,8 +76,8 @@ const DEFAULT: FeeState = {
 
 const FeePlanDocument = dynamic(() => import('./FeePlanDocument'), { ssr: false })
 
-const PLAN_TEXT: Record<string, string> = { basic: 'text-blue-700', standard: 'text-yellow-700', premium: 'text-purple-700' }
-const PLAN_BORDER: Record<string, string> = { basic: 'border-blue-200 bg-blue-50', standard: 'border-yellow-200 bg-yellow-50', premium: 'border-purple-200 bg-purple-50' }
+const PLAN_TEXT: Record<string, string> = { basic: 'text-blue-700', standard: 'text-yellow-700', premium: 'text-blue-700' }
+const PLAN_BORDER: Record<string, string> = { basic: 'border-blue-200 bg-blue-50', standard: 'border-yellow-200 bg-yellow-50', premium: 'border-blue-200 bg-blue-50' }
 
 export function FeePlanBuilder() {
   const db = createClient() as any

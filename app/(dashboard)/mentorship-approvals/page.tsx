@@ -39,12 +39,12 @@ const MODE_CLS: Record<string, string> = {
 const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
   practical:  { label: 'Practical',  cls: 'bg-emerald-100 text-emerald-800' },
   assignment: { label: 'Assignment', cls: 'bg-blue-100 text-blue-800' },
-  theory:     { label: 'Theory',     cls: 'bg-purple-100 text-purple-800' },
+  theory:     { label: 'Theory',     cls: 'bg-blue-100 text-blue-800' },
   work_assignment: { label: 'Work Assignment', cls: 'bg-blue-100 text-blue-800' },
-  exam:       { label: 'Exam',       cls: 'bg-purple-100 text-purple-800' },
+  exam:       { label: 'Exam',       cls: 'bg-blue-100 text-blue-800' },
 }
 
-const AVATAR = ['from-violet-500 to-purple-600','from-blue-500 to-cyan-600','from-emerald-500 to-teal-600','from-rose-500 to-pink-600','from-amber-500 to-orange-600','from-indigo-500 to-blue-600']
+const AVATAR = ['from-blue-500 to-blue-600','from-blue-500 to-cyan-600','from-emerald-500 to-teal-600','from-rose-500 to-pink-600','from-amber-500 to-orange-600','from-indigo-500 to-blue-600']
 function pal(name: string) { let h = 0; for (let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff; return AVATAR[h%AVATAR.length] }
 function inits(name: string) { return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() }
 
@@ -253,7 +253,7 @@ export default function MentorshipDashboardPage() {
   return (
     <div className="space-y-5">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -261,7 +261,7 @@ export default function MentorshipDashboardPage() {
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Award className="w-4 h-4" /></div>
               <h1 className="text-xl font-bold tracking-tight">Mentorship Dashboard</h1>
             </div>
-            <p className="text-violet-200 text-sm mt-1">Counselor-wise students, mentor assignment & work approvals</p>
+            <p className="text-blue-200 text-sm mt-1">Counselor-wise students, mentor assignment & work approvals</p>
           </div>
           <button onClick={load} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -286,18 +286,18 @@ export default function MentorshipDashboardPage() {
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         <button onClick={() => setTab('students')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='students' ? 'border-violet-600 text-violet-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='students' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
           <Users className="w-4 h-4" /> Students & Mentors
         </button>
         <button onClick={() => setTab('approvals')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='approvals' ? 'border-violet-600 text-violet-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='approvals' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
           <ClipboardList className="w-4 h-4" /> Approvals
           {mentorships.length > 0 && <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{mentorships.length}</span>}
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
       ) : tab === 'students' ? (
         <>
           {/* Counselor chips */}
@@ -308,7 +308,7 @@ export default function MentorshipDashboardPage() {
             </button>
             {counselors.filter(c => counselorCounts[c.id]).map(c => (
               <button key={c.id} onClick={() => setCounselorFilter(c.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${counselorFilter===c.id ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${counselorFilter===c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
                 {c.full_name} <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${counselorFilter===c.id?'bg-white/20':'bg-gray-100 text-gray-500'}`}>{counselorCounts[c.id]}</span>
               </button>
             ))}
@@ -323,7 +323,7 @@ export default function MentorshipDashboardPage() {
             <div className="relative flex-1 min-w-[180px] max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, phone, enroll…"
-                className="w-full pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400" />
+                className="w-full pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
             </div>
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-auto min-w-[150px] h-9 text-xs gap-1">
@@ -362,7 +362,7 @@ export default function MentorshipDashboardPage() {
               </SelectContent>
             </Select>
             {(departmentFilter!=='all' || courseFilter!=='all' || boardFilter!=='all' || sessionFilter!=='all' || search || counselorFilter!=='all') && (
-              <button onClick={() => { setDepartmentFilter('all'); setCourseFilter('all'); setBoardFilter('all'); setSessionFilter('all'); setSearch(''); setCounselorFilter('all') }} className="text-xs text-violet-600 hover:underline">Clear</button>
+              <button onClick={() => { setDepartmentFilter('all'); setCourseFilter('all'); setBoardFilter('all'); setSessionFilter('all'); setSearch(''); setCounselorFilter('all') }} className="text-xs text-blue-600 hover:underline">Clear</button>
             )}
             <Button variant="outline" size="sm" onClick={exportExcel} className="gap-1.5 h-9 ml-auto" disabled={filtered.length === 0}>
               <Download className="w-3.5 h-3.5" /> Export Excel
@@ -389,7 +389,7 @@ export default function MentorshipDashboardPage() {
                   <tbody className="divide-y divide-gray-100">
                     {filtered.map((s, idx) => {
                       return (
-                        <tr key={s.id} className="hover:bg-violet-50/30 transition-colors">
+                        <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
                           <td className="px-3 py-3 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
                           <td className="px-3 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">{fmtEnroll(s.enrollment_number)}</span></td>
                           <td className="px-3 py-3">
@@ -403,12 +403,12 @@ export default function MentorshipDashboardPage() {
                           <td className="px-3 py-3">{s.mode ? <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold border whitespace-nowrap ${MODE_CLS[s.mode] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>{s.mode === 'attending' ? 'Attending' : 'Non-Attending'}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3">{s.department?.name ? <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.department.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3"><span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.course?.name ?? '—'}</span></td>
-                          <td className="px-3 py-3">{s.sub_section?.name ? <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-lg font-bold whitespace-nowrap">{s.sub_section.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
+                          <td className="px-3 py-3">{s.sub_section?.name ? <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold whitespace-nowrap">{s.sub_section.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                           <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.session?.name ?? '—'}</td>
                           <td className="px-3 py-3">
                             <div className="min-w-[170px]">
                               <Select value={s.mentor_telecaller_id ?? 'none'} onValueChange={(v) => changeMentor(s.id, v)} disabled={changingId === s.id}>
-                                <SelectTrigger className={`h-8 text-xs ${s.mentor_telecaller_id ? 'border-violet-200 bg-violet-50' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                                <SelectTrigger className={`h-8 text-xs ${s.mentor_telecaller_id ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
                                   <SelectValue placeholder="Assign mentor…">
                                     {changingId === s.id ? 'Updating…' : (s.mentor_telecaller_id ? conName[s.mentor_telecaller_id] ?? 'Unknown' : 'Assign mentor…')}
                                   </SelectValue>
@@ -443,20 +443,20 @@ export default function MentorshipDashboardPage() {
           </div>
         ) : (
           <div className="rounded-xl border overflow-hidden bg-white">
-            <div className="px-4 py-2.5 bg-violet-50 border-b flex items-center gap-3 flex-wrap">
+            <div className="px-4 py-2.5 bg-blue-50 border-b flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 accent-violet-600 cursor-pointer"
+                  className="h-4 w-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
                   checked={mentorships.length > 0 && selectedIds.size === mentorships.length}
                   ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < mentorships.length }}
                   onChange={toggleSelectAll}
                 />
-                <span className="text-xs font-bold text-violet-700 uppercase tracking-wider">Pending Approvals</span>
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Pending Approvals</span>
               </label>
               {selectedIds.size > 0 ? (
                 <div className="flex items-center gap-2 ml-auto">
-                  <span className="text-xs font-semibold text-violet-700">{selectedIds.size} selected</span>
+                  <span className="text-xs font-semibold text-blue-700">{selectedIds.size} selected</span>
                   <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700" disabled={bulkBusy} onClick={bulkApprove}>
                     {bulkBusy ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve {selectedIds.size}</>}
                   </Button>
@@ -465,7 +465,7 @@ export default function MentorshipDashboardPage() {
                   </Button>
                 </div>
               ) : (
-                <span className="text-xs text-violet-600 ml-auto">{mentorships.length} pending</span>
+                <span className="text-xs text-blue-600 ml-auto">{mentorships.length} pending</span>
               )}
             </div>
             <div className="divide-y">
@@ -473,11 +473,11 @@ export default function MentorshipDashboardPage() {
                 const stu = m.mentorship?.student
                 const mentorName = m.mentorship?.telecaller?.full_name
                 return (
-                  <div key={m.id} className={`px-4 py-4 ${selectedIds.has(m.id) ? 'bg-violet-50/40' : ''}`}>
+                  <div key={m.id} className={`px-4 py-4 ${selectedIds.has(m.id) ? 'bg-blue-50/40' : ''}`}>
                     <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 mt-1 rounded border-gray-300 accent-violet-600 cursor-pointer flex-shrink-0"
+                        className="h-4 w-4 mt-1 rounded border-gray-300 accent-blue-600 cursor-pointer flex-shrink-0"
                         checked={selectedIds.has(m.id)}
                         onChange={() => toggleSelect(m.id)}
                       />
@@ -512,11 +512,11 @@ export default function MentorshipDashboardPage() {
                             <IndianRupee className="w-3.5 h-3.5 text-green-600" />
                             <input type="number" min="0" max="100" step="0.5" placeholder="Salary % bonus"
                               value={salaryPct[m.id] ?? ''} onChange={e => setSalaryPct(p => ({ ...p, [m.id]: e.target.value }))}
-                              className="w-32 h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                              className="w-32 h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                           </div>
                           <input type="text" placeholder="Admin remarks (optional)"
                             value={adminRemarks[m.id] ?? ''} onChange={e => setAdminRemarks(p => ({ ...p, [m.id]: e.target.value }))}
-                            className="flex-1 min-w-[160px] h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                            className="flex-1 min-w-[160px] h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                         </div>
                       </div>
                       <div className="flex sm:flex-col gap-2 flex-shrink-0">

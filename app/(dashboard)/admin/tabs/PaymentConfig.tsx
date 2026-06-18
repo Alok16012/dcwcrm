@@ -112,7 +112,7 @@ export function PaymentConfig({ departments }: Props) {
           {/* Part Payment Rules */}
           <Card className={cfg.part_payment ? '' : 'opacity-50 pointer-events-none'}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2"><SplitSquareVertical className="w-4 h-4 text-purple-500" />Part Payment Rules</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2"><SplitSquareVertical className="w-4 h-4 text-blue-500" />Part Payment Rules</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>

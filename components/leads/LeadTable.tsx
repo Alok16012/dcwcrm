@@ -29,7 +29,7 @@ import {
 } from '@/types/app.types'
 
 const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-violet-500', 'bg-pink-500', 'bg-emerald-500',
+  'bg-blue-500', 'bg-blue-500', 'bg-pink-500', 'bg-emerald-500',
   'bg-orange-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500',
 ]
 
@@ -48,7 +48,7 @@ function getInitials(name: string) {
 const STATUS_COLORS: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 border-blue-200',
   contacted: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  interested: 'bg-purple-50 text-purple-700 border-purple-200',
+  interested: 'bg-blue-50 text-blue-700 border-blue-200',
   counselled: 'bg-orange-50 text-orange-700 border-orange-200',
   document_received: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   converted: 'bg-green-50 text-green-700 border-green-200',
@@ -63,7 +63,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  new: 'bg-blue-500', contacted: 'bg-yellow-500', interested: 'bg-purple-500',
+  new: 'bg-blue-500', contacted: 'bg-yellow-500', interested: 'bg-blue-500',
   counselled: 'bg-orange-500', document_received: 'bg-cyan-500', converted: 'bg-green-500',
   lost: 'bg-red-500', dnp: 'bg-slate-400', switch_off: 'bg-zinc-400',
   not_reachable: 'bg-gray-400', not_interested: 'bg-rose-500',

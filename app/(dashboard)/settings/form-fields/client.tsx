@@ -36,7 +36,7 @@ const FIELD_TYPES = [
 
 const TYPE_COLORS: Record<string, string> = {
   text: 'bg-blue-100 text-blue-700',
-  number: 'bg-purple-100 text-purple-700',
+  number: 'bg-blue-100 text-blue-700',
   email: 'bg-green-100 text-green-700',
   phone: 'bg-yellow-100 text-yellow-700',
   textarea: 'bg-orange-100 text-orange-700',

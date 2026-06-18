@@ -228,7 +228,7 @@ export function AssociateManager() {
   return (
     <div className="space-y-5">
       {/* ── Hero Dashboard ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-1/3 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
         <div className="relative flex items-start justify-between gap-4 flex-wrap">
@@ -237,13 +237,13 @@ export function AssociateManager() {
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Users className="w-4 h-4" /></div>
               <h1 className="text-xl font-bold tracking-tight">Associates Overview</h1>
             </div>
-            <p className="text-violet-200 text-sm mt-1">Associates, coordinators, referred students & revenue</p>
+            <p className="text-blue-200 text-sm mt-1">Associates, coordinators, referred students & revenue</p>
           </div>
           <div className="flex gap-2">
             <button onClick={load} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium">
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </button>
-            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-1.5 bg-white text-violet-700 hover:bg-violet-50 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">
               <UserPlus className="w-3.5 h-3.5" /> Add Associate
             </button>
           </div>
@@ -290,7 +290,7 @@ export function AssociateManager() {
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Board</p>
             <div className="flex flex-wrap gap-1.5">
               {studentsByBoard.length === 0 ? <span className="text-xs text-gray-300">—</span> : studentsByBoard.map(([b, n]) => (
-                <span key={b} className="text-xs bg-violet-50 border border-violet-100 text-violet-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-violet-500">· {n}</span></span>
+                <span key={b} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-blue-500">· {n}</span></span>
               ))}
             </div>
           </div>

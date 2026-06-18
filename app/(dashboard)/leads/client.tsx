@@ -144,7 +144,7 @@ export function LeadsClient() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         <StatCard label="Total Leads" value={stats.total} icon={Users} color="bg-blue-100 text-blue-600" />
-        <StatCard label="New Today" value={stats.newToday} icon={TrendingUp} color="bg-violet-100 text-violet-600" />
+        <StatCard label="New Today" value={stats.newToday} icon={TrendingUp} color="bg-blue-100 text-blue-600" />
         <StatCard label="Converted" value={stats.converted} icon={CheckCircle} color="bg-emerald-100 text-emerald-600" />
         <StatCard label="Followup Due" value={stats.followupDue} icon={Clock} color="bg-amber-100 text-amber-600" />
       </div>

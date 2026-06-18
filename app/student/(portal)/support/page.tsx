@@ -157,23 +157,23 @@ export default function SupportPage() {
 
         {/* Mentor contact */}
         {mentor && (
-          <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm">
               {mentor.full_name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-0.5">Your Mentor</p>
-              <p className="text-sm font-bold text-violet-900">{mentor.full_name}</p>
-              {mentor.phone && <p className="text-xs text-violet-600 font-mono">{mentor.phone}</p>}
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-0.5">Your Mentor</p>
+              <p className="text-sm font-bold text-blue-900">{mentor.full_name}</p>
+              {mentor.phone && <p className="text-xs text-blue-600 font-mono">{mentor.phone}</p>}
             </div>
             {mentor.phone && (
               <div className="flex gap-2 shrink-0">
                 <a href={`tel:${mentor.phone}`}
-                  className="flex items-center gap-1 bg-white border border-violet-300 text-violet-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-colors">
+                  className="flex items-center gap-1 bg-white border border-blue-300 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:bg-blue-50 transition-colors">
                   <PhoneCall className="h-3.5 w-3.5" /> Call
                 </a>
                 <a href={`https://wa.me/91${mentor.phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+                  className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
                   <Phone className="h-3.5 w-3.5" /> WhatsApp
                 </a>
               </div>

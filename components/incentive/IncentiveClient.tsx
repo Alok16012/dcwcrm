@@ -134,9 +134,9 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="rounded-lg border p-3 sm:p-4 bg-purple-50">
-          <p className="text-xs sm:text-sm text-purple-700 font-medium">Total Incentive</p>
-          <p className="text-lg sm:text-2xl font-bold text-purple-900 break-words">{fmt(totalIncentive)}</p>
+        <div className="rounded-lg border p-3 sm:p-4 bg-blue-50">
+          <p className="text-xs sm:text-sm text-blue-700 font-medium">Total Incentive</p>
+          <p className="text-lg sm:text-2xl font-bold text-blue-900 break-words">{fmt(totalIncentive)}</p>
         </div>
         <div className="rounded-lg border p-3 sm:p-4 bg-green-50">
           <p className="text-xs sm:text-sm text-green-700 font-medium">Paid</p>
@@ -174,7 +174,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
               {payrollRows.map((row, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{MONTH_NAMES[row.month - 1]} {row.year}</td>
-                  <td className="px-4 py-3 text-right text-purple-700 font-semibold whitespace-nowrap">{fmt(row.incentive ?? 0)}</td>
+                  <td className="px-4 py-3 text-right text-blue-700 font-semibold whitespace-nowrap">{fmt(row.incentive ?? 0)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(row.net ?? 0)}</td>
                   <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
                     {row.payment_date ? new Date(row.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
@@ -200,7 +200,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-base">My Student Enrollments — Month-wise</h3>
-            <span className="text-sm text-purple-700 font-bold bg-purple-50 px-3 py-1 rounded-full">
+            <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
               Total: {fmt(studentIncentives.reduce((s, r) => s + r.incentive_amount, 0))}
             </span>
           </div>
@@ -227,15 +227,15 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
                 {months.map(([key, { label, total, students }]) => (
                   <div key={key} className="rounded-lg border overflow-hidden">
                     {/* Month header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border-b">
+                    <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
-                        <span className="font-semibold text-sm text-purple-900">{label}</span>
-                        <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                        <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                        <span className="font-semibold text-sm text-blue-900">{label}</span>
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
                           {students.length} student{students.length > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <span className="font-bold text-purple-700">{fmt(total)}</span>
+                      <span className="font-bold text-blue-700">{fmt(total)}</span>
                     </div>
                     {/* Students in this month */}
                     <div className="overflow-x-auto">

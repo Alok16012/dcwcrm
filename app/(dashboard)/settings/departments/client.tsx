@@ -66,22 +66,22 @@ function AddSubSectionsPanel({ departmentId, onSave, onCancel, saving }: {
     }
 
     return (
-        <div className="border-t border-purple-200 bg-purple-50/40 px-4 py-3 space-y-2">
-            <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <div className="border-t border-blue-200 bg-blue-50/40 px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <School className="w-3.5 h-3.5" /> Add University / Board
-                <span className="text-purple-500 font-normal normal-case">(Press Enter for new row)</span>
+                <span className="text-blue-500 font-normal normal-case">(Press Enter for new row)</span>
             </p>
             <div className="space-y-1.5">
                 {rows.map((row, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-purple-500 font-bold w-5 text-right flex-shrink-0">{i + 1}.</span>
+                        <span className="text-xs text-blue-500 font-bold w-5 text-right flex-shrink-0">{i + 1}.</span>
                         <Input
                             ref={i === rows.length - 1 ? lastInputRef : undefined}
                             value={row}
                             onChange={(e) => updateRow(i, e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, i)}
                             placeholder={`University / Board ${i + 1} name...`}
-                            className="h-8 text-sm bg-white border-purple-200 focus:border-purple-400"
+                            className="h-8 text-sm bg-white border-blue-200 focus:border-blue-400"
                             autoFocus={i === 0}
                         />
                         <button onClick={() => removeRow(i)} className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0">
@@ -90,11 +90,11 @@ function AddSubSectionsPanel({ departmentId, onSave, onCancel, saving }: {
                     </div>
                 ))}
             </div>
-            <button onClick={addRow} className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium mt-1 px-1">
+            <button onClick={addRow} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 px-1">
                 <Plus className="w-3.5 h-3.5" /> Add another
             </button>
             <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" onClick={handleSave} disabled={saving || rows.every((r) => !r.trim())} className="bg-purple-600 hover:bg-purple-700 h-8 text-xs px-4">
+                <Button size="sm" onClick={handleSave} disabled={saving || rows.every((r) => !r.trim())} className="bg-blue-600 hover:bg-blue-700 h-8 text-xs px-4">
                     {saving ? 'Saving...' : `Save ${rows.filter((r) => r.trim()).length} Item${rows.filter((r) => r.trim()).length !== 1 ? 's' : ''}`}
                 </Button>
                 <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700 px-2">Cancel</button>
@@ -268,7 +268,7 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
                                     <div className="px-16 py-3 text-xs text-gray-400 flex items-center gap-2 bg-gray-50/60">
                                         <School className="w-3.5 h-3.5" />
                                         No boards yet —
-                                        <button onClick={() => setAddingSubTo(dept.id)} className="text-purple-600 hover:underline font-medium">add one</button>
+                                        <button onClick={() => setAddingSubTo(dept.id)} className="text-blue-600 hover:underline font-medium">add one</button>
                                     </div>
                                 )}
                                 {dept.department_sub_sections.length > 0 && (
@@ -276,8 +276,8 @@ export function DepartmentsClient({ departments: initial }: { departments: Depar
                                         {dept.department_sub_sections.map((sub) => (
                                             <div key={sub.id} className="flex items-center gap-3 px-4 py-2.5 group">
                                                 <div className="w-6 flex-shrink-0" />
-                                                <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center flex-shrink-0 ml-7">
-                                                    <School className="w-3 h-3 text-purple-600" />
+                                                <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center flex-shrink-0 ml-7">
+                                                    <School className="w-3 h-3 text-blue-600" />
                                                 </div>
                                                 {editingSub === sub.id ? (
                                                     <InlineEdit value={sub.name} placeholder="University/Board name" onSave={(v) => saveSub(dept.id, sub.id, v)} onCancel={() => setEditingSub(null)} />

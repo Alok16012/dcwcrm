@@ -516,7 +516,7 @@ export function DispatchManager() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <span className="text-[11px] bg-purple-50 text-purple-700 border border-purple-100 rounded-md px-2 py-0.5">{docLabel}</span>
+                    <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabel}</span>
                     {d.courier && <span className="text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md px-2 py-0.5">{d.courier}</span>}
                     {d.associate && (
                       <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{d.associate.name}</span>
@@ -586,7 +586,7 @@ export function DispatchManager() {
                           {d.enrollment_number && <p className="text-[11px] text-gray-400 font-mono">{d.enrollment_number}</p>}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-xs bg-purple-50 text-purple-700 border border-purple-100 rounded-md px-2 py-0.5">{docLabel}</span>
+                          <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabel}</span>
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {d.associate

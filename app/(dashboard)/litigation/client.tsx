@@ -526,7 +526,7 @@ export function LitigationClient({
                   <td className="px-4 py-4">
                     <p className="font-medium text-gray-800 text-[13px]">{l.department?.name ?? '—'}</p>
                     {l.sub_section && (
-                      <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
+                      <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                         {l.sub_section.name}
                       </span>
                     )}
@@ -749,7 +749,7 @@ export function LitigationClient({
                         <td className="px-4 py-4">
                           <p className="font-medium text-gray-800 text-[13px]">{s.department?.name ?? '—'}</p>
                           {s.sub_section && (
-                            <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
+                            <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                               {s.sub_section.name}
                             </span>
                           )}

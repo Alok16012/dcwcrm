@@ -23,7 +23,7 @@ const ACTIVITY_ICONS: Record<ActivityType, React.ElementType> = {
 const ACTIVITY_COLORS: Record<ActivityType, string> = {
   created: 'bg-blue-100 text-blue-600',
   status_changed: 'bg-orange-100 text-orange-600',
-  assigned: 'bg-purple-100 text-purple-600',
+  assigned: 'bg-blue-100 text-blue-600',
   transferred: 'bg-indigo-100 text-indigo-600',
   note_added: 'bg-gray-100 text-gray-600',
   followup_set: 'bg-yellow-100 text-yellow-600',

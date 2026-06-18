@@ -184,7 +184,7 @@ export default function AssociateDetailClient({ id }: { id: string }) {
         {[
           { label: 'Total Admissions', value: students.length.toString(), icon: GraduationCap, cls: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
           { label: 'Active', value: activeCount.toString(), icon: CheckCircle2, cls: 'bg-green-50 border-green-100 text-green-700' },
-          { label: 'Total Fee', value: fmtMoney(totalRevenue), icon: IndianRupee, cls: 'bg-purple-50 border-purple-100 text-purple-700' },
+          { label: 'Total Fee', value: fmtMoney(totalRevenue), icon: IndianRupee, cls: 'bg-blue-50 border-blue-100 text-blue-700' },
           { label: 'Received', value: fmtMoney(received), icon: Wallet, cls: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
         ].map(s => (
           <div key={s.label} className={`border rounded-2xl p-4 ${s.cls}`}>
@@ -198,7 +198,7 @@ export default function AssociateDetailClient({ id }: { id: string }) {
       {/* Breakdowns */}
       {students.length > 0 && (
         <div className="grid md:grid-cols-3 gap-4">
-          <BreakdownCard title="By Board" icon={School} color="violet" items={byBoard} />
+          <BreakdownCard title="By Board" icon={School} color="blue" items={byBoard} />
           <BreakdownCard title="By Counselor" icon={UserCog} color="blue" items={byCounselor} />
           <BreakdownCard title="Month-wise Admissions" icon={Clock} color="amber" items={byMonth.map(([k, n]) => [monthLabel(k), n] as [string, number])} />
         </div>
@@ -223,7 +223,7 @@ export default function AssociateDetailClient({ id }: { id: string }) {
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-sm font-semibold text-gray-900">{s.full_name}</span>
                     {s.enrollment_number && <span className="text-[10px] font-mono text-gray-400">{s.enrollment_number}</span>}
-                    {s.sub_section?.name && <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{s.sub_section.name}</span>}
+                    {s.sub_section?.name && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{s.sub_section.name}</span>}
                     {s.counsellor?.full_name && <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">{s.counsellor.full_name}</span>}
                     <span className="ml-auto text-[10px] font-bold text-emerald-600">{pct}%</span>
                   </div>
@@ -266,13 +266,13 @@ export default function AssociateDetailClient({ id }: { id: string }) {
   )
 }
 
-function BreakdownCard({ title, icon: Icon, color, items }: { title: string; icon: any; color: 'violet'|'blue'|'amber'; items: [string, number][] }) {
+function BreakdownCard({ title, icon: Icon, color, items }: { title: string; icon: any; color: 'blue'|'blue'|'amber'; items: [string, number][] }) {
   const cls = {
-    violet: 'bg-violet-50 border-violet-100 text-violet-700',
+    blue: 'bg-blue-50 border-blue-100 text-blue-700',
     blue:   'bg-blue-50 border-blue-100 text-blue-700',
     amber:  'bg-amber-50 border-amber-100 text-amber-700',
   }[color]
-  const dot = { violet: 'text-violet-400', blue: 'text-blue-400', amber: 'text-amber-400' }[color]
+  const dot = { blue: 'text-blue-400', blue: 'text-blue-400', amber: 'text-amber-400' }[color]
   return (
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
       <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2 flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {title}</p>

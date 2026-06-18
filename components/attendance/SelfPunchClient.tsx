@@ -44,7 +44,7 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> 
   half_day: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Half Day' },
   absent:   { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Absent' },
   leave:    { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Leave' },
-  holiday:  { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Holiday' },
+  holiday:  { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Holiday' },
   late:     { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Late' },
 }
 

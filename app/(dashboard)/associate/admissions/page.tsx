@@ -16,7 +16,7 @@ import {
 const STATUS_CFG: Record<string, { label: string; color: string; icon: any }> = {
   new:           { label: 'New',            color: 'bg-blue-100 text-blue-800 border-blue-200',     icon: Clock },
   contacted:     { label: 'Contacted',      color: 'bg-indigo-100 text-indigo-800 border-indigo-200',icon: Phone },
-  interested:    { label: 'Interested',     color: 'bg-purple-100 text-purple-800 border-purple-200',icon: CheckCircle2 },
+  interested:    { label: 'Interested',     color: 'bg-blue-100 text-blue-800 border-blue-200',icon: CheckCircle2 },
   not_interested:{ label: 'Not Interested', color: 'bg-gray-100 text-gray-600 border-gray-200',      icon: XCircle },
   follow_up:     { label: 'Follow-up',      color: 'bg-amber-100 text-amber-800 border-amber-200',   icon: Clock },
   converted:     { label: 'Converted',      color: 'bg-green-100 text-green-800 border-green-200',   icon: CheckCircle2 },

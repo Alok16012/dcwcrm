@@ -63,7 +63,7 @@ export default function StudentMentorshipPage() {
   }, [])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   const isDcw = mcase?.managed_by !== 'self'
@@ -78,7 +78,7 @@ export default function StudentMentorshipPage() {
     <div className="space-y-6 max-w-2xl mx-auto px-4 py-6">
       <div>
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Award className="w-6 h-6 text-violet-600" /> Mentorship
+          <Award className="w-6 h-6 text-blue-600" /> Mentorship
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">Your mentor, learning stages & payments</p>
       </div>
@@ -92,8 +92,8 @@ export default function StudentMentorshipPage() {
       ) : (
         <>
           {/* Mentor card */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-2xl p-5 text-white">
-            <p className="text-violet-200 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Your Mentor</p>
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 text-white">
+            <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Your Mentor</p>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
                 {mentor.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
@@ -119,13 +119,13 @@ export default function StudentMentorshipPage() {
             <>
               {/* Mode + payment summary (DCW) */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${isDcw ? 'bg-violet-100 text-violet-700' : 'bg-gray-200 text-gray-700'}`}>{isDcw ? 'Managed by DCW' : 'By Self'}</span>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${isDcw ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{isDcw ? 'Managed by DCW' : 'By Self'}</span>
               </div>
 
               {isDcw && total > 0 && (
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: 'Total', value: total, color: 'bg-violet-50 text-violet-700' },
+                    { label: 'Total', value: total, color: 'bg-blue-50 text-blue-700' },
                     { label: 'Paid', value: paid, color: 'bg-emerald-50 text-emerald-700' },
                     { label: 'Remaining', value: remaining, color: 'bg-amber-50 text-amber-700' },
                   ].map(s => (
@@ -139,7 +139,7 @@ export default function StudentMentorshipPage() {
 
               {/* Stages journey */}
               <div>
-                <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5"><BookMarked className="w-4 h-4 text-violet-600" /> Learning Stages</h2>
+                <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5"><BookMarked className="w-4 h-4 text-blue-600" /> Learning Stages</h2>
                 <div className="space-y-2.5">
                   {STAGE_ORDER.map((key, i) => {
                     const st = stageMap[key] ?? { subjects: [], status: 'not_started' }
@@ -147,13 +147,13 @@ export default function StudentMentorshipPage() {
                     return (
                       <div key={key} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
                           <span className="text-sm font-bold text-gray-800">{STAGE_LABEL[key]}</span>
                           <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.color}`}>{cfg.label}</span>
                         </div>
                         {st.subjects.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {st.subjects.map(sub => <span key={sub} className="text-xs bg-violet-50 text-violet-700 font-semibold px-2 py-0.5 rounded-lg">{sub}</span>)}
+                            {st.subjects.map(sub => <span key={sub} className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-lg">{sub}</span>)}
                           </div>
                         ) : <p className="text-xs text-gray-400">No subjects yet</p>}
                       </div>

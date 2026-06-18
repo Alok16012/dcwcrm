@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 
 const DOC_SLOTS = [
   { key: 'admit_card_url',      label: 'Admit Card',      short: 'AC', color: 'blue' },
-  { key: 'enrollment_card_url', label: 'Enrollment Card', short: 'EC', color: 'purple' },
+  { key: 'enrollment_card_url', label: 'Enrollment Card', short: 'EC', color: 'blue' },
   { key: 'id_card_url',         label: 'ID Card',         short: 'ID', color: 'orange' },
   { key: 'marksheet_url',       label: 'Marksheet',       short: 'MK', color: 'teal' },
   { key: 'certificate_url',     label: 'Certificate',     short: 'CR', color: 'green' },

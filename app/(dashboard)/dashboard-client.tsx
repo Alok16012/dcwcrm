@@ -72,7 +72,7 @@ function getInitials(name: string) {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-violet-500', 'bg-pink-500', 'bg-emerald-500',
+  'bg-blue-500', 'bg-blue-500', 'bg-pink-500', 'bg-emerald-500',
   'bg-orange-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500',
 ]
 function getAvatarColor(name: string) {
@@ -473,13 +473,13 @@ export default function DashboardClient({
       {/* ── My Tasks ── */}
       {myTasks.length > 0 && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="px-4 py-3.5 border-b bg-gradient-to-r from-violet-50 to-blue-50 flex items-center justify-between">
+          <div className="px-4 py-3.5 border-b bg-gradient-to-r from-blue-50 to-blue-50 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-violet-600" />
+              <ClipboardList className="w-4 h-4 text-blue-600" />
               <h3 className="font-semibold text-sm text-slate-800">My Pending Tasks</h3>
-              <span className="bg-violet-600 text-white text-[10px] rounded-full px-2 py-0.5 font-medium">{myTasks.length}</span>
+              <span className="bg-blue-600 text-white text-[10px] rounded-full px-2 py-0.5 font-medium">{myTasks.length}</span>
             </div>
-            <Link href="/tasks" className="text-xs text-violet-600 hover:underline flex items-center gap-0.5">
+            <Link href="/tasks" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
               View all <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
@@ -507,7 +507,7 @@ export default function DashboardClient({
             })}
           </div>
           <div className="px-4 py-2.5 border-t bg-slate-50">
-            <Link href="/tasks" className="text-xs text-violet-600 hover:underline font-medium flex items-center gap-1">
+            <Link href="/tasks" className="text-xs text-blue-600 hover:underline font-medium flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Go to Tasks to mark done
             </Link>
           </div>

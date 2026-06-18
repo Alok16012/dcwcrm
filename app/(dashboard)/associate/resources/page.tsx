@@ -13,7 +13,7 @@ const RESOURCE_TYPE_CFG: Record<ResourceType | string, { label: string; icon: an
   brochure:       { label: 'Brochure',         icon: BookOpen,      color: 'text-blue-600',    bg: 'bg-blue-50' },
   fee_structure:  { label: 'Fee Structure',    icon: FileText,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
   admission_form: { label: 'Admission Form',   icon: GraduationCap, color: 'text-indigo-600',  bg: 'bg-indigo-50' },
-  marketing:      { label: 'Marketing',        icon: FileImage,     color: 'text-purple-600',  bg: 'bg-purple-50' },
+  marketing:      { label: 'Marketing',        icon: FileImage,     color: 'text-blue-600',  bg: 'bg-blue-50' },
   poster:         { label: 'Poster',           icon: Image,         color: 'text-pink-600',    bg: 'bg-pink-50' },
   reel:           { label: 'Reel / Creative',  icon: Video,         color: 'text-orange-600',  bg: 'bg-orange-50' },
   training:       { label: 'Training',         icon: Folder,        color: 'text-amber-600',   bg: 'bg-amber-50' },

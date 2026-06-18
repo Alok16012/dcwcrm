@@ -432,14 +432,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
                     {/* Mentorship */}
                     {student?.id && (
-                        <div className="bg-violet-50/50 rounded-xl p-4 border border-violet-100">
-                            <SectionHeader icon={GraduationCap} title="Mentorship" color="border-violet-200" />
+                        <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+                            <SectionHeader icon={GraduationCap} title="Mentorship" color="border-blue-200" />
                             <div className="space-y-3">
                                 {currentMentor && (
-                                    <div className="flex items-center justify-between bg-white border border-violet-200 rounded-lg px-3 py-2">
+                                    <div className="flex items-center justify-between bg-white border border-blue-200 rounded-lg px-3 py-2">
                                         <div>
-                                            <p className="text-[10px] text-violet-500 font-bold uppercase tracking-wider leading-none mb-0.5">Assigned Mentor</p>
-                                            <p className="text-sm font-semibold text-violet-900">{currentMentor.full_name}</p>
+                                            <p className="text-[10px] text-blue-500 font-bold uppercase tracking-wider leading-none mb-0.5">Assigned Mentor</p>
+                                            <p className="text-sm font-semibold text-blue-900">{currentMentor.full_name}</p>
                                         </div>
                                         <Button type="button" size="sm" variant="ghost"
                                             className="h-7 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
@@ -451,7 +451,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                 <div className="flex gap-2 items-end">
                                     <div className="flex-1">
                                         <Select value={selectedLead || 'none'} onValueChange={v => setSelectedLead(v === 'none' ? '' : (v ?? ''))}>
-                                            <SelectTrigger className="bg-white border-violet-200 h-9 text-sm">
+                                            <SelectTrigger className="bg-white border-blue-200 h-9 text-sm">
                                                 <SelectValue>
                                                     {selectedLead ? leads.find(l => l.id === selectedLead)?.full_name ?? '— Select Lead / Counselor —' : '— Select Lead / Counselor —'}
                                                 </SelectValue>
@@ -466,7 +466,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                     </div>
                                     <Button type="button" onClick={assignMentor}
                                         disabled={!selectedLead || savingMentorship}
-                                        className="bg-violet-600 hover:bg-violet-700 text-white h-9 text-sm shrink-0">
+                                        className="bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm shrink-0">
                                         {savingMentorship ? 'Assigning...' : currentMentor ? 'Reassign' : 'Assign'}
                                     </Button>
                                 </div>
@@ -475,12 +475,12 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                     )}
 
                     {/* Enrollment */}
-                    <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
-                        <SectionHeader icon={Tag} title="Enrollment Details" color="border-purple-200" />
+                    <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+                        <SectionHeader icon={Tag} title="Enrollment Details" color="border-blue-200" />
                         <div className="grid grid-cols-2 gap-4">
                             <FieldWrapper label="Mode">
                                 <Select value={watch('mode') || ''} onValueChange={(v) => setValue('mode', v as any)}>
-                                    <SelectTrigger className="bg-white border-purple-200">
+                                    <SelectTrigger className="bg-white border-blue-200">
                                         <SelectValue placeholder="Select mode" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -493,14 +493,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
                             <FieldWrapper label="Enrollment Date">
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-                                    <Input type="date" {...register('enrollment_date')} className="pl-9 bg-white border-purple-200" />
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                                    <Input type="date" {...register('enrollment_date')} className="pl-9 bg-white border-blue-200" />
                                 </div>
                             </FieldWrapper>
 
                             <FieldWrapper label="Status">
                                 <Select value={watch('status')} onValueChange={(v) => setValue('status', v as any)}>
-                                    <SelectTrigger className="bg-white border-purple-200">
+                                    <SelectTrigger className="bg-white border-blue-200">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -531,9 +531,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
                             <FieldWrapper label="Counsellor">
                                 <div className="relative">
-                                    <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+                                    <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                                     <Select value={(watch('assigned_counsellor') as string) || 'none'} onValueChange={(v) => setValue('assigned_counsellor', (v === 'none' ? '' : v) as any)}>
-                                        <SelectTrigger className="pl-9 bg-white border-purple-200">
+                                        <SelectTrigger className="pl-9 bg-white border-blue-200">
                                             <SelectValue placeholder="Select counsellor">
                                                 {(watch('assigned_counsellor') && watch('assigned_counsellor') !== 'none')
                                                     ? counsellors.find(c => c.id === (watch('assigned_counsellor') || ''))?.full_name || (student as any)?.counsellor?.full_name || watch('assigned_counsellor')
@@ -552,8 +552,8 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
                             <FieldWrapper label="Incentive Amount">
                                 <div className="relative">
-                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-                                    <Input type="number" {...register('incentive_amount', { valueAsNumber: true })} className="pl-9 bg-white border-purple-200" />
+                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                                    <Input type="number" {...register('incentive_amount', { valueAsNumber: true })} className="pl-9 bg-white border-blue-200" />
                                 </div>
                             </FieldWrapper>
                         </div>

@@ -97,9 +97,9 @@ export function ProspectusManager({ departments }: Props) {
           <p className="text-2xl font-bold text-green-700">{totalDownloads}</p>
           <p className="text-xs text-green-600">Total Downloads</p>
         </div>
-        <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-purple-700">{list.filter(p => p.visibility === 'associate_and_student').length}</p>
-          <p className="text-xs text-purple-600">Shareable with Students</p>
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-blue-700">{list.filter(p => p.visibility === 'associate_and_student').length}</p>
+          <p className="text-xs text-blue-600">Shareable with Students</p>
         </div>
       </div>
 

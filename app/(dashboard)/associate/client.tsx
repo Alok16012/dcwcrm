@@ -19,7 +19,7 @@ const fmt = (n: number) =>
 const LEAD_STATUS: Record<string, { label: string; color: string }> = {
   new:          { label: 'New',        color: 'bg-blue-100 text-blue-800' },
   contacted:    { label: 'Contacted',  color: 'bg-indigo-100 text-indigo-800' },
-  interested:   { label: 'Interested', color: 'bg-purple-100 text-purple-800' },
+  interested:   { label: 'Interested', color: 'bg-blue-100 text-blue-800' },
   not_interested:{ label: 'Not Interested', color: 'bg-gray-100 text-gray-600' },
   follow_up:    { label: 'Follow-up',  color: 'bg-amber-100 text-amber-800' },
   converted:    { label: 'Converted',  color: 'bg-green-100 text-green-800' },
@@ -246,7 +246,7 @@ export default function AssociateClient() {
           { label: 'Add Lead',    href: '/associate/admissions?new=1',icon: Users,         color: 'text-blue-600',    bg: 'bg-blue-50' },
           { label: 'My Students', href: '/associate/students',         icon: GraduationCap, color: 'text-indigo-600',  bg: 'bg-indigo-50' },
           { label: 'Accounts',    href: '/associate/account',          icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Dispatch',    href: '/associate/dispatch',         icon: Package,       color: 'text-purple-600',  bg: 'bg-purple-50' },
+          { label: 'Dispatch',    href: '/associate/dispatch',         icon: Package,       color: 'text-blue-600',  bg: 'bg-blue-50' },
           { label: 'Resources',   href: '/associate/resources',        icon: BarChart2,     color: 'text-orange-600',  bg: 'bg-orange-50' },
           { label: 'Support',     href: '/associate/support',          icon: AlertCircle,   color: 'text-rose-600',    bg: 'bg-rose-50' },
           { label: 'Profile',     href: '/associate/profile',          icon: UserCheck,     color: 'text-gray-600',    bg: 'bg-gray-100' },
@@ -270,14 +270,14 @@ export default function AssociateClient() {
           {/* Board-wise */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-50">
-              <School className="h-4 w-4 text-violet-500" />
+              <School className="h-4 w-4 text-blue-500" />
               <span className="font-semibold text-gray-900 text-sm">Students by Board</span>
             </div>
             <div className="p-4 flex flex-wrap gap-2">
               {boardBreakdown.map(([board, count]) => (
-                <div key={board} className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
-                  <span className="text-sm font-bold text-violet-700">{board}</span>
-                  <span className="text-xs font-bold bg-violet-600 text-white rounded-full px-2 py-0.5">{count}</span>
+                <div key={board} className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                  <span className="text-sm font-bold text-blue-700">{board}</span>
+                  <span className="text-xs font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">{count}</span>
                 </div>
               ))}
             </div>
@@ -322,7 +322,7 @@ export default function AssociateClient() {
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <p className="text-sm font-semibold text-gray-900">{s.full_name}</p>
                     {s.sub_section?.name && (
-                      <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{s.sub_section.name}</span>
+                      <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{s.sub_section.name}</span>
                     )}
                     {s.counsellor?.full_name && (
                       <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">{s.counsellor.full_name}</span>

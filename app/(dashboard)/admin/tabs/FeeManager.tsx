@@ -96,7 +96,7 @@ export function FeeManager({ courses, departments }: Props) {
       <div className="grid grid-cols-3 gap-3">
         {['Basic', 'Standard', 'Premium'].map((plan, i) => {
           const avg = Math.round(plans.filter(p => p.is_active).reduce((s, p) => s + [p.basic_fee, p.standard_fee, p.premium_fee][i], 0) / (plans.filter(p => p.is_active).length || 1))
-          const colors = ['bg-blue-50 border-blue-200 text-blue-700', 'bg-purple-50 border-purple-200 text-purple-700', 'bg-amber-50 border-amber-200 text-amber-700']
+          const colors = ['bg-blue-50 border-blue-200 text-blue-700', 'bg-blue-50 border-blue-200 text-blue-700', 'bg-amber-50 border-amber-200 text-amber-700']
           return (
             <Card key={plan} className={`border ${colors[i].split(' ').slice(0, 2).join(' ')}`}>
               <CardContent className="p-4">
@@ -117,7 +117,7 @@ export function FeeManager({ courses, departments }: Props) {
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Course</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Department</th>
               <th className="text-right px-4 py-3 font-semibold text-blue-600">Basic</th>
-              <th className="text-right px-4 py-3 font-semibold text-purple-600">Standard</th>
+              <th className="text-right px-4 py-3 font-semibold text-blue-600">Standard</th>
               <th className="text-right px-4 py-3 font-semibold text-amber-600">Premium</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Effective From</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
@@ -130,7 +130,7 @@ export function FeeManager({ courses, departments }: Props) {
                 <td className="px-4 py-3 font-medium">{p.course_name}</td>
                 <td className="px-4 py-3 text-slate-600">{p.department_name}</td>
                 <td className="px-4 py-3 text-right font-mono text-blue-700">{fmt(p.basic_fee)}</td>
-                <td className="px-4 py-3 text-right font-mono text-purple-700">{fmt(p.standard_fee)}</td>
+                <td className="px-4 py-3 text-right font-mono text-blue-700">{fmt(p.standard_fee)}</td>
                 <td className="px-4 py-3 text-right font-mono text-amber-700">{fmt(p.premium_fee)}</td>
                 <td className="px-4 py-3 text-slate-500">{p.effective_from}</td>
                 <td className="px-4 py-3">

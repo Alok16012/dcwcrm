@@ -253,7 +253,7 @@ export function FeesClient() {
                   <th className="text-right px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Actual Fee</th>
                   <th className="text-center px-4 py-3 font-semibold text-amber-700 bg-amber-50/60">Basic</th>
                   <th className="text-center px-4 py-3 font-semibold text-blue-700 bg-blue-50/60">Standard</th>
-                  <th className="text-center px-4 py-3 font-semibold text-purple-700 bg-purple-50/60">Premium</th>
+                  <th className="text-center px-4 py-3 font-semibold text-blue-700 bg-blue-50/60">Premium</th>
                   {canManage && <th className="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>}
                 </tr>
               </thead>
@@ -280,10 +280,10 @@ export function FeesClient() {
                         <p className="text-[10px] text-blue-500">{f.standard_percent}%</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 bg-purple-50/40">
+                    <td className="px-4 py-3 bg-blue-50/40">
                       <div className="text-center">
-                        <p className="font-bold text-purple-800 font-mono">{fmt(calcFee(f.actual_fee, f.premium_percent))}</p>
-                        <p className="text-[10px] text-purple-500">{f.premium_percent}%</p>
+                        <p className="font-bold text-blue-800 font-mono">{fmt(calcFee(f.actual_fee, f.premium_percent))}</p>
+                        <p className="text-[10px] text-blue-500">{f.premium_percent}%</p>
                       </div>
                     </td>
                     {canManage && (
@@ -359,7 +359,7 @@ export function FeesClient() {
               <div className="grid grid-cols-3 gap-3">
                 {(['basic', 'standard', 'premium'] as const).map(tier => {
                   const key = `${tier}_percent` as keyof typeof feeForm
-                  const colors = { basic: 'amber', standard: 'blue', premium: 'purple' }
+                  const colors = { basic: 'amber', standard: 'blue', premium: 'blue' }
                   const color = colors[tier]
                   const computed = feeForm.actual_fee && feeForm[key]
                     ? calcFee(Number(feeForm.actual_fee), Number(feeForm[key])) : 0

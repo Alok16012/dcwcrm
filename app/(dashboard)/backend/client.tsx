@@ -43,7 +43,7 @@ const MODE_COLORS: Record<string, string> = {
 }
 
 const COUNSELLOR_PALETTE = [
-  'bg-violet-100 text-violet-700',
+  'bg-blue-100 text-blue-700',
   'bg-sky-100 text-sky-700',
   'bg-pink-100 text-pink-700',
   'bg-teal-100 text-teal-700',
@@ -798,7 +798,7 @@ export function BackendListClient() {
           <Button
             size="sm"
             onClick={() => { setSelectedCounselor(''); setShowMentorAssign(true) }}
-            className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5 h-8 whitespace-nowrap"
+            className="bg-blue-600 hover:bg-blue-500 text-white gap-1.5 h-8 whitespace-nowrap"
           >
             <Award className="w-3.5 h-3.5" /> Assign Mentor
           </Button>
@@ -867,7 +867,7 @@ export function BackendListClient() {
         <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-violet-600" /> Assign Mentor
+              <Award className="w-5 h-5 text-blue-600" /> Assign Mentor
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -890,7 +890,7 @@ export function BackendListClient() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowMentorAssign(false)}>Cancel</Button>
               <Button
-                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={bulkAssignMentor}
                 disabled={!selectedCounselor || assigningMentor}
               >

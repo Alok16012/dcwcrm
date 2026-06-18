@@ -187,14 +187,14 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
 
         <TabsContent value="incentives" className="pt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg border p-4 bg-purple-50/50 flex justify-between items-center transition-all hover:shadow-sm">
+            <div className="rounded-lg border p-4 bg-blue-50/50 flex justify-between items-center transition-all hover:shadow-sm">
               <div>
-                <h3 className="font-semibold text-purple-900">Current Cycle Incentive</h3>
-                <p className="text-xs text-purple-700">
+                <h3 className="font-semibold text-blue-900">Current Cycle Incentive</h3>
+                <p className="text-xs text-blue-700">
                   {format(cycleStart, 'dd MMM')} to {format(cycleEnd, 'dd MMM yyyy')}
                 </p>
               </div>
-              <div className="text-2xl font-bold text-purple-700">
+              <div className="text-2xl font-bold text-blue-700">
                 {fmt(currentCycleIncentives)}
               </div>
             </div>
@@ -230,7 +230,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
                   {months.map(([key, { label, total }]) => (
                     <div key={key} className="flex justify-between items-center px-4 py-3">
                       <span className="text-sm font-medium text-gray-700">{label}</span>
-                      <span className="text-sm font-bold text-purple-700">{fmt(total)}</span>
+                      <span className="text-sm font-bold text-blue-700">{fmt(total)}</span>
                     </div>
                   ))}
                 </div>

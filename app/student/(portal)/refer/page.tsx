@@ -84,14 +84,14 @@ export default function ReferPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
     </div>
   )
 
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="relative bg-gradient-to-br from-violet-600 to-purple-700 rounded-2xl p-6 text-white overflow-hidden">
+      <div className="relative bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
         <div className="relative flex items-start gap-4">
           <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
@@ -99,7 +99,7 @@ export default function ReferPage() {
           </div>
           <div>
             <h1 className="text-xl font-extrabold">Refer & Earn</h1>
-            <p className="text-violet-200 text-sm mt-1">Know someone who wants to study? Refer them and earn rewards when they take admission!</p>
+            <p className="text-blue-200 text-sm mt-1">Know someone who wants to study? Refer them and earn rewards when they take admission!</p>
             <div className="flex gap-2 mt-3 flex-wrap">
               {['Refer a Friend', 'They Get Admission', 'You Earn Reward'].map((s, i) => (
                 <span key={i} className="text-xs bg-white/20 px-2.5 py-1 rounded-full font-medium">{s}</span>
@@ -112,7 +112,7 @@ export default function ReferPage() {
       {/* Refer form */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="h-4 w-4 text-violet-600" /> Refer Someone
+          <Users className="h-4 w-4 text-blue-600" /> Refer Someone
         </h2>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -156,7 +156,7 @@ export default function ReferPage() {
           <Button
             onClick={submit}
             disabled={submitting || !form.name.trim() || !form.phone.trim()}
-            className="w-full bg-violet-600 hover:bg-violet-700 text-white gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
           >
             {submitting
               ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
@@ -177,13 +177,13 @@ export default function ReferPage() {
           <div className="divide-y divide-gray-50">
             {referrals.map(r => (
               <div key={r.id} className="px-5 py-3.5 flex items-center gap-3">
-                <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center shrink-0 text-violet-600 font-bold text-sm">
+                <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shrink-0 text-blue-600 font-bold text-sm">
                   {r.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">{r.name}</p>
                   <p className="text-xs text-gray-400 font-mono">{r.phone}</p>
-                  {r.interested_in && <p className="text-xs text-violet-600 mt-0.5 truncate">{r.interested_in}</p>}
+                  {r.interested_in && <p className="text-xs text-blue-600 mt-0.5 truncate">{r.interested_in}</p>}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-gray-400">{new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
@@ -195,9 +195,9 @@ export default function ReferPage() {
         </div>
       )}
 
-      <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-        <p className="text-xs font-semibold text-violet-800 mb-1">📋 How it works</p>
-        <p className="text-xs text-violet-700">Submit your friend's details. Our team will contact them. Once they take admission, you earn your reward. For reward details, contact your counsellor.</p>
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+        <p className="text-xs font-semibold text-blue-800 mb-1">📋 How it works</p>
+        <p className="text-xs text-blue-700">Submit your friend's details. Our team will contact them. Once they take admission, you earn your reward. For reward details, contact your counsellor.</p>
       </div>
     </div>
   )

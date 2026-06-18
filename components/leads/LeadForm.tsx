@@ -50,7 +50,7 @@ function sanitizeStatus(status: string): LeadFormData['status'] {
 const STATUS_DOT: Record<string, string> = {
   new: 'bg-blue-500',
   contacted: 'bg-yellow-500',
-  interested: 'bg-purple-500',
+  interested: 'bg-blue-500',
   counselled: 'bg-orange-500',
   document_received: 'bg-cyan-500',
   converted: 'bg-green-500',
@@ -447,13 +447,13 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       </div>
 
       {/* ── Section 2: Lead Details ── */}
-      <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
-        <SectionHeader icon={Tag} title="Lead Details" color="border-purple-200" />
+      <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+        <SectionHeader icon={Tag} title="Lead Details" color="border-blue-200" />
         <div className="grid grid-cols-2 gap-4">
           {isVisible('status') && (
             <FieldWrapper label="Status">
               <Select value={watch('status')} onValueChange={(v) => setValue('status', v as LeadFormData['status'])}>
-                <SelectTrigger className="bg-white border-purple-200">
+                <SelectTrigger className="bg-white border-blue-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -473,7 +473,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           {isVisible('source') && (
             <FieldWrapper label="Source">
               <Select value={watch('source')} onValueChange={(v) => setValue('source', v as LeadFormData['source'])}>
-                <SelectTrigger className="bg-white border-purple-200">
+                <SelectTrigger className="bg-white border-blue-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -489,10 +489,10 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         </div>
 
         {isVisible('mode') && (
-          <div className="mt-4 pt-4 border-t border-purple-100">
+          <div className="mt-4 pt-4 border-t border-blue-100">
             <FieldWrapper label="Mode">
               <Select value={watch('mode') || ''} onValueChange={(v) => setValue('mode', v as any)}>
-                <SelectTrigger className="bg-white border-purple-200">
+                <SelectTrigger className="bg-white border-blue-200">
                   <SelectValue placeholder="Select mode" />
                 </SelectTrigger>
                 <SelectContent>
@@ -509,11 +509,11 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         )}
 
         {isVisible('enrollment_date') && (
-          <div className="mt-4 pt-4 border-t border-purple-100">
+          <div className="mt-4 pt-4 border-t border-blue-100">
             <FieldWrapper label="Expected Enrollment Date">
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-                <Input type="date" {...register('enrollment_date')} className="pl-9 bg-white border-purple-200" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                <Input type="date" {...register('enrollment_date')} className="pl-9 bg-white border-blue-200" />
               </div>
             </FieldWrapper>
           </div>

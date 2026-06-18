@@ -261,7 +261,7 @@ export default async function StudentDashboardPage() {
         {[
           { label: 'My Admission',    href: '/student/admission', icon: GraduationCap, color: 'text-blue-600',    bg: 'bg-blue-50',    hover: 'hover:bg-blue-100'    },
           { label: 'Accounts',        href: '/student/accounts',  icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50', hover: 'hover:bg-emerald-100' },
-          { label: 'Study Materials', href: '/student/materials', icon: BookOpen,      color: 'text-purple-600',  bg: 'bg-purple-50',  hover: 'hover:bg-purple-100'  },
+          { label: 'Study Materials', href: '/student/materials', icon: BookOpen,      color: 'text-blue-600',  bg: 'bg-blue-50',  hover: 'hover:bg-blue-100'  },
           { label: 'Help & Support',  href: '/student/support',   icon: HelpCircle,    color: 'text-orange-600',  bg: 'bg-orange-50',  hover: 'hover:bg-orange-100'  },
           { label: 'My Profile',      href: '/student/profile',   icon: User,          color: 'text-indigo-600',  bg: 'bg-indigo-50',  hover: 'hover:bg-indigo-100'  },
         ].map(({ label, href, icon: Icon, color, bg, hover }) => (

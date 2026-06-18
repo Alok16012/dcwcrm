@@ -132,7 +132,7 @@ export function SystemSettings() {
         {/* Payment Gateway */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2"><CreditCard className="w-4 h-4 text-purple-500" />Payment Gateway (Razorpay)</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2"><CreditCard className="w-4 h-4 text-blue-500" />Payment Gateway (Razorpay)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>

@@ -4,7 +4,7 @@ import { BookOpen, FileText, Video, Radio, Download, Book, ExternalLink, Monitor
 
 const TYPE_META: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   ebook:          { label: 'E-Books',          icon: Book,      color: 'text-blue-600',   bg: 'bg-blue-50' },
-  pdf_notes:      { label: 'PDF Notes',        icon: FileText,  color: 'text-purple-600', bg: 'bg-purple-50' },
+  pdf_notes:      { label: 'PDF Notes',        icon: FileText,  color: 'text-blue-600', bg: 'bg-blue-50' },
   syllabus:       { label: 'Syllabus',         icon: BookOpen,  color: 'text-green-600',  bg: 'bg-green-50' },
   recorded_class: { label: 'Recorded Classes', icon: Video,     color: 'text-orange-600', bg: 'bg-orange-50' },
   live_class:     { label: 'Live Classes',     icon: Radio,     color: 'text-red-600',    bg: 'bg-red-50' },
@@ -50,23 +50,23 @@ export default async function MaterialsPage() {
       </div>
 
       {/* BOSSE LMS Card */}
-      <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl p-5 text-white overflow-hidden relative">
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white overflow-hidden relative">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
         <div className="relative">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Monitor className="h-5 w-5 text-violet-200" />
-                <p className="text-xs font-bold uppercase tracking-widest text-violet-200">BOSSE Online Portal</p>
+                <Monitor className="h-5 w-5 text-blue-200" />
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-200">BOSSE Online Portal</p>
               </div>
               <h2 className="text-xl font-extrabold leading-tight">BOSSE LMS</h2>
-              <p className="text-sm text-violet-200 mt-1">Board of Open Schooling & Skill Education — Access your study material, admit card and results online.</p>
+              <p className="text-sm text-blue-200 mt-1">Board of Open Schooling & Skill Education — Access your study material, admit card and results online.</p>
             </div>
             <a
               href="https://www.bosseonline.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-1.5 bg-white text-violet-700 font-bold text-xs px-4 py-2 rounded-xl hover:bg-violet-50 transition-colors mt-1"
+              className="shrink-0 flex items-center gap-1.5 bg-white text-blue-700 font-bold text-xs px-4 py-2 rounded-xl hover:bg-blue-50 transition-colors mt-1"
             >
               Open LMS <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -74,7 +74,7 @@ export default async function MaterialsPage() {
 
           {/* Login Steps */}
           <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-            <p className="text-xs font-bold text-violet-100 uppercase tracking-wide mb-3">How to Login</p>
+            <p className="text-xs font-bold text-blue-100 uppercase tracking-wide mb-3">How to Login</p>
             <div className="space-y-2">
               {[
                 { step: '1', text: 'Go to bosseonline.in and click "Student Login"' },
@@ -86,7 +86,7 @@ export default async function MaterialsPage() {
                   <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
                     <span className="text-[10px] font-bold text-white">{step}</span>
                   </div>
-                  <p className="text-xs text-violet-100 leading-relaxed">{text}</p>
+                  <p className="text-xs text-blue-100 leading-relaxed">{text}</p>
                 </div>
               ))}
             </div>
@@ -96,7 +96,7 @@ export default async function MaterialsPage() {
             href="https://www.bosseonline.in"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 flex items-center gap-1 text-xs text-violet-200 hover:text-white transition-colors font-medium"
+            className="mt-3 flex items-center gap-1 text-xs text-blue-200 hover:text-white transition-colors font-medium"
           >
             www.bosseonline.in <ChevronRight className="h-3 w-3" />
           </a>

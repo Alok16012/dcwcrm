@@ -109,7 +109,7 @@ export function IncentiveManager({ courses, departments }: Props) {
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Department</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Type</th>
               <th className="text-right px-4 py-3 font-semibold text-blue-600">Basic</th>
-              <th className="text-right px-4 py-3 font-semibold text-purple-600">Standard</th>
+              <th className="text-right px-4 py-3 font-semibold text-blue-600">Standard</th>
               <th className="text-right px-4 py-3 font-semibold text-amber-600">Premium</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Effective</th>
               <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
@@ -127,7 +127,7 @@ export function IncentiveManager({ courses, departments }: Props) {
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-blue-700">{formatIncentive(s, 'basic_incentive')}</td>
-                <td className="px-4 py-3 text-right font-mono text-purple-700">{formatIncentive(s, 'standard_incentive')}</td>
+                <td className="px-4 py-3 text-right font-mono text-blue-700">{formatIncentive(s, 'standard_incentive')}</td>
                 <td className="px-4 py-3 text-right font-mono text-amber-700">{formatIncentive(s, 'premium_incentive')}</td>
                 <td className="px-4 py-3 text-slate-500">{s.effective_from}</td>
                 <td className="px-4 py-3">

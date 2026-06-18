@@ -64,8 +64,8 @@ function fmtEnroll(n: string | null | undefined) {
 }
 const BOARD_BADGE: Record<string, string> = {
   NIOS:  'bg-blue-100 text-blue-800 border-blue-200',
-  BOSSE: 'bg-violet-100 text-violet-800 border-violet-200',
-  BBOSE: 'bg-violet-100 text-violet-800 border-violet-200',
+  BOSSE: 'bg-blue-100 text-blue-800 border-blue-200',
+  BBOSE: 'bg-blue-100 text-blue-800 border-blue-200',
 }
 function boardBadge(name: string) {
   const u = name.toUpperCase()
@@ -73,7 +73,7 @@ function boardBadge(name: string) {
   return 'bg-gray-100 text-gray-700 border-gray-200'
 }
 const AVATAR_PALETTES = [
-  'from-violet-500 to-purple-600','from-blue-500 to-cyan-600','from-emerald-500 to-teal-600',
+  'from-blue-500 to-blue-600','from-blue-500 to-cyan-600','from-emerald-500 to-teal-600',
   'from-rose-500 to-pink-600','from-amber-500 to-orange-600','from-indigo-500 to-blue-600',
 ]
 function avatarPalette(name: string) {
@@ -295,13 +295,13 @@ export default function MentorshipClient() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
     <div className="space-y-5">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -309,7 +309,7 @@ export default function MentorshipClient() {
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Award className="w-4 h-4" /></div>
               <h1 className="text-xl font-bold tracking-tight">Mentorship</h1>
             </div>
-            <p className="text-violet-200 text-sm mt-1">Manage your students — stages & installment payments</p>
+            <p className="text-blue-200 text-sm mt-1">Manage your students — stages & installment payments</p>
           </div>
           <button onClick={load} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -347,7 +347,7 @@ export default function MentorshipClient() {
         <div className="relative ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input type="text" placeholder="Search name, phone..." value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 w-52" />
+            className="pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 w-52" />
         </div>
       </div>
 
@@ -376,7 +376,7 @@ export default function MentorshipClient() {
                   const boardName = s.sub_section?.name ?? ''
                   const sum = caseSummary(s.id)
                   return (
-                    <tr key={s.id} className="hover:bg-violet-50/30 transition-colors">
+                    <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="px-3 py-3 text-gray-400 text-xs tabular-nums font-medium">{idx + 1}</td>
                       <td className="px-3 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg whitespace-nowrap">{fmtEnroll(s.enrollment_number)}</span></td>
                       <td className="px-3 py-3">
@@ -412,7 +412,7 @@ export default function MentorshipClient() {
                       <td className="px-3 py-3">
                         {sum ? (
                           <div className="flex items-center gap-1 flex-wrap min-w-[110px]">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${sum.c.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>{sum.c.managed_by === 'self' ? 'Self' : 'DCW'}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${sum.c.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>{sum.c.managed_by === 'self' ? 'Self' : 'DCW'}</span>
                             {sum.c.managed_by !== 'self' && <span className="text-[10px] font-semibold text-emerald-700 whitespace-nowrap">₹{sum.paid}/{sum.total}</span>}
                             {sum.pending > 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md whitespace-nowrap">⏳{sum.pending}</span>}
                           </div>
@@ -420,7 +420,7 @@ export default function MentorshipClient() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1.5">
-                          <Button size="sm" onClick={() => openManage(s)} className="h-7 px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white gap-1">
+                          <Button size="sm" onClick={() => openManage(s)} className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white gap-1">
                             <BookMarked className="w-3 h-3" /> Manage
                           </Button>
                           <button onClick={() => setDetailStudent(s)} className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50" title="Lifecycle">
@@ -462,7 +462,7 @@ export default function MentorshipClient() {
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <StudentLifecycle student={detailStudent} title="Student Progress" />
                 </div>
-                <Button onClick={() => { openManage(detailStudent); setDetailStudent(null) }} className="w-full bg-violet-600 hover:bg-violet-700 text-white gap-2">
+                <Button onClick={() => { openManage(detailStudent); setDetailStudent(null) }} className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2">
                   <BookMarked className="w-4 h-4" /> Manage Mentorship
                 </Button>
               </div>
@@ -476,7 +476,7 @@ export default function MentorshipClient() {
         <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-gray-900">
-              <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center"><BookMarked className="w-4 h-4 text-violet-600" /></div>
+              <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center"><BookMarked className="w-4 h-4 text-blue-600" /></div>
               Manage Mentorship
               {manageStudent && <span className="text-sm font-normal text-gray-500 ml-1">— {manageStudent.full_name}</span>}
             </DialogTitle>
@@ -485,7 +485,7 @@ export default function MentorshipClient() {
           <div className="space-y-4 mt-1">
             {/* Mode */}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setCaseMode('dcw')} className={`py-2.5 rounded-xl text-sm font-bold border-2 ${caseMode === 'dcw' ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-500 border-gray-200'}`}>Managed by DCW</button>
+              <button onClick={() => setCaseMode('dcw')} className={`py-2.5 rounded-xl text-sm font-bold border-2 ${caseMode === 'dcw' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>Managed by DCW</button>
               <button onClick={() => setCaseMode('self')} className={`py-2.5 rounded-xl text-sm font-bold border-2 ${caseMode === 'self' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}>By Self</button>
             </div>
 
@@ -508,7 +508,7 @@ export default function MentorshipClient() {
                 return (
                   <div key={st.key} className="border border-gray-200 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
                       <span className="text-sm font-bold text-gray-800">{st.label}</span>
                       <div className="ml-auto flex gap-1">
                         {(['not_started', 'in_progress', 'completed'] as const).map(stt => (
@@ -529,7 +529,7 @@ export default function MentorshipClient() {
                     {stage.subjects.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
                         {stage.subjects.map(sub => (
-                          <span key={sub} className="inline-flex items-center gap-1 bg-violet-100 text-violet-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                          <span key={sub} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
                             {sub}<button onClick={() => removeSubject(st.key, sub)}><X className="w-3 h-3 hover:text-red-500" /></button>
                           </span>
                         ))}
@@ -540,7 +540,7 @@ export default function MentorshipClient() {
               })}
             </div>
 
-            <Button onClick={saveCase} disabled={savingCase} className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white">
+            <Button onClick={saveCase} disabled={savingCase} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white">
               {savingCase ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Saving...</> : 'Save Mentorship'}
             </Button>
 
@@ -568,13 +568,13 @@ export default function MentorshipClient() {
                   <input ref={payFileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setPayFile(e.target.files?.[0] ?? null)} />
                   <div className="flex items-center gap-2">
                     {payFile ? (
-                      <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-lg px-3 h-9 flex-1">
-                        <FileText className="w-4 h-4 text-violet-600" />
-                        <span className="text-xs text-violet-800 truncate flex-1">{payFile.name}</span>
+                      <div className="flex items-center gap-2 bg-white border border-blue-200 rounded-lg px-3 h-9 flex-1">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs text-blue-800 truncate flex-1">{payFile.name}</span>
                         <button onClick={() => setPayFile(null)}><X className="w-3.5 h-3.5 text-gray-400" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => payFileRef.current?.click()} className="flex items-center gap-1.5 text-xs text-gray-500 border-2 border-dashed border-gray-200 rounded-lg px-3 h-9 flex-1 hover:border-violet-300">
+                      <button onClick={() => payFileRef.current?.click()} className="flex items-center gap-1.5 text-xs text-gray-500 border-2 border-dashed border-gray-200 rounded-lg px-3 h-9 flex-1 hover:border-blue-300">
                         <Upload className="w-3.5 h-3.5" /> Screenshot / proof
                       </button>
                     )}

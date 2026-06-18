@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, Clock, Eye, RefreshCw,
-  Copy, UserCheck, Wallet,
+  Copy, UserCheck, Wallet, Users, UserPlus,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AssociateManager } from '@/app/(dashboard)/admin/tabs/AssociateManager'
-import { PageHeader } from '@/components/shared/PageHeader'
+import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -52,6 +52,29 @@ export default function AssociatesClient() {
 
   const [isAdmin, setIsAdmin] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'approvals' | 'recharges'>('all')
+
+  // Hero dashboard stats (shown above the tabs)
+  const [heroAssociates, setHeroAssociates] = useState<any[]>([])
+  const [heroStudents, setHeroStudents] = useState<any[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const fmtAgg = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`
+
+  const loadHero = useCallback(async () => {
+    const [{ data: assoc }, { data: studs }] = await Promise.all([
+      (supabase as any).from('associates').select('id, status'),
+      (supabase as any).from('students').select('total_fee, amount_paid').not('referred_by_associate', 'is', null),
+    ])
+    setHeroAssociates((assoc ?? []) as any[])
+    setHeroStudents((studs ?? []) as any[])
+  }, [supabase])
+
+  useEffect(() => { loadHero() }, [loadHero, reloadKey])
+
+  const heroApproved = heroAssociates.filter(a => a.status === 'approved').length
+  const heroPending = heroAssociates.filter(a => a.status === 'pending').length
+  const heroFee = heroStudents.reduce((s, x) => s + (x.total_fee ?? 0), 0)
+  const heroReceived = heroStudents.reduce((s, x) => s + (x.amount_paid ?? 0), 0)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }: any) => {
@@ -191,8 +214,46 @@ export default function AssociatesClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Associates" description="Manage associates, approvals and wallet recharges" />
+    <div className="space-y-5">
+      {/* ── Dashboard hero (above the tabs) ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+        <div className="absolute bottom-0 left-1/3 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Users className="w-4 h-4" /></div>
+              <h1 className="text-xl font-bold tracking-tight">Associates Dashboard</h1>
+            </div>
+            <p className="text-blue-200 text-sm mt-1">Associates, approvals, wallet recharges & revenue</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setReloadKey(k => k + 1)} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium">
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+            {isAdmin && (
+              <button onClick={() => setCreateOpen(true)} className="flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">
+                <UserPlus className="w-3.5 h-3.5" /> Add Associate
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+          {[
+            { label: 'Total Associates', value: heroAssociates.length.toString() },
+            { label: 'Approved',         value: heroApproved.toString() },
+            { label: 'Pending',          value: heroPending.toString() },
+            { label: 'Students Referred',value: heroStudents.length.toString() },
+            { label: 'Total Fee',        value: fmtAgg(heroFee) },
+            { label: 'Received',         value: fmtAgg(heroReceived) },
+          ].map(s => (
+            <div key={s.label} className="bg-white/15 rounded-xl px-3 py-3 backdrop-blur-sm">
+              <p className="text-lg font-bold text-white leading-tight truncate">{s.value}</p>
+              <p className="text-[11px] text-white/70 font-medium mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Tab switcher */}
       <div className="flex gap-2 border-b border-slate-200">
@@ -237,7 +298,10 @@ export default function AssociatesClient() {
       </div>
 
       {/* ── ALL ASSOCIATES ── */}
-      {activeTab === 'all' && <AssociateManager />}
+      {activeTab === 'all' && <AssociateManager key={reloadKey} />}
+
+      <CreateAssociateDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={() => { setCreateOpen(false); setReloadKey(k => k + 1) }} />
+
 
       {/* ── APPROVALS ── */}
       {activeTab === 'approvals' && (

@@ -67,6 +67,7 @@ export function AssociateManager() {
   const [filterState, setFilterState] = useState('')
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [coordFilter, setCoordFilter] = useState('all') // 'all' | coordinator name | 'unassigned'
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
@@ -163,7 +164,11 @@ export function AssociateManager() {
       a.email.toLowerCase().includes(q) ||
       (a.institution_name ?? '').toLowerCase().includes(q) ||
       (a.district ?? '').toLowerCase().includes(q)
-    return matchSearch &&
+    const coord = a.coordinator_name ?? 'Unassigned'
+    const matchCoord = coordFilter === 'all'
+      || (coordFilter === 'unassigned' && coord === 'Unassigned')
+      || coord === coordFilter
+    return matchSearch && matchCoord &&
       (!filterState || a.state === filterState) &&
       (!filterDistrict || a.district === filterDistrict) &&
       (!filterStatus || a.status === filterStatus)
@@ -265,17 +270,31 @@ export function AssociateManager() {
         </div>
       </div>
 
+      {/* Coordinator filter chips (which coordinator has how many associates) */}
+      <div className="flex gap-1.5 flex-wrap">
+        <button onClick={() => setCoordFilter('all')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${coordFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+          All <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${coordFilter === 'all' ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{associates.length}</span>
+        </button>
+        {associatesByCoordinator.filter(([c]) => c !== 'Unassigned').map(([c, n]) => (
+          <button key={c} onClick={() => setCoordFilter(c)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${coordFilter === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+            {c} <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${coordFilter === c ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{n}</span>
+          </button>
+        ))}
+        {(() => {
+          const un = associatesByCoordinator.find(([c]) => c === 'Unassigned')?.[1] ?? 0
+          return un > 0 ? (
+            <button onClick={() => setCoordFilter('unassigned')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${coordFilter === 'unassigned' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-200 hover:border-amber-400'}`}>
+              Unassigned <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${coordFilter === 'unassigned' ? 'bg-white/20' : 'bg-amber-100'}`}>{un}</span>
+            </button>
+          ) : null
+        })()}
+      </div>
+
       {(studentsByCoordinator.length > 0 || studentsByBoard.length > 0) && (
-        <div className="grid md:grid-cols-3 gap-3">
-          {/* Associates by Coordinator */}
-          <div className="bg-white border border-gray-100 rounded-xl p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><UserCog className="w-3.5 h-3.5" /> Associates by Coordinator</p>
-            <div className="flex flex-wrap gap-1.5">
-              {associatesByCoordinator.map(([c, n]) => (
-                <span key={c} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-blue-500">· {n}</span></span>
-              ))}
-            </div>
-          </div>
+        <div className="grid md:grid-cols-2 gap-3">
           {/* Students by Coordinator */}
           <div className="bg-white border border-gray-100 rounded-xl p-4">
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Coordinator</p>
@@ -340,6 +359,7 @@ export function AssociateManager() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b">
               <tr>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">S.No</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Associate Code</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
@@ -350,8 +370,9 @@ export function AssociateManager() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map(a => (
+              {filtered.map((a, idx) => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/associates/${a.id}`)}>
+                  <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{idx + 1}</td>
                   <td className="px-4 py-3">
                     {a.associate_code
                       ? <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg whitespace-nowrap">{a.associate_code}</span>

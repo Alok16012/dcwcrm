@@ -32,17 +32,21 @@ export default async function HrmsPage() {
     : { data: [] }
   const profMap = Object.fromEntries(((profRaw ?? []) as { id: string; full_name: string; role: string }[]).map((p) => [p.id, p]))
 
-  const rows = (empData ?? []).map((e) => ({
-    id: e.id,
-    profile_id: e.profile_id,
-    employee_code: e.employee_code,
-    full_name: profMap[e.profile_id]?.full_name ?? '—',
-    role: (profMap[e.profile_id]?.role ?? 'lead') as import('@/types/app.types').UserRole,
-    department: e.department ?? '—',
-    designation: e.designation ?? '—',
-    joining_date: e.joining_date ?? '—',
-    status: (e.is_active ? 'active' : 'inactive') as 'active' | 'inactive',
-  }))
+  // Only internal staff — students & associates have their own modules
+  const INTERNAL_ROLES = ['admin', 'lead', 'telecaller', 'counselor', 'backend', 'housekeeping']
+  const rows = (empData ?? [])
+    .filter((e) => INTERNAL_ROLES.includes(profMap[e.profile_id]?.role ?? 'lead'))
+    .map((e) => ({
+      id: e.id,
+      profile_id: e.profile_id,
+      employee_code: e.employee_code,
+      full_name: profMap[e.profile_id]?.full_name ?? '—',
+      role: (profMap[e.profile_id]?.role ?? 'lead') as import('@/types/app.types').UserRole,
+      department: e.department ?? '—',
+      designation: e.designation ?? '—',
+      joining_date: e.joining_date ?? '—',
+      status: (e.is_active ? 'active' : 'inactive') as 'active' | 'inactive',
+    }))
 
   return (
     <div className="space-y-6">

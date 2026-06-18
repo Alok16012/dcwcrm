@@ -340,6 +340,7 @@ export function AssociateManager() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b">
               <tr>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">Associate Code</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Coordinator</th>
@@ -351,10 +352,12 @@ export function AssociateManager() {
             <tbody className="divide-y">
               {filtered.map(a => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/associates/${a.id}`)}>
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {a.name}
-                    {a.associate_code && <span className="ml-1.5 text-[10px] font-mono text-slate-400">{a.associate_code}</span>}
+                  <td className="px-4 py-3">
+                    {a.associate_code
+                      ? <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg whitespace-nowrap">{a.associate_code}</span>
+                      : <span className="text-slate-400 text-xs">—</span>}
                   </td>
+                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{a.name}</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{a.phone}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {a.coordinator_name

@@ -263,29 +263,6 @@ export function AssociateManager() {
         })()}
       </div>
 
-      {(studentsByCoordinator.length > 0 || studentsByBoard.length > 0) && (
-        <div className="grid md:grid-cols-2 gap-3">
-          {/* Students by Coordinator */}
-          <div className="bg-white border border-gray-100 rounded-xl p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Coordinator</p>
-            <div className="flex flex-wrap gap-1.5">
-              {studentsByCoordinator.length === 0 ? <span className="text-xs text-gray-300">—</span> : studentsByCoordinator.map(([c, n]) => (
-                <span key={c} className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg px-2 py-1 font-semibold">{c} <span className="text-indigo-500">· {n}</span></span>
-              ))}
-            </div>
-          </div>
-          {/* Students by Board */}
-          <div className="bg-white border border-gray-100 rounded-xl p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Students by Board</p>
-            <div className="flex flex-wrap gap-1.5">
-              {studentsByBoard.length === 0 ? <span className="text-xs text-gray-300">—</span> : studentsByBoard.map(([b, n]) => (
-                <span key={b} className="text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2 py-1 font-semibold">{b} <span className="text-blue-500">· {n}</span></span>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="bg-white border rounded-xl p-3 flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-44">

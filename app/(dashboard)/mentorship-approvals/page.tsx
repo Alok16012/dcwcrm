@@ -151,31 +151,58 @@ export default function MentorshipDashboardPage() {
     }
   }
 
+  // Approve a payment + credit the mentor's incentive (best-effort ledger)
+  async function markApproved(id: string, userId?: string) {
+    const amt = salaryPct[id] ? parseFloat(salaryPct[id]) : null
+    const { error } = await (supabase as any).from('mentorship_payments').update({
+      status: 'approved',
+      admin_remarks: adminRemarks[id] || null,
+      approved_by: userId ?? null,
+      approved_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    if (amt && amt > 0) {
+      // store the exact incentive amount (₹) on the payment — ignore if column absent
+      try { await (supabase as any).from('mentorship_payments').update({ incentive_amount: amt }).eq('id', id) } catch {}
+      // credit the mentor's incentive ledger with name + reason
+      const m = mentorships.find(x => x.id === id)
+      const mentorId = m?.mentorship?.telecaller?.id
+      if (mentorId) {
+        try {
+          await (supabase as any).from('mentor_incentives').insert({
+            mentor_id: mentorId,
+            payment_id: id,
+            student_id: m?.mentorship?.student?.id ?? null,
+            amount: amt,
+            reason: `Mentorship — ${m?.mentorship?.student?.full_name ?? 'student'}`,
+            created_by: userId ?? null,
+          })
+        } catch {}
+      }
+    }
+  }
+
   async function approve(id: string) {
     setApprovingId(id)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const pct = salaryPct[id] ? parseFloat(salaryPct[id]) : null
-      const { error } = await (supabase as any).from('mentorship_payments').update({
-        status: 'approved', salary_percentage: pct, admin_remarks: adminRemarks[id] || null,
-        approved_by: user?.id ?? null, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }).eq('id', id)
-      if (error) throw error
-      toast.success('Mentorship approved')
+      await markApproved(id, user?.id)
+      toast.success('Payment approved')
       setMentorships(prev => prev.filter(m => m.id !== id))
-    } catch { toast.error('Failed to approve') } finally { setApprovingId(null) }
+      setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    } catch (e: any) { toast.error(e?.message ?? 'Failed to approve') } finally { setApprovingId(null) }
   }
 
   async function reject(id: string) {
     setApprovingId(id)
     try {
       const { error } = await (supabase as any).from('mentorship_payments')
-        .update({ status: 'rejected', admin_remarks: adminRemarks[id] || null, updated_at: new Date().toISOString() }).eq('id', id)
+        .update({ status: 'rejected', admin_remarks: adminRemarks[id] || null }).eq('id', id)
       if (error) throw error
-      toast.success('Mentorship rejected')
+      toast.success('Payment rejected')
       setMentorships(prev => prev.filter(m => m.id !== id))
       setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
-    } catch { toast.error('Failed to reject') } finally { setApprovingId(null) }
+    } catch (e: any) { toast.error(e?.message ?? 'Failed to reject') } finally { setApprovingId(null) }
   }
 
   function toggleSelect(id: string) {
@@ -191,19 +218,11 @@ export default function MentorshipDashboardPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const ids = Array.from(selectedIds)
-      // per-record salary% / remarks if set; otherwise plain approve
-      await Promise.all(ids.map(id =>
-        (supabase as any).from('mentorship_payments').update({
-          status: 'approved',
-          salary_percentage: salaryPct[id] ? parseFloat(salaryPct[id]) : null,
-          admin_remarks: adminRemarks[id] || null,
-          approved_by: user?.id ?? null, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        }).eq('id', id)
-      ))
-      toast.success(`Approved ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
+      for (const id of ids) await markApproved(id, user?.id)
+      toast.success(`Approved ${ids.length} payment${ids.length !== 1 ? 's' : ''}`)
       setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
       setSelectedIds(new Set())
-    } catch { toast.error('Bulk approve failed') } finally { setBulkBusy(false) }
+    } catch (e: any) { toast.error(e?.message ?? 'Bulk approve failed') } finally { setBulkBusy(false) }
   }
 
   async function bulkReject() {
@@ -212,7 +231,7 @@ export default function MentorshipDashboardPage() {
     try {
       const ids = Array.from(selectedIds)
       const { error } = await (supabase as any).from('mentorship_payments')
-        .update({ status: 'rejected', updated_at: new Date().toISOString() }).in('id', ids)
+        .update({ status: 'rejected' }).in('id', ids)
       if (error) throw error
       toast.success(`Rejected ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
       setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
@@ -508,11 +527,11 @@ export default function MentorshipDashboardPage() {
                           </p>
                         )}
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <IndianRupee className="w-3.5 h-3.5 text-green-600" />
-                            <input type="number" min="0" max="100" step="0.5" placeholder="Salary % bonus"
+                          <div className="flex items-center gap-1 border border-gray-300 rounded px-2 h-7">
+                            <span className="text-gray-400 text-xs font-bold">₹</span>
+                            <input type="number" min="0" step="1" placeholder="Incentive to mentor"
                               value={salaryPct[m.id] ?? ''} onChange={e => setSalaryPct(p => ({ ...p, [m.id]: e.target.value }))}
-                              className="w-32 h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                              className="w-36 h-full text-xs focus:outline-none" />
                           </div>
                           <input type="text" placeholder="Admin remarks (optional)"
                             value={adminRemarks[m.id] ?? ''} onChange={e => setAdminRemarks(p => ({ ...p, [m.id]: e.target.value }))}

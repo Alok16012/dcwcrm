@@ -38,7 +38,20 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
   const [addYear, setAddYear] = useState(String(new Date().getFullYear()))
   const [addIncentive, setAddIncentive] = useState('')
   const [saving, setSaving] = useState(false)
+  const [mentorIncentives, setMentorIncentives] = useState<{ id: string; amount: number; reason: string | null; created_at: string }[]>([])
   const supabase = createClient()
+
+  useEffect(() => {
+    async function loadMentorInc() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await (supabase as any).from('mentor_incentives')
+        .select('id, amount, reason, created_at').eq('mentor_id', user.id)
+        .order('created_at', { ascending: false })
+      setMentorIncentives((data ?? []) as any[])
+    }
+    loadMentorInc().catch(() => {})
+  }, [supabase])
 
   const fetchPayroll = useCallback(async () => {
     if (!viewEmployeeId) { setPayrollRows([]); setLoading(false); return }
@@ -267,6 +280,29 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
               </div>
             )
           })()}
+        </div>
+      )}
+
+      {/* Mentorship incentives (credited on payment approval) */}
+      {mentorIncentives.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-base">Mentorship Incentives</h3>
+            <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
+              Total: {fmt(mentorIncentives.reduce((s, r) => s + Number(r.amount), 0))}
+            </span>
+          </div>
+          <div className="rounded-lg border overflow-hidden bg-white divide-y">
+            {mentorIncentives.map(mi => (
+              <div key={mi.id} className="flex items-center justify-between px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{mi.reason ?? 'Mentorship'}</p>
+                  <p className="text-xs text-gray-400">{format(new Date(mi.created_at), 'dd MMM yyyy')}</p>
+                </div>
+                <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

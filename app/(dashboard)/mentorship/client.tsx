@@ -37,7 +37,7 @@ const STAGE_ORDER: { key: StageKey; label: string }[] = [
   { key: 'assignment', label: 'Assignment' },
   { key: 'theory',     label: 'Theory' },
 ]
-interface PayEntry { amount: string; date: string; proof_url: string | null; file: File | null }
+interface PayEntry { amount: string; date: string; proof_url: string | null; file: File | null; payment_id?: string | null }
 interface SubjectRow {
   name: string
   amount: string
@@ -98,6 +98,7 @@ export default function MentorshipClient() {
   const [stages, setStages] = useState<StageState>(emptyStages())
   const [subjInput, setSubjInput] = useState<Record<StageKey, string>>({ practical: '', assignment: '', theory: '' })
   const [savingCase, setSavingCase] = useState(false)
+  const [payStatus, setPayStatus] = useState<Record<string, string>>({}) // payment_id -> status
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -121,6 +122,16 @@ export default function MentorshipClient() {
         if (!cMap[c.student_id] || hasStages) cMap[c.student_id] = c
       })
       setCases(cMap)
+
+      // verification status of each installment (payment_id -> status)
+      const caseIds = Object.values(cMap).map(c => c.id)
+      if (caseIds.length) {
+        const { data: pays } = await (supabase as any).from('mentorship_payments')
+          .select('id, status').in('mentorship_id', caseIds)
+        const sMap: Record<string, string> = {}
+        ;((pays ?? []) as any[]).forEach(p => { sMap[p.id] = p.status })
+        setPayStatus(sMap)
+      }
     } catch {
       toast.error('Failed to load students')
     } finally {
@@ -141,9 +152,9 @@ export default function MentorshipClient() {
             // installment payments (new) or legacy single collected
             let payments: PayEntry[] = []
             if (Array.isArray(sub.payments)) {
-              payments = sub.payments.map((p: any) => ({ amount: p.amount != null ? String(p.amount) : '', date: p.date ?? '', proof_url: p.proof_url ?? null, file: null }))
+              payments = sub.payments.map((p: any) => ({ amount: p.amount != null ? String(p.amount) : '', date: p.date ?? '', proof_url: p.proof_url ?? null, file: null, payment_id: p.payment_id ?? null }))
             } else if (sub.collected != null && Number(sub.collected) > 0) {
-              payments = [{ amount: String(sub.collected), date: sub.paid_on ?? '', proof_url: sub.proof_url ?? null, file: null }]
+              payments = [{ amount: String(sub.collected), date: sub.paid_on ?? '', proof_url: sub.proof_url ?? null, file: null, payment_id: null }]
             }
             return { name: sub.name ?? '', amount: sub.amount != null ? String(sub.amount) : '', status: sub.status ?? 'not_started', payments }
           })
@@ -199,7 +210,7 @@ export default function MentorshipClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // upload any new installment proof files
+      // upload any new installment proof files; keep payment_id for sync
       const built = await Promise.all(STAGE_ORDER.map(async st => {
         const subs = await Promise.all(stages[st.key].map(async sub => {
           const payments = await Promise.all(sub.payments.map(async (p, pi) => {
@@ -211,7 +222,7 @@ export default function MentorshipClient() {
               if (!upErr) proof = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
               else toast.warning(`Proof upload failed for ${sub.name}`)
             }
-            return { amount: parseFloat(p.amount) || 0, date: p.date || null, proof_url: proof }
+            return { stage: st.key, subject: sub.name, amount: parseFloat(p.amount) || 0, date: p.date || null, proof_url: proof, payment_id: p.payment_id ?? null }
           }))
           return { name: sub.name, amount: caseMode === 'dcw' ? num(sub.amount) : 0, status: sub.status, payments: caseMode === 'dcw' ? payments : [] }
         }))
@@ -233,14 +244,45 @@ export default function MentorshipClient() {
         status: 'approved',
         updated_at: new Date().toISOString(),
       }
+      let savedCaseId = caseId
       if (caseId) {
         const { error } = await (supabase as any).from('student_mentorships').update(payload).eq('id', caseId)
         if (error) throw error
       } else {
-        const { error } = await (supabase as any).from('student_mentorships').insert(payload)
+        const { data, error } = await (supabase as any).from('student_mentorships').insert(payload).select('id').single()
         if (error) throw error
+        savedCaseId = data.id
       }
-      toast.success('Mentorship saved')
+
+      // Create a verification request (mentorship_payments) for each NEW installment
+      if (caseMode === 'dcw' && savedCaseId) {
+        const STAGE_LBL: Record<string, string> = { practical: 'Practical', assignment: 'Assignment', theory: 'Theory' }
+        let createdAny = false
+        for (const st of built) {
+          for (const sub of st.subjects as any[]) {
+            for (const p of sub.payments as any[]) {
+              if (!p.payment_id && p.amount > 0) {
+                const { data: pay, error: payErr } = await (supabase as any).from('mentorship_payments').insert({
+                  mentorship_id: savedCaseId,
+                  amount: p.amount,
+                  paid_on: p.date,
+                  screenshot_url: p.proof_url,
+                  note: `${STAGE_LBL[p.stage] ?? p.stage} · ${sub.name}`,
+                  status: 'pending',
+                  created_by: user.id,
+                }).select('id').single()
+                if (!payErr && pay) { p.payment_id = pay.id; createdAny = true }
+              }
+            }
+          }
+        }
+        // re-save stages with the new payment_ids so re-saving doesn't duplicate
+        if (createdAny) {
+          await (supabase as any).from('student_mentorships').update({ stages: built }).eq('id', savedCaseId)
+        }
+      }
+
+      toast.success('Mentorship saved — payments sent for verification')
       setManageStudent(null)
       await load()
     } catch (e: any) {
@@ -508,7 +550,9 @@ export default function MentorshipClient() {
                             {/* Installment payments */}
                             <div className="mt-2 space-y-1.5">
                               <p className="text-[9px] font-bold text-gray-400 uppercase">Payments received</p>
-                              {sub.payments.map((p, pidx) => (
+                              {sub.payments.map((p, pidx) => {
+                                const pst = p.payment_id ? payStatus[p.payment_id] : null
+                                return (
                                 <div key={pidx} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1.5">
                                   <div className="relative w-20">
                                     <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₹</span>
@@ -522,9 +566,14 @@ export default function MentorshipClient() {
                                   ) : (
                                     <label className="h-7 px-1.5 flex items-center border-2 border-dashed border-gray-200 rounded text-gray-400 cursor-pointer hover:border-blue-300"><FileText className="w-3.5 h-3.5" /><input type="file" accept="image/*,.pdf" className="hidden" onChange={e => updatePayment(st.key, idx, pidx, { file: e.target.files?.[0] ?? null })} /></label>
                                   )}
+                                  {pst && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${pst === 'approved' ? 'bg-emerald-100 text-emerald-700' : pst === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+                                      {pst === 'approved' ? '✓' : pst === 'rejected' ? '✕' : '⏳'}
+                                    </span>
+                                  )}
                                   <button onClick={() => removePayment(st.key, idx, pidx)} className="text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
                                 </div>
-                              ))}
+                              )})}
                               <button onClick={() => addPayment(st.key, idx)} className="w-full flex items-center justify-center gap-1 h-7 border-2 border-dashed border-emerald-200 rounded-lg text-xs font-semibold text-emerald-600 hover:bg-emerald-50">
                                 + Add payment
                               </button>

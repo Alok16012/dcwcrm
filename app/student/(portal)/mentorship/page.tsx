@@ -1,14 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import {
-  Award, GraduationCap, Phone, IndianRupee, FileText, BookMarked, User, Wallet,
-} from 'lucide-react'
+import { Award, GraduationCap, Phone, FileText, BookMarked, User } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface MentorProfile { full_name: string; phone: string | null; email: string | null }
 interface CaseRow { id: string; managed_by: string | null; total_amount: number | null; stages: any }
-interface Payment { id: string; amount: number; note: string | null; screenshot_url: string | null; status: string; created_at: string }
+interface SubjectObj { name: string; amount: number; collected: number; status: string; proof_url: string | null; paid_on: string | null }
 
 const STAGE_LABEL: Record<string, string> = { practical: 'Practical', assignment: 'Assignment', theory: 'Theory' }
 const STAGE_ORDER = ['practical', 'assignment', 'theory']
@@ -17,16 +15,10 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
   in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-700' },
   completed:   { label: 'Completed',   color: 'bg-emerald-100 text-emerald-700' },
 }
-const PAY_CFG: Record<string, { label: string; color: string }> = {
-  pending:  { label: 'Pending',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  approved: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-600 border-red-200' },
-}
 
 export default function StudentMentorshipPage() {
   const [mentor, setMentor] = useState<MentorProfile | null>(null)
   const [mcase, setMcase] = useState<CaseRow | null>(null)
-  const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [noMentor, setNoMentor] = useState(false)
   const supabase = createClient()
@@ -45,18 +37,11 @@ export default function StudentMentorshipPage() {
           .select('full_name, phone, email').eq('id', student.mentor_telecaller_id).single()
         setMentor(mentorData as unknown as MentorProfile)
 
-        // latest case (row with stages)
         const { data: caseRows } = await (supabase as any).from('student_mentorships')
           .select('id, managed_by, total_amount, stages, created_at')
           .eq('student_id', student.id).order('created_at', { ascending: false })
         const c = ((caseRows ?? []) as any[]).find(r => Array.isArray(r.stages) && r.stages.length > 0) ?? (caseRows ?? [])[0] ?? null
         setMcase(c)
-        if (c) {
-          const { data: pays } = await (supabase as any).from('mentorship_payments')
-            .select('id, amount, note, screenshot_url, status, created_at')
-            .eq('mentorship_id', c.id).order('created_at', { ascending: false })
-          setPayments((pays ?? []) as Payment[])
-        }
       } catch { /* silent */ } finally { setLoading(false) }
     }
     load()
@@ -67,19 +52,27 @@ export default function StudentMentorshipPage() {
   }
 
   const isDcw = mcase?.managed_by !== 'self'
-  const total = mcase?.total_amount ?? 0
-  const paid = payments.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount), 0)
-  const remaining = Math.max(total - paid, 0)
-  const stageArr: { stage: string; subjects: string[]; status: string }[] = Array.isArray(mcase?.stages) ? mcase!.stages : []
-  const stageMap: Record<string, { subjects: string[]; status: string }> = {}
-  stageArr.forEach(s => { stageMap[s.stage] = { subjects: s.subjects ?? [], status: s.status ?? 'not_started' } })
+  const stageArr: { stage: string; subjects: SubjectObj[] }[] = Array.isArray(mcase?.stages)
+    ? mcase!.stages.map((st: any) => ({
+        stage: st.stage,
+        subjects: (st.subjects ?? []).map((sub: any) =>
+          typeof sub === 'string'
+            ? { name: sub, amount: 0, collected: 0, status: 'not_started', proof_url: null, paid_on: null }
+            : { name: sub.name ?? '', amount: Number(sub.amount ?? 0), collected: Number(sub.collected ?? 0), status: sub.status ?? 'not_started', proof_url: sub.proof_url ?? null, paid_on: sub.paid_on ?? null }
+        ),
+      }))
+    : []
+  const stageMap: Record<string, SubjectObj[]> = {}
+  stageArr.forEach(s => { stageMap[s.stage] = s.subjects })
+  const allSubs = stageArr.flatMap(s => s.subjects)
+  const total = allSubs.reduce((s, x) => s + x.amount, 0)
+  const collected = allSubs.reduce((s, x) => s + x.collected, 0)
+  const remaining = Math.max(total - collected, 0)
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto px-4 py-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Award className="w-6 h-6 text-blue-600" /> Mentorship
-        </h1>
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Award className="w-6 h-6 text-blue-600" /> Mentorship</h1>
         <p className="text-sm text-gray-500 mt-0.5">Your mentor, learning stages & payments</p>
       </div>
 
@@ -95,9 +88,7 @@ export default function StudentMentorshipPage() {
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 text-white">
             <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Your Mentor</p>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                {mentor.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-              </div>
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">{mentor.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
               <div>
                 <p className="text-lg font-bold">{mentor.full_name}</p>
                 {mentor.phone && (
@@ -117,7 +108,6 @@ export default function StudentMentorshipPage() {
             </div>
           ) : (
             <>
-              {/* Mode + payment summary (DCW) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${isDcw ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{isDcw ? 'Managed by DCW' : 'By Self'}</span>
               </div>
@@ -126,8 +116,8 @@ export default function StudentMentorshipPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: 'Total', value: total, color: 'bg-blue-50 text-blue-700' },
-                    { label: 'Paid', value: paid, color: 'bg-emerald-50 text-emerald-700' },
-                    { label: 'Remaining', value: remaining, color: 'bg-amber-50 text-amber-700' },
+                    { label: 'Collected', value: collected, color: 'bg-emerald-50 text-emerald-700' },
+                    { label: 'Pending', value: remaining, color: 'bg-amber-50 text-amber-700' },
                   ].map(s => (
                     <div key={s.label} className={`rounded-xl p-3 text-center ${s.color}`}>
                       <p className="text-lg font-bold">₹{s.value.toLocaleString('en-IN')}</p>
@@ -137,58 +127,48 @@ export default function StudentMentorshipPage() {
                 </div>
               )}
 
-              {/* Stages journey */}
-              <div>
-                <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5"><BookMarked className="w-4 h-4 text-blue-600" /> Learning Stages</h2>
-                <div className="space-y-2.5">
-                  {STAGE_ORDER.map((key, i) => {
-                    const st = stageMap[key] ?? { subjects: [], status: 'not_started' }
-                    const cfg = STATUS_CFG[st.status] ?? STATUS_CFG.not_started
-                    return (
-                      <div key={key} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-                        <div className="flex items-center gap-2 mb-1.5">
+              {/* Stages with per-subject breakdown */}
+              <div className="space-y-3">
+                {STAGE_ORDER.map((key, i) => {
+                  const subs = stageMap[key] ?? []
+                  const stTotal = subs.reduce((s, x) => s + x.amount, 0)
+                  const stColl = subs.reduce((s, x) => s + x.collected, 0)
+                  return (
+                    <div key={key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                        <div className="flex items-center gap-2">
                           <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
                           <span className="text-sm font-bold text-gray-800">{STAGE_LABEL[key]}</span>
-                          <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.color}`}>{cfg.label}</span>
                         </div>
-                        {st.subjects.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {st.subjects.map(sub => <span key={sub} className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-lg">{sub}</span>)}
-                          </div>
-                        ) : <p className="text-xs text-gray-400">No subjects yet</p>}
+                        {isDcw && stTotal > 0 && <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">₹{stColl}/{stTotal}</span>}
                       </div>
-                    )
-                  })}
-                </div>
+                      <div className="p-3 space-y-2">
+                        {subs.length === 0 ? <p className="text-xs text-gray-400">No subjects yet</p> : subs.map((sub, idx) => {
+                          const cfg = STATUS_CFG[sub.status] ?? STATUS_CFG.not_started
+                          const pending = sub.amount - sub.collected
+                          return (
+                            <div key={idx} className="border border-gray-100 rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="text-sm font-semibold text-gray-800">{sub.name}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.color}`}>{cfg.label}</span>
+                                {sub.proof_url && <a href={sub.proof_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 ml-auto"><FileText className="w-3.5 h-3.5" /></a>}
+                              </div>
+                              {isDcw && sub.amount > 0 && (
+                                <div className="flex items-center gap-3 flex-wrap text-xs">
+                                  <span className="text-gray-500">Total: <b className="text-gray-700">₹{sub.amount}</b></span>
+                                  <span className="text-emerald-600">Collected: ₹{sub.collected}</span>
+                                  {pending > 0 && <span className="text-amber-600">Pending: ₹{pending}</span>}
+                                  {sub.paid_on && <span className="text-gray-400">· {format(new Date(sub.paid_on), 'dd MMM yyyy')}</span>}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-
-              {/* Payment ledger (DCW) */}
-              {isDcw && (
-                <div>
-                  <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5"><Wallet className="w-4 h-4 text-emerald-600" /> Payment History</h2>
-                  {payments.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-xl border border-dashed border-gray-200">
-                      <p className="text-sm text-gray-400">No payments recorded yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {payments.map(p => {
-                        const cfg = PAY_CFG[p.status] ?? PAY_CFG.pending
-                        return (
-                          <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center gap-2">
-                            <IndianRupee className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                            <span className="text-sm font-bold text-gray-800">₹{Number(p.amount).toLocaleString('en-IN')}</span>
-                            {p.note && <span className="text-xs text-gray-400 truncate">· {p.note}</span>}
-                            <span className="text-[10px] text-gray-400 ml-auto whitespace-nowrap">{format(new Date(p.created_at), 'dd MMM yyyy')}</span>
-                            {p.screenshot_url && <a href={p.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-blue-500"><FileText className="w-3.5 h-3.5" /></a>}
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </>
           )}
         </>

@@ -1,16 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
-  GraduationCap, CheckCircle2, Clock, RefreshCw,
-  FileText, Award, Upload, X, IndianRupee, BookMarked, Phone, Users,
-  Search, Eye, Plus, Wallet,
+  GraduationCap, RefreshCw, Award, X, BookMarked, Phone, Users, Clock,
+  Search, Eye, Wallet, FileText, CheckCircle2,
 } from 'lucide-react'
-import { format } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
@@ -39,22 +37,22 @@ const STAGE_ORDER: { key: StageKey; label: string }[] = [
   { key: 'assignment', label: 'Assignment' },
   { key: 'theory',     label: 'Theory' },
 ]
-type StageState = Record<StageKey, { subjects: string[]; status: string }>
-const emptyStages = (): StageState => ({
-  practical:  { subjects: [], status: 'not_started' },
-  assignment: { subjects: [], status: 'not_started' },
-  theory:     { subjects: [], status: 'not_started' },
-})
+interface SubjectRow {
+  name: string
+  amount: string
+  collected: string
+  status: string
+  proof_url: string | null
+  paid_on: string
+  file: File | null
+}
+type StageState = Record<StageKey, SubjectRow[]>
+const emptyStages = (): StageState => ({ practical: [], assignment: [], theory: [] })
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   not_started: { label: 'Not Started', cls: 'bg-gray-100 text-gray-600' },
   in_progress: { label: 'In Progress', cls: 'bg-amber-100 text-amber-700' },
   completed:   { label: 'Completed',   cls: 'bg-emerald-100 text-emerald-700' },
-}
-const PAY_CFG: Record<string, { label: string; cls: string }> = {
-  pending:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  approved: { label: 'Approved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-600 border-red-200' },
 }
 
 function fmtEnroll(n: string | null | undefined) {
@@ -63,7 +61,7 @@ function fmtEnroll(n: string | null | undefined) {
   return n
 }
 const BOARD_BADGE: Record<string, string> = {
-  NIOS:  'bg-blue-100 text-blue-800 border-blue-200',
+  NIOS: 'bg-blue-100 text-blue-800 border-blue-200',
   BOSSE: 'bg-blue-100 text-blue-800 border-blue-200',
   BBOSE: 'bg-blue-100 text-blue-800 border-blue-200',
 }
@@ -81,35 +79,26 @@ function avatarPalette(name: string) {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
   return AVATAR_PALETTES[h % AVATAR_PALETTES.length]
 }
+const num = (s: string) => parseFloat(s) || 0
 
 interface CaseRow { id: string; student_id: string; managed_by: string | null; total_amount: number | null; stages: any; status: string }
-interface Payment { id: string; mentorship_id: string; amount: number; paid_on: string | null; screenshot_url: string | null; note: string | null; status: string; salary_percentage: number | null; admin_remarks: string | null; created_at: string }
 
 export default function MentorshipClient() {
   const supabase = createClient()
   const [students, setStudents] = useState<AssignedStudent[]>([])
-  const [cases, setCases] = useState<Record<string, CaseRow>>({}) // by student_id
-  const [paysByCase, setPaysByCase] = useState<Record<string, Payment[]>>({})
+  const [cases, setCases] = useState<Record<string, CaseRow>>({})
   const [loading, setLoading] = useState(true)
   const [boardFilter, setBoardFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [detailStudent, setDetailStudent] = useState<AssignedStudent | null>(null)
 
-  // Manage modal state
+  // Manage modal
   const [manageStudent, setManageStudent] = useState<AssignedStudent | null>(null)
   const [caseId, setCaseId] = useState<string | null>(null)
   const [caseMode, setCaseMode] = useState<'dcw' | 'self'>('dcw')
-  const [caseTotal, setCaseTotal] = useState('')
   const [stages, setStages] = useState<StageState>(emptyStages())
   const [subjInput, setSubjInput] = useState<Record<StageKey, string>>({ practical: '', assignment: '', theory: '' })
-  const [casePayments, setCasePayments] = useState<Payment[]>([])
   const [savingCase, setSavingCase] = useState(false)
-  // add-payment sub form
-  const [payAmount, setPayAmount] = useState('')
-  const [payNote, setPayNote] = useState('')
-  const [payFile, setPayFile] = useState<File | null>(null)
-  const [addingPay, setAddingPay] = useState(false)
-  const payFileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,31 +109,19 @@ export default function MentorshipClient() {
         .select(`id, full_name, enrollment_number, phone, father_name, city,
           verification_status, exam_status, result_status, admit_card_url, portal_active, total_fee, amount_paid,
           course:courses(name), sub_section:department_sub_sections(name), session:sessions(name)`)
-        .eq('mentor_telecaller_id', user.id)
-        .order('full_name')
+        .eq('mentor_telecaller_id', user.id).order('full_name')
       if (error) throw error
       setStudents((studs ?? []) as AssignedStudent[])
 
-      // cases for this mentor (prefer rows that have stages set)
       const { data: caseRows } = await (supabase as any).from('student_mentorships')
         .select('id, student_id, managed_by, total_amount, stages, status, created_at')
-        .eq('telecaller_id', user.id)
-        .order('created_at', { ascending: true })
+        .eq('telecaller_id', user.id).order('created_at', { ascending: true })
       const cMap: Record<string, CaseRow> = {}
       ;((caseRows ?? []) as any[]).forEach(c => {
         const hasStages = Array.isArray(c.stages) && c.stages.length > 0
         if (!cMap[c.student_id] || hasStages) cMap[c.student_id] = c
       })
       setCases(cMap)
-
-      const caseIds = Object.values(cMap).map(c => c.id)
-      const pMap: Record<string, Payment[]> = {}
-      if (caseIds.length) {
-        const { data: pays } = await (supabase as any).from('mentorship_payments')
-          .select('*').in('mentorship_id', caseIds).order('created_at', { ascending: false })
-        ;((pays ?? []) as Payment[]).forEach(p => { (pMap[p.mentorship_id] ||= []).push(p) })
-      }
-      setPaysByCase(pMap)
     } catch {
       toast.error('Failed to load students')
     } finally {
@@ -159,7 +136,18 @@ export default function MentorshipClient() {
     if (Array.isArray(raw)) {
       raw.forEach((s: any) => {
         const k = s.stage as StageKey
-        if (st[k]) st[k] = { subjects: Array.isArray(s.subjects) ? s.subjects : [], status: s.status || 'not_started' }
+        if (st[k] && Array.isArray(s.subjects)) {
+          st[k] = s.subjects.map((sub: any) =>
+            typeof sub === 'string'
+              ? { name: sub, amount: '', collected: '', status: 'not_started', proof_url: null, paid_on: '', file: null }
+              : {
+                  name: sub.name ?? '', amount: sub.amount != null ? String(sub.amount) : '',
+                  collected: sub.collected != null ? String(sub.collected) : '',
+                  status: sub.status ?? 'not_started', proof_url: sub.proof_url ?? null,
+                  paid_on: sub.paid_on ?? '', file: null,
+                }
+          )
+        }
       })
     }
     return st
@@ -170,67 +158,78 @@ export default function MentorshipClient() {
     setManageStudent(s)
     setCaseId(c?.id ?? null)
     setCaseMode((c?.managed_by as any) === 'self' ? 'self' : 'dcw')
-    setCaseTotal(c?.total_amount != null ? String(c.total_amount) : '')
     setStages(c ? parseStages(c.stages) : emptyStages())
-    setCasePayments(c ? (paysByCase[c.id] ?? []) : [])
     setSubjInput({ practical: '', assignment: '', theory: '' })
-    setPayAmount(''); setPayNote(''); setPayFile(null)
   }
 
   function addSubject(stage: StageKey) {
     const v = subjInput[stage].trim()
     if (!v) return
-    setStages(prev => prev[stage].subjects.includes(v) ? prev : { ...prev, [stage]: { ...prev[stage], subjects: [...prev[stage].subjects, v] } })
+    setStages(prev => ({ ...prev, [stage]: [...prev[stage], { name: v, amount: '', collected: '', status: 'not_started', proof_url: null, paid_on: '', file: null }] }))
     setSubjInput(prev => ({ ...prev, [stage]: '' }))
   }
-  function removeSubject(stage: StageKey, sub: string) {
-    setStages(prev => ({ ...prev, [stage]: { ...prev[stage], subjects: prev[stage].subjects.filter(x => x !== sub) } }))
+  function removeSubject(stage: StageKey, idx: number) {
+    setStages(prev => ({ ...prev, [stage]: prev[stage].filter((_, i) => i !== idx) }))
   }
-  function setStageStatus(stage: StageKey, status: string) {
-    setStages(prev => ({ ...prev, [stage]: { ...prev[stage], status } }))
+  function updateSubject(stage: StageKey, idx: number, patch: Partial<SubjectRow>) {
+    setStages(prev => ({ ...prev, [stage]: prev[stage].map((s, i) => i === idx ? { ...s, ...patch } : s) }))
   }
 
-  // returns the case id (creating/updating the row)
-  async function persistCase(): Promise<string | null> {
-    if (!manageStudent) return null
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-    const stagesJson = STAGE_ORDER.map(s => ({ stage: s.key, subjects: stages[s.key].subjects, status: stages[s.key].status }))
-    const currentStage = (STAGE_ORDER.find(s => stages[s.key].status !== 'completed')?.key) ?? 'theory'
-    const payload: any = {
-      student_id: manageStudent.id,
-      telecaller_id: user.id,
-      created_by: user.id,
-      task_type: currentStage,
-      managed_by: caseMode,
-      work_status: stages[currentStage as StageKey]?.status ?? 'in_progress',
-      subject_name: STAGE_ORDER.flatMap(s => stages[s.key].subjects).join(', ') || null,
-      total_amount: caseMode === 'dcw' ? (parseFloat(caseTotal) || null) : null,
-      stages: stagesJson,
-      current_stage: currentStage,
-      status: 'approved',
-      updated_at: new Date().toISOString(),
-    }
-    if (caseId) {
-      const { error } = await (supabase as any).from('student_mentorships').update(payload).eq('id', caseId)
-      if (error) throw error
-      return caseId
-    } else {
-      const { data, error } = await (supabase as any).from('student_mentorships').insert(payload).select('id').single()
-      if (error) throw error
-      setCaseId(data.id)
-      return data.id as string
-    }
-  }
+  // overall + per-stage rollups
+  const stageTotal = (stage: StageKey) => stages[stage].reduce((s, x) => s + num(x.amount), 0)
+  const stageCollected = (stage: StageKey) => stages[stage].reduce((s, x) => s + num(x.collected), 0)
+  const grandTotal = STAGE_ORDER.reduce((s, st) => s + stageTotal(st.key), 0)
+  const grandCollected = STAGE_ORDER.reduce((s, st) => s + stageCollected(st.key), 0)
+  const grandPending = Math.max(grandTotal - grandCollected, 0)
 
   async function saveCase() {
     if (!manageStudent) return
-    if (STAGE_ORDER.every(s => stages[s.key].subjects.length === 0)) { toast.error('Add subjects to at least one stage'); return }
-    if (caseMode === 'dcw' && !caseTotal) { toast.error('Total amount required for DCW-managed'); return }
+    if (STAGE_ORDER.every(s => stages[s.key].length === 0)) { toast.error('Add subjects to at least one stage'); return }
     setSavingCase(true)
     try {
-      await persistCase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      // upload any new proof files
+      const built = await Promise.all(STAGE_ORDER.map(async st => {
+        const subs = await Promise.all(stages[st.key].map(async sub => {
+          let proof = sub.proof_url
+          if (sub.file) {
+            const ext = sub.file.name.split('.').pop()
+            const path = `mentorship/${user.id}/${manageStudent.id}/${st.key}-${sub.name}-${Date.now()}.${ext}`
+            const { error: upErr } = await supabase.storage.from('student-documents').upload(path, sub.file, { upsert: true })
+            if (!upErr) proof = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
+            else toast.warning(`Proof upload failed for ${sub.name}`)
+          }
+          return { name: sub.name, amount: num(sub.amount), collected: num(sub.collected), status: sub.status, proof_url: proof, paid_on: sub.paid_on || null }
+        }))
+        return { stage: st.key, subjects: subs }
+      }))
+
+      const total = built.reduce((s, st) => s + st.subjects.reduce((a, x) => a + x.amount, 0), 0)
+      const currentStage = STAGE_ORDER.find(s => stages[s.key].some(x => x.status !== 'completed'))?.key ?? 'theory'
+      const payload: any = {
+        student_id: manageStudent.id,
+        telecaller_id: user.id,
+        created_by: user.id,
+        task_type: currentStage,
+        managed_by: caseMode,
+        subject_name: STAGE_ORDER.flatMap(s => stages[s.key].map(x => x.name)).join(', ') || null,
+        total_amount: caseMode === 'dcw' ? total : null,
+        stages: built,
+        current_stage: currentStage,
+        status: 'approved',
+        updated_at: new Date().toISOString(),
+      }
+      if (caseId) {
+        const { error } = await (supabase as any).from('student_mentorships').update(payload).eq('id', caseId)
+        if (error) throw error
+      } else {
+        const { error } = await (supabase as any).from('student_mentorships').insert(payload)
+        if (error) throw error
+      }
       toast.success('Mentorship saved')
+      setManageStudent(null)
       await load()
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to save')
@@ -239,60 +238,21 @@ export default function MentorshipClient() {
     }
   }
 
-  async function addPayment() {
-    if (!manageStudent) return
-    if (!payAmount || parseFloat(payAmount) <= 0) { toast.error('Enter a valid amount'); return }
-    setAddingPay(true)
-    try {
-      const id = await persistCase()
-      if (!id) throw new Error('Could not save mentorship')
-      const { data: { user } } = await supabase.auth.getUser()
-      let shot: string | null = null
-      if (payFile) {
-        const ext = payFile.name.split('.').pop()
-        const path = `mentorship/${user!.id}/${manageStudent.id}/pay-${Date.now()}.${ext}`
-        const { error: upErr } = await supabase.storage.from('student-documents').upload(path, payFile, { upsert: true })
-        if (upErr) { toast.warning('Screenshot upload failed — payment added without it') }
-        else shot = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
-      }
-      const { data, error } = await (supabase as any).from('mentorship_payments').insert({
-        mentorship_id: id,
-        amount: parseFloat(payAmount),
-        note: payNote.trim() || null,
-        screenshot_url: shot,
-        paid_on: new Date().toISOString().slice(0, 10),
-        status: 'pending',
-        created_by: user?.id,
-      }).select('*').single()
-      if (error) throw error
-      setCasePayments(prev => [data as Payment, ...prev])
-      setPayAmount(''); setPayNote(''); setPayFile(null)
-      if (payFileRef.current) payFileRef.current.value = ''
-      toast.success('Payment added — sent for admin approval')
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to add payment')
-    } finally {
-      setAddingPay(false)
-    }
-  }
-
   const boards = ['all', ...Array.from(new Set(students.map(s => s.sub_section?.name).filter(Boolean) as string[]))]
   const filtered = students
     .filter(s => boardFilter === 'all' || s.sub_section?.name === boardFilter)
     .filter(s => !search || s.full_name.toLowerCase().includes(search.toLowerCase()) || s.phone.includes(search) || fmtEnroll(s.enrollment_number).toLowerCase().includes(search.toLowerCase()))
 
-  const allPayments = Object.values(paysByCase).flat()
-  const pendingPayCount = allPayments.filter(p => p.status === 'pending').length
   const caseCount = Object.keys(cases).length
 
   function caseSummary(studentId: string) {
     const c = cases[studentId]
     if (!c) return null
-    const pays = paysByCase[c.id] ?? []
-    const paid = pays.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount), 0)
-    const pending = pays.filter(p => p.status === 'pending').length
-    return { c, paid, pending, total: c.total_amount ?? 0 }
+    let total = 0, collected = 0
+    if (Array.isArray(c.stages)) c.stages.forEach((st: any) => (st.subjects ?? []).forEach((sub: any) => { total += Number(sub.amount ?? 0); collected += Number(sub.collected ?? 0) }))
+    return { c, total: total || (c.total_amount ?? 0), collected }
   }
+  const grandCollectedAll = Object.keys(cases).reduce((s, sid) => s + (caseSummary(sid)?.collected ?? 0), 0)
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
@@ -309,7 +269,7 @@ export default function MentorshipClient() {
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Award className="w-4 h-4" /></div>
               <h1 className="text-xl font-bold tracking-tight">Mentorship</h1>
             </div>
-            <p className="text-blue-200 text-sm mt-1">Manage your students — stages & installment payments</p>
+            <p className="text-blue-200 text-sm mt-1">Manage students — stage-wise subjects, amounts & collection</p>
           </div>
           <button onClick={load} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -319,7 +279,7 @@ export default function MentorshipClient() {
           {[
             { icon: Users, label: 'Assigned', value: students.length },
             { icon: BookMarked, label: 'Active Cases', value: caseCount },
-            { icon: Clock, label: 'Pending Payments', value: pendingPayCount },
+            { icon: Wallet, label: 'Collected', value: `₹${grandCollectedAll.toLocaleString('en-IN')}` },
           ].map(stat => (
             <div key={stat.label} className="bg-white/15 rounded-xl px-3 py-3 backdrop-blur-sm">
               <stat.icon className="w-4 h-4 text-white/70 mb-1" />
@@ -388,9 +348,7 @@ export default function MentorshipClient() {
                       <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.father_name || '—'}</td>
                       <td className="px-3 py-3">
                         {s.phone ? (
-                          <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline whitespace-nowrap">
-                            <Phone className="w-3 h-3" />{s.phone}
-                          </a>
+                          <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline whitespace-nowrap"><Phone className="w-3 h-3" />{s.phone}</a>
                         ) : <span className="text-gray-400 text-xs">—</span>}
                       </td>
                       <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.city || '—'}</td>
@@ -399,33 +357,22 @@ export default function MentorshipClient() {
                       <td className="px-3 py-3"><span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.session?.name ?? '—'}</span></td>
                       <td className="px-3 py-3">
                         <div className="flex flex-col gap-1 min-w-[80px]">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-500">{pct}%</span>
-                            <span className="text-[10px] text-gray-400">{lastIdx + 1}/{total}</span>
-                          </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
-                          </div>
+                          <div className="flex items-center justify-between"><span className="text-[10px] font-bold text-gray-500">{pct}%</span><span className="text-[10px] text-gray-400">{lastIdx + 1}/{total}</span></div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} /></div>
                         </div>
                       </td>
-                      {/* Mentorship case */}
                       <td className="px-3 py-3">
                         {sum ? (
                           <div className="flex items-center gap-1 flex-wrap min-w-[110px]">
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${sum.c.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>{sum.c.managed_by === 'self' ? 'Self' : 'DCW'}</span>
-                            {sum.c.managed_by !== 'self' && <span className="text-[10px] font-semibold text-emerald-700 whitespace-nowrap">₹{sum.paid}/{sum.total}</span>}
-                            {sum.pending > 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md whitespace-nowrap">⏳{sum.pending}</span>}
+                            {sum.c.managed_by !== 'self' && <span className="text-[10px] font-semibold text-emerald-700 whitespace-nowrap">₹{sum.collected}/{sum.total}</span>}
                           </div>
                         ) : <span className="text-xs text-gray-400">—</span>}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1.5">
-                          <Button size="sm" onClick={() => openManage(s)} className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white gap-1">
-                            <BookMarked className="w-3 h-3" /> Manage
-                          </Button>
-                          <button onClick={() => setDetailStudent(s)} className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50" title="Lifecycle">
-                            <Eye className="w-3.5 h-3.5 text-gray-500" />
-                          </button>
+                          <Button size="sm" onClick={() => openManage(s)} className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white gap-1"><BookMarked className="w-3 h-3" /> Manage</Button>
+                          <button onClick={() => setDetailStudent(s)} className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50" title="Lifecycle"><Eye className="w-3.5 h-3.5 text-gray-500" /></button>
                         </div>
                       </td>
                     </tr>
@@ -434,13 +381,11 @@ export default function MentorshipClient() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 font-medium">
-            {filtered.length} student{filtered.length !== 1 ? 's' : ''} {boardFilter !== 'all' ? `· ${boardFilter}` : ''}
-          </div>
+          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 font-medium">{filtered.length} student{filtered.length !== 1 ? 's' : ''}</div>
         </div>
       )}
 
-      {/* Lifecycle detail modal */}
+      {/* Lifecycle detail */}
       <Dialog open={!!detailStudent} onOpenChange={open => !open && setDetailStudent(null)}>
         <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl">
           {detailStudent && (
@@ -448,23 +393,14 @@ export default function MentorshipClient() {
               <DialogHeader>
                 <DialogTitle>
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarPalette(detailStudent.full_name)} flex items-center justify-center text-white font-bold`}>
-                      {detailStudent.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{detailStudent.full_name}</p>
-                      <p className="text-xs text-gray-400 font-normal">{fmtEnroll(detailStudent.enrollment_number)} · {detailStudent.phone}</p>
-                    </div>
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarPalette(detailStudent.full_name)} flex items-center justify-center text-white font-bold`}>{detailStudent.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
+                    <div><p className="font-bold text-gray-900">{detailStudent.full_name}</p><p className="text-xs text-gray-400 font-normal">{fmtEnroll(detailStudent.enrollment_number)} · {detailStudent.phone}</p></div>
                   </div>
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-2">
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <StudentLifecycle student={detailStudent} title="Student Progress" />
-                </div>
-                <Button onClick={() => { openManage(detailStudent); setDetailStudent(null) }} className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2">
-                  <BookMarked className="w-4 h-4" /> Manage Mentorship
-                </Button>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><StudentLifecycle student={detailStudent} title="Student Progress" /></div>
+                <Button onClick={() => { openManage(detailStudent); setDetailStudent(null) }} className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"><BookMarked className="w-4 h-4" /> Manage Mentorship</Button>
               </div>
             </>
           )}
@@ -473,7 +409,7 @@ export default function MentorshipClient() {
 
       {/* Manage Mentorship modal */}
       <Dialog open={!!manageStudent} onOpenChange={open => !open && setManageStudent(null)}>
-        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-gray-900">
               <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center"><BookMarked className="w-4 h-4 text-blue-600" /></div>
@@ -489,121 +425,108 @@ export default function MentorshipClient() {
               <button onClick={() => setCaseMode('self')} className={`py-2.5 rounded-xl text-sm font-bold border-2 ${caseMode === 'self' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}>By Self</button>
             </div>
 
-            {/* Total (DCW) */}
+            {/* Auto total summary (DCW) */}
             {caseMode === 'dcw' && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total Mentorship Amount (₹) <span className="text-red-500">*</span></Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
-                  <Input type="number" placeholder="e.g. 500" value={caseTotal} onChange={e => setCaseTotal(e.target.value)} className="h-10 pl-7" />
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Total Mentorship Amount</p>
+                    <p className="text-[10px] text-gray-400">Auto-calculated from all subjects</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-extrabold text-gray-900">₹ {grandTotal}</p>
+                    <p className="text-[11px] font-semibold"><span className="text-emerald-600">Collected: ₹{grandCollected}</span> · <span className="text-amber-600">Pending: ₹{grandPending}</span></p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Stage journey */}
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Stages (journey)</Label>
-              {STAGE_ORDER.map((st, i) => {
-                const stage = stages[st.key]
-                return (
-                  <div key={st.key} className="border border-gray-200 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                      <span className="text-sm font-bold text-gray-800">{st.label}</span>
-                      <div className="ml-auto flex gap-1">
-                        {(['not_started', 'in_progress', 'completed'] as const).map(stt => (
-                          <button key={stt} onClick={() => setStageStatus(st.key, stt)}
-                            className={`text-[10px] font-bold px-2 py-1 rounded-md border ${stage.status === stt ? (STATUS_CFG[stt].cls + ' border-transparent') : 'bg-white text-gray-400 border-gray-200'}`}>
-                            {STATUS_CFG[stt].label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input placeholder="Add subject, press Enter" value={subjInput[st.key]}
-                        onChange={e => setSubjInput(prev => ({ ...prev, [st.key]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubject(st.key) } }}
-                        className="h-9 flex-1 text-sm" />
-                      <Button type="button" variant="outline" className="h-9 px-3" onClick={() => addSubject(st.key)}>Add</Button>
-                    </div>
-                    {stage.subjects.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {stage.subjects.map(sub => (
-                          <span key={sub} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
-                            {sub}<button onClick={() => removeSubject(st.key, sub)}><X className="w-3 h-3 hover:text-red-500" /></button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+            {/* Stages */}
+            {STAGE_ORDER.map((st, i) => (
+              <div key={st.key} className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                    <span className="text-sm font-bold text-gray-800">{st.label}</span>
                   </div>
-                )
-              })}
-            </div>
+                  {caseMode === 'dcw' && (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Total: ₹{stageTotal(st.key)} | Collected: ₹{stageCollected(st.key)}</span>
+                  )}
+                </div>
+                <div className="p-3 space-y-3">
+                  {stages[st.key].map((sub, idx) => {
+                    const pending = num(sub.amount) - num(sub.collected)
+                    return (
+                      <div key={idx} className="border border-gray-100 rounded-xl p-3 bg-white">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-sm font-bold text-gray-800">{sub.name}</span>
+                          <div className="flex items-center gap-1">
+                            {(['not_started', 'in_progress', 'completed'] as const).map(stt => (
+                              <button key={stt} onClick={() => updateSubject(st.key, idx, { status: stt })}
+                                className={`text-[9px] font-bold px-1.5 py-1 rounded-md border ${sub.status === stt ? STATUS_CFG[stt].cls + ' border-transparent' : 'bg-white text-gray-400 border-gray-200'}`}>
+                                {STATUS_CFG[stt].label}
+                              </button>
+                            ))}
+                            <button onClick={() => removeSubject(st.key, idx)} className="ml-1 text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                        {caseMode === 'dcw' && (
+                          <>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="space-y-0.5">
+                                <Label className="text-[9px] font-bold text-gray-400 uppercase">Total ₹</Label>
+                                <Input type="number" value={sub.amount} onChange={e => updateSubject(st.key, idx, { amount: e.target.value })} className="h-8 text-sm" placeholder="100" />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[9px] font-bold text-emerald-600 uppercase">Collected ₹</Label>
+                                <Input type="number" value={sub.collected} onChange={e => updateSubject(st.key, idx, { collected: e.target.value })} className="h-8 text-sm bg-emerald-50/50 border-emerald-200" placeholder="0" />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[9px] font-bold text-amber-600 uppercase">Pending ₹</Label>
+                                <div className="h-8 flex items-center px-2 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md">{pending}</div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="space-y-0.5">
+                                <Label className="text-[9px] font-bold text-gray-400 uppercase">Date collected</Label>
+                                <Input type="date" value={sub.paid_on} onChange={e => updateSubject(st.key, idx, { paid_on: e.target.value })} className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[9px] font-bold text-gray-400 uppercase">Proof</Label>
+                                {sub.file ? (
+                                  <div className="h-8 flex items-center gap-1 px-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700">
+                                    <FileText className="w-3 h-3 flex-shrink-0" /><span className="truncate flex-1">{sub.file.name}</span>
+                                    <button onClick={() => updateSubject(st.key, idx, { file: null })}><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : sub.proof_url ? (
+                                  <a href={sub.proof_url} target="_blank" rel="noopener noreferrer" className="h-8 flex items-center gap-1 px-2 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-700"><CheckCircle2 className="w-3 h-3" /> Uploaded</a>
+                                ) : (
+                                  <label className="h-8 flex items-center justify-center gap-1 px-2 border-2 border-dashed border-gray-200 rounded-md text-xs text-gray-400 cursor-pointer hover:border-blue-300">
+                                    <FileText className="w-3 h-3" /> Choose File
+                                    <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => updateSubject(st.key, idx, { file: e.target.files?.[0] ?? null })} />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="flex gap-2">
+                    <Input placeholder="Add subject, press Enter" value={subjInput[st.key]}
+                      onChange={e => setSubjInput(prev => ({ ...prev, [st.key]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubject(st.key) } }}
+                      className="h-9 flex-1 text-sm" />
+                    <Button type="button" onClick={() => addSubject(st.key)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white">Add</Button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-            <Button onClick={saveCase} disabled={savingCase} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white">
+            <Button onClick={saveCase} disabled={savingCase} className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white text-base font-bold">
               {savingCase ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Saving...</> : 'Save Mentorship'}
             </Button>
-
-            {/* Payments (DCW only) */}
-            {caseMode === 'dcw' && (
-              <div className="border-t border-gray-100 pt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Installment Payments</Label>
-                  {caseTotal && (() => {
-                    const paid = casePayments.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount), 0)
-                    const rem = (parseFloat(caseTotal) || 0) - paid
-                    return <span className="text-xs font-semibold text-gray-500">Paid ₹{paid} · Remaining ₹{rem}</span>
-                  })()}
-                </div>
-
-                {/* Add payment */}
-                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₹</span>
-                      <Input type="number" placeholder="Amount" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="h-9 pl-7 bg-white" />
-                    </div>
-                    <Input placeholder="Note (optional)" value={payNote} onChange={e => setPayNote(e.target.value)} className="h-9 bg-white" />
-                  </div>
-                  <input ref={payFileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setPayFile(e.target.files?.[0] ?? null)} />
-                  <div className="flex items-center gap-2">
-                    {payFile ? (
-                      <div className="flex items-center gap-2 bg-white border border-blue-200 rounded-lg px-3 h-9 flex-1">
-                        <FileText className="w-4 h-4 text-blue-600" />
-                        <span className="text-xs text-blue-800 truncate flex-1">{payFile.name}</span>
-                        <button onClick={() => setPayFile(null)}><X className="w-3.5 h-3.5 text-gray-400" /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => payFileRef.current?.click()} className="flex items-center gap-1.5 text-xs text-gray-500 border-2 border-dashed border-gray-200 rounded-lg px-3 h-9 flex-1 hover:border-blue-300">
-                        <Upload className="w-3.5 h-3.5" /> Screenshot / proof
-                      </button>
-                    )}
-                    <Button onClick={addPayment} disabled={addingPay} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white gap-1">
-                      {addingPay ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Plus className="w-3.5 h-3.5" /> Add</>}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Payment list */}
-                {casePayments.length > 0 && (
-                  <div className="space-y-1.5">
-                    {casePayments.map(p => {
-                      const cfg = PAY_CFG[p.status] ?? PAY_CFG.pending
-                      return (
-                        <div key={p.id} className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-3 py-2">
-                          <IndianRupee className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                          <span className="text-sm font-bold text-gray-800">₹{p.amount}</span>
-                          {p.note && <span className="text-xs text-gray-400 truncate">· {p.note}</span>}
-                          <span className="text-[10px] text-gray-400 ml-auto whitespace-nowrap">{format(new Date(p.created_at), 'dd MMM')}</span>
-                          {p.screenshot_url && <a href={p.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-blue-500"><FileText className="w-3.5 h-3.5" /></a>}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>{cfg.label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </DialogContent>
       </Dialog>

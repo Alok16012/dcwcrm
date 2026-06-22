@@ -37,16 +37,15 @@ const STAGE_ORDER: { key: StageKey; label: string }[] = [
   { key: 'assignment', label: 'Assignment' },
   { key: 'theory',     label: 'Theory' },
 ]
+interface PayEntry { amount: string; date: string; proof_url: string | null; file: File | null }
 interface SubjectRow {
   name: string
   amount: string
-  collected: string
   status: string
-  proof_url: string | null
-  paid_on: string
-  file: File | null
+  payments: PayEntry[]
 }
 type StageState = Record<StageKey, SubjectRow[]>
+const subjCollected = (sub: SubjectRow) => sub.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
 const emptyStages = (): StageState => ({ practical: [], assignment: [], theory: [] })
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
@@ -137,16 +136,17 @@ export default function MentorshipClient() {
       raw.forEach((s: any) => {
         const k = s.stage as StageKey
         if (st[k] && Array.isArray(s.subjects)) {
-          st[k] = s.subjects.map((sub: any) =>
-            typeof sub === 'string'
-              ? { name: sub, amount: '', collected: '', status: 'not_started', proof_url: null, paid_on: '', file: null }
-              : {
-                  name: sub.name ?? '', amount: sub.amount != null ? String(sub.amount) : '',
-                  collected: sub.collected != null ? String(sub.collected) : '',
-                  status: sub.status ?? 'not_started', proof_url: sub.proof_url ?? null,
-                  paid_on: sub.paid_on ?? '', file: null,
-                }
-          )
+          st[k] = s.subjects.map((sub: any) => {
+            if (typeof sub === 'string') return { name: sub, amount: '', status: 'not_started', payments: [] }
+            // installment payments (new) or legacy single collected
+            let payments: PayEntry[] = []
+            if (Array.isArray(sub.payments)) {
+              payments = sub.payments.map((p: any) => ({ amount: p.amount != null ? String(p.amount) : '', date: p.date ?? '', proof_url: p.proof_url ?? null, file: null }))
+            } else if (sub.collected != null && Number(sub.collected) > 0) {
+              payments = [{ amount: String(sub.collected), date: sub.paid_on ?? '', proof_url: sub.proof_url ?? null, file: null }]
+            }
+            return { name: sub.name ?? '', amount: sub.amount != null ? String(sub.amount) : '', status: sub.status ?? 'not_started', payments }
+          })
         }
       })
     }
@@ -165,7 +165,7 @@ export default function MentorshipClient() {
   function addSubject(stage: StageKey) {
     const v = subjInput[stage].trim()
     if (!v) return
-    setStages(prev => ({ ...prev, [stage]: [...prev[stage], { name: v, amount: '', collected: '', status: 'not_started', proof_url: null, paid_on: '', file: null }] }))
+    setStages(prev => ({ ...prev, [stage]: [...prev[stage], { name: v, amount: '', status: 'not_started', payments: [] }] }))
     setSubjInput(prev => ({ ...prev, [stage]: '' }))
   }
   function removeSubject(stage: StageKey, idx: number) {
@@ -174,10 +174,19 @@ export default function MentorshipClient() {
   function updateSubject(stage: StageKey, idx: number, patch: Partial<SubjectRow>) {
     setStages(prev => ({ ...prev, [stage]: prev[stage].map((s, i) => i === idx ? { ...s, ...patch } : s) }))
   }
+  function addPayment(stage: StageKey, idx: number) {
+    setStages(prev => ({ ...prev, [stage]: prev[stage].map((s, i) => i === idx ? { ...s, payments: [...s.payments, { amount: '', date: new Date().toISOString().slice(0, 10), proof_url: null, file: null }] } : s) }))
+  }
+  function updatePayment(stage: StageKey, idx: number, pidx: number, patch: Partial<PayEntry>) {
+    setStages(prev => ({ ...prev, [stage]: prev[stage].map((s, i) => i === idx ? { ...s, payments: s.payments.map((p, j) => j === pidx ? { ...p, ...patch } : p) } : s) }))
+  }
+  function removePayment(stage: StageKey, idx: number, pidx: number) {
+    setStages(prev => ({ ...prev, [stage]: prev[stage].map((s, i) => i === idx ? { ...s, payments: s.payments.filter((_, j) => j !== pidx) } : s) }))
+  }
 
   // overall + per-stage rollups
   const stageTotal = (stage: StageKey) => stages[stage].reduce((s, x) => s + num(x.amount), 0)
-  const stageCollected = (stage: StageKey) => stages[stage].reduce((s, x) => s + num(x.collected), 0)
+  const stageCollected = (stage: StageKey) => stages[stage].reduce((s, x) => s + subjCollected(x), 0)
   const grandTotal = STAGE_ORDER.reduce((s, st) => s + stageTotal(st.key), 0)
   const grandCollected = STAGE_ORDER.reduce((s, st) => s + stageCollected(st.key), 0)
   const grandPending = Math.max(grandTotal - grandCollected, 0)
@@ -190,18 +199,21 @@ export default function MentorshipClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // upload any new proof files
+      // upload any new installment proof files
       const built = await Promise.all(STAGE_ORDER.map(async st => {
         const subs = await Promise.all(stages[st.key].map(async sub => {
-          let proof = sub.proof_url
-          if (sub.file) {
-            const ext = sub.file.name.split('.').pop()
-            const path = `mentorship/${user.id}/${manageStudent.id}/${st.key}-${sub.name}-${Date.now()}.${ext}`
-            const { error: upErr } = await supabase.storage.from('student-documents').upload(path, sub.file, { upsert: true })
-            if (!upErr) proof = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
-            else toast.warning(`Proof upload failed for ${sub.name}`)
-          }
-          return { name: sub.name, amount: num(sub.amount), collected: num(sub.collected), status: sub.status, proof_url: proof, paid_on: sub.paid_on || null }
+          const payments = await Promise.all(sub.payments.map(async (p, pi) => {
+            let proof = p.proof_url
+            if (p.file) {
+              const ext = p.file.name.split('.').pop()
+              const path = `mentorship/${user.id}/${manageStudent.id}/${st.key}-${sub.name}-${pi}-${Date.now()}.${ext}`
+              const { error: upErr } = await supabase.storage.from('student-documents').upload(path, p.file, { upsert: true })
+              if (!upErr) proof = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
+              else toast.warning(`Proof upload failed for ${sub.name}`)
+            }
+            return { amount: parseFloat(p.amount) || 0, date: p.date || null, proof_url: proof }
+          }))
+          return { name: sub.name, amount: caseMode === 'dcw' ? num(sub.amount) : 0, status: sub.status, payments: caseMode === 'dcw' ? payments : [] }
         }))
         return { stage: st.key, subjects: subs }
       }))
@@ -249,7 +261,11 @@ export default function MentorshipClient() {
     const c = cases[studentId]
     if (!c) return null
     let total = 0, collected = 0
-    if (Array.isArray(c.stages)) c.stages.forEach((st: any) => (st.subjects ?? []).forEach((sub: any) => { total += Number(sub.amount ?? 0); collected += Number(sub.collected ?? 0) }))
+    if (Array.isArray(c.stages)) c.stages.forEach((st: any) => (st.subjects ?? []).forEach((sub: any) => {
+      total += Number(sub.amount ?? 0)
+      if (Array.isArray(sub.payments)) collected += sub.payments.reduce((a: number, p: any) => a + Number(p.amount ?? 0), 0)
+      else collected += Number(sub.collected ?? 0)
+    }))
     return { c, total: total || (c.total_amount ?? 0), collected }
   }
   const grandCollectedAll = Object.keys(cases).reduce((s, sid) => s + (caseSummary(sid)?.collected ?? 0), 0)
@@ -455,7 +471,8 @@ export default function MentorshipClient() {
                 </div>
                 <div className="p-3 space-y-3">
                   {stages[st.key].map((sub, idx) => {
-                    const pending = num(sub.amount) - num(sub.collected)
+                    const coll = subjCollected(sub)
+                    const pending = num(sub.amount) - coll
                     return (
                       <div key={idx} className="border border-gray-100 rounded-xl p-3 bg-white">
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -472,6 +489,7 @@ export default function MentorshipClient() {
                         </div>
                         {caseMode === 'dcw' && (
                           <>
+                            {/* Total + collected/pending summary */}
                             <div className="grid grid-cols-3 gap-2">
                               <div className="space-y-0.5">
                                 <Label className="text-[9px] font-bold text-gray-400 uppercase">Total ₹</Label>
@@ -479,34 +497,37 @@ export default function MentorshipClient() {
                               </div>
                               <div className="space-y-0.5">
                                 <Label className="text-[9px] font-bold text-emerald-600 uppercase">Collected ₹</Label>
-                                <Input type="number" value={sub.collected} onChange={e => updateSubject(st.key, idx, { collected: e.target.value })} className="h-8 text-sm bg-emerald-50/50 border-emerald-200" placeholder="0" />
+                                <div className="h-8 flex items-center px-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md">{coll}</div>
                               </div>
                               <div className="space-y-0.5">
                                 <Label className="text-[9px] font-bold text-amber-600 uppercase">Pending ₹</Label>
                                 <div className="h-8 flex items-center px-2 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md">{pending}</div>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div className="space-y-0.5">
-                                <Label className="text-[9px] font-bold text-gray-400 uppercase">Date collected</Label>
-                                <Input type="date" value={sub.paid_on} onChange={e => updateSubject(st.key, idx, { paid_on: e.target.value })} className="h-8 text-xs" />
-                              </div>
-                              <div className="space-y-0.5">
-                                <Label className="text-[9px] font-bold text-gray-400 uppercase">Proof</Label>
-                                {sub.file ? (
-                                  <div className="h-8 flex items-center gap-1 px-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700">
-                                    <FileText className="w-3 h-3 flex-shrink-0" /><span className="truncate flex-1">{sub.file.name}</span>
-                                    <button onClick={() => updateSubject(st.key, idx, { file: null })}><X className="w-3 h-3" /></button>
+
+                            {/* Installment payments */}
+                            <div className="mt-2 space-y-1.5">
+                              <p className="text-[9px] font-bold text-gray-400 uppercase">Payments received</p>
+                              {sub.payments.map((p, pidx) => (
+                                <div key={pidx} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1.5">
+                                  <div className="relative w-20">
+                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₹</span>
+                                    <Input type="number" value={p.amount} onChange={e => updatePayment(st.key, idx, pidx, { amount: e.target.value })} className="h-7 text-xs pl-4 bg-white" placeholder="20" />
                                   </div>
-                                ) : sub.proof_url ? (
-                                  <a href={sub.proof_url} target="_blank" rel="noopener noreferrer" className="h-8 flex items-center gap-1 px-2 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-700"><CheckCircle2 className="w-3 h-3" /> Uploaded</a>
-                                ) : (
-                                  <label className="h-8 flex items-center justify-center gap-1 px-2 border-2 border-dashed border-gray-200 rounded-md text-xs text-gray-400 cursor-pointer hover:border-blue-300">
-                                    <FileText className="w-3 h-3" /> Choose File
-                                    <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => updateSubject(st.key, idx, { file: e.target.files?.[0] ?? null })} />
-                                  </label>
-                                )}
-                              </div>
+                                  <Input type="date" value={p.date} onChange={e => updatePayment(st.key, idx, pidx, { date: e.target.value })} className="h-7 text-xs flex-1 bg-white" />
+                                  {p.file ? (
+                                    <button onClick={() => updatePayment(st.key, idx, pidx, { file: null })} className="h-7 px-1.5 flex items-center gap-1 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700"><FileText className="w-3 h-3" /><X className="w-3 h-3" /></button>
+                                  ) : p.proof_url ? (
+                                    <a href={p.proof_url} target="_blank" rel="noopener noreferrer" className="h-7 px-1.5 flex items-center bg-emerald-50 border border-emerald-200 rounded text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /></a>
+                                  ) : (
+                                    <label className="h-7 px-1.5 flex items-center border-2 border-dashed border-gray-200 rounded text-gray-400 cursor-pointer hover:border-blue-300"><FileText className="w-3.5 h-3.5" /><input type="file" accept="image/*,.pdf" className="hidden" onChange={e => updatePayment(st.key, idx, pidx, { file: e.target.files?.[0] ?? null })} /></label>
+                                  )}
+                                  <button onClick={() => removePayment(st.key, idx, pidx)} className="text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                                </div>
+                              ))}
+                              <button onClick={() => addPayment(st.key, idx)} className="w-full flex items-center justify-center gap-1 h-7 border-2 border-dashed border-emerald-200 rounded-lg text-xs font-semibold text-emerald-600 hover:bg-emerald-50">
+                                + Add payment
+                              </button>
                             </div>
                           </>
                         )}

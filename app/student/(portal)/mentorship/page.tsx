@@ -55,11 +55,15 @@ export default function StudentMentorshipPage() {
   const stageArr: { stage: string; subjects: SubjectObj[] }[] = Array.isArray(mcase?.stages)
     ? mcase!.stages.map((st: any) => ({
         stage: st.stage,
-        subjects: (st.subjects ?? []).map((sub: any) =>
-          typeof sub === 'string'
-            ? { name: sub, amount: 0, collected: 0, status: 'not_started', proof_url: null, paid_on: null }
-            : { name: sub.name ?? '', amount: Number(sub.amount ?? 0), collected: Number(sub.collected ?? 0), status: sub.status ?? 'not_started', proof_url: sub.proof_url ?? null, paid_on: sub.paid_on ?? null }
-        ),
+        subjects: (st.subjects ?? []).map((sub: any) => {
+          if (typeof sub === 'string') return { name: sub, amount: 0, collected: 0, status: 'not_started', proof_url: null, paid_on: null }
+          const collected = Array.isArray(sub.payments)
+            ? sub.payments.reduce((a: number, p: any) => a + Number(p.amount ?? 0), 0)
+            : Number(sub.collected ?? 0)
+          const lastPaid = Array.isArray(sub.payments) && sub.payments.length ? sub.payments[sub.payments.length - 1]?.date : sub.paid_on
+          const proof = Array.isArray(sub.payments) && sub.payments.length ? (sub.payments.find((p: any) => p.proof_url)?.proof_url ?? null) : (sub.proof_url ?? null)
+          return { name: sub.name ?? '', amount: Number(sub.amount ?? 0), collected, status: sub.status ?? 'not_started', proof_url: proof, paid_on: lastPaid ?? null }
+        }),
       }))
     : []
   const stageMap: Record<string, SubjectObj[]> = {}

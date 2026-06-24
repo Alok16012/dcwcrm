@@ -67,10 +67,20 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
     supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
     supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
     supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
-    (supabase as any).from('mentor_incentives').select('id, amount, reason, created_at').eq('mentor_id', employee.profile_id).order('created_at', { ascending: false }),
+    (supabase as any).from('mentorship_payments')
+      .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(full_name))')
+      .eq('status', 'approved').eq('mentorship.telecaller_id', employee.profile_id)
+      .order('approved_at', { ascending: false }),
   ])
 
-  const mentorIncentives = (mentorIncRes?.data ?? []) as { id: string; amount: number; reason: string | null; created_at: string }[]
+  const mentorIncentives = ((mentorIncRes?.data ?? []) as any[])
+    .map(p => ({
+      id: p.id as string,
+      amount: Number(p.incentive_amount ?? p.salary_percentage ?? 0),
+      reason: `Mentorship — ${p.mentorship?.student?.full_name ?? 'student'}`,
+      created_at: (p.approved_at ?? p.created_at) as string,
+    }))
+    .filter(m => m.amount > 0)
   const mentorIncTotal = mentorIncentives.reduce((s, m) => s + Number(m.amount), 0)
 
   const attendanceRaw = attRes.data as { date: string; status: string }[] | null

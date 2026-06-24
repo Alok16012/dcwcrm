@@ -45,10 +45,20 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
     async function loadMentorInc() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await (supabase as any).from('mentor_incentives')
-        .select('id, amount, reason, created_at').eq('mentor_id', user.id)
-        .order('created_at', { ascending: false })
-      setMentorIncentives((data ?? []) as any[])
+      // read approved mentorship payments for this mentor (shows old + new)
+      const { data } = await (supabase as any).from('mentorship_payments')
+        .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(full_name))')
+        .eq('status', 'approved').eq('mentorship.telecaller_id', user.id)
+        .order('approved_at', { ascending: false })
+      const rows = ((data ?? []) as any[])
+        .map(p => ({
+          id: p.id as string,
+          amount: Number(p.incentive_amount ?? p.salary_percentage ?? 0),
+          reason: `Mentorship — ${p.mentorship?.student?.full_name ?? 'student'}`,
+          created_at: (p.approved_at ?? p.created_at) as string,
+        }))
+        .filter(m => m.amount > 0)
+      setMentorIncentives(rows)
     }
     loadMentorInc().catch(() => {})
   }, [supabase])

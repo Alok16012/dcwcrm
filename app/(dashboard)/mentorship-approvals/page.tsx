@@ -164,10 +164,10 @@ export default function MentorshipDashboardPage() {
     if (amt && amt > 0) {
       // store the exact incentive amount (₹) on the payment — ignore if column absent
       try { await (supabase as any).from('mentorship_payments').update({ incentive_amount: amt }).eq('id', id) } catch {}
-      // credit the mentor's incentive ledger with name + reason
       const m = mentorships.find(x => x.id === id)
       const mentorId = m?.mentorship?.telecaller?.id
       if (mentorId) {
+        // detailed ledger entry (best-effort)
         try {
           await (supabase as any).from('mentor_incentives').insert({
             mentor_id: mentorId,
@@ -178,7 +178,33 @@ export default function MentorshipDashboardPage() {
             created_by: userId ?? null,
           })
         } catch {}
+        // credit the mentor's payroll incentive for the current month → reflects in HRMS + Incentive page
+        try { await creditPayrollIncentive(mentorId, amt) } catch {}
       }
+    }
+  }
+
+  // Add the incentive to the mentor's payroll (current month) so it shows in HRMS + their Incentive page
+  async function creditPayrollIncentive(mentorProfileId: string, amount: number) {
+    const { data: emp } = await (supabase as any).from('employees').select('id').eq('profile_id', mentorProfileId).maybeSingle()
+    if (!emp) return
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+    const { data: existing } = await (supabase as any).from('payroll')
+      .select('id, incentive, gross, net').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
+    if (existing) {
+      await (supabase as any).from('payroll').update({
+        incentive: (existing.incentive ?? 0) + amount,
+        gross: (existing.gross ?? 0) + amount,
+        net: (existing.net ?? 0) + amount,
+      }).eq('id', existing.id)
+    } else {
+      await (supabase as any).from('payroll').insert({
+        employee_id: emp.id, month, year,
+        basic: 0, hra: 0, allowances: 0, incentive: amount, gross: amount,
+        pf: 0, tds: 0, other_deductions: 0, leave_deduction: 0, net: amount, status: 'draft',
+      })
     }
   }
 

@@ -62,12 +62,16 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
         return format(d, 'yyyy-MM-dd')
       })()
 
-  const [attRes, payrollRes, studentsRes, profileRes] = await Promise.all([
+  const [attRes, payrollRes, studentsRes, profileRes, mentorIncRes] = await Promise.all([
     supabase.from('attendance').select('date, status').eq('employee_id', id).gte('date', cycleStartDate).lte('date', cycleEndDate),
     supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
     supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
     supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
+    (supabase as any).from('mentor_incentives').select('id, amount, reason, created_at').eq('mentor_id', employee.profile_id).order('created_at', { ascending: false }),
   ])
+
+  const mentorIncentives = (mentorIncRes?.data ?? []) as { id: string; amount: number; reason: string | null; created_at: string }[]
+  const mentorIncTotal = mentorIncentives.reduce((s, m) => s + Number(m.amount), 0)
 
   const attendanceRaw = attRes.data as { date: string; status: string }[] | null
   const payrollData = payrollRes.data as Record<string, unknown>[] | null
@@ -186,6 +190,27 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
         </TabsContent>
 
         <TabsContent value="incentives" className="pt-4 space-y-4">
+          {/* Mentorship incentives (verified mentorship payments) */}
+          {mentorIncentives.length > 0 && (
+            <div className="rounded-lg border overflow-hidden">
+              <div className="bg-emerald-50 px-4 py-2.5 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-emerald-800 text-sm">Mentorship Incentives</h3>
+                <span className="text-sm font-bold text-emerald-700">{fmt(mentorIncTotal)}</span>
+              </div>
+              <div className="divide-y bg-white">
+                {mentorIncentives.map(mi => (
+                  <div key={mi.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{mi.reason ?? 'Mentorship'}</p>
+                      <p className="text-xs text-gray-400">{format(new Date(mi.created_at), 'dd MMM yyyy')}</p>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-lg border p-4 bg-blue-50/50 flex justify-between items-center transition-all hover:shadow-sm">
               <div>

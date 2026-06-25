@@ -17,6 +17,7 @@ import { format } from 'date-fns'
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = [
+  { value: 'marksheet',                label: 'Marksheet' },
   { value: 'migration',                label: 'Migration' },
   { value: 'transfer_certificate',     label: 'Transfer Certificate' },
   { value: 'duplicate_marksheet',      label: 'Duplicate Marksheet' },
@@ -32,7 +33,7 @@ const DOCUMENT_TYPES = [
 
 // Legacy values kept only for displaying older records correctly
 const LEGACY_DOC_LABELS: Record<string, string> = {
-  marksheet: 'Marksheet', certificate: 'Certificate', degree: 'Degree / Diploma', other: 'Other',
+  certificate: 'Certificate', degree: 'Degree / Diploma', other: 'Other',
 }
 const docLabelOf = (v: string) =>
   DOCUMENT_TYPES.find(t => t.value === v)?.label ?? LEGACY_DOC_LABELS[v] ?? v
@@ -460,8 +461,48 @@ export function DispatchManager() {
   // Student selected in form
   const formStudentObj = students.find(s => s.id === form.student_id) ?? null
 
+  const pendingCount = dispatches.filter(d => d.status === 'pending').length
+
   return (
     <div className="space-y-4">
+
+      {/* ── Hero ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-5 sm:p-6 text-white">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+        <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-white/5 rounded-full translate-y-1/2" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Truck className="w-5 h-5" /></div>
+              <h1 className="text-xl font-bold tracking-tight">Dispatch &amp; Documents</h1>
+            </div>
+            <p className="text-blue-100 text-sm">Track received &amp; dispatched student documents</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => openAdd('inbound')} className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors px-3.5 py-2 rounded-lg text-sm font-semibold backdrop-blur-sm">
+              <ArrowDownToLine className="w-4 h-4" /> <span className="hidden sm:inline">Add</span> Received
+            </button>
+            <button onClick={() => openAdd('outbound')} className="inline-flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 transition-colors px-3.5 py-2 rounded-lg text-sm font-bold shadow-sm">
+              <Send className="w-4 h-4" /> <span className="hidden sm:inline">Add</span> Dispatch
+            </button>
+          </div>
+        </div>
+        <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+          {[
+            { icon: Package, label: 'Total Entries', value: dispatches.length },
+            { icon: ArrowDownToLine, label: 'Received', value: inboundCount },
+            { icon: Send, label: 'Dispatched', value: outboundCount },
+            { icon: RefreshCw, label: 'Pending', value: pendingCount },
+          ].map(s => (
+            <div key={s.label} className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 px-3.5 py-3">
+              <div className="flex items-center gap-1.5 text-blue-100 text-[11px] font-semibold uppercase tracking-wide">
+                <s.icon className="w-3.5 h-3.5" /> {s.label}
+              </div>
+              <p className="text-2xl font-extrabold mt-1">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ── Type Tabs ── */}
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl w-fit">
@@ -522,19 +563,8 @@ export function DispatchManager() {
           </select>
         )}
 
-        <Button variant="outline" size="sm" onClick={load} className="h-9 px-2.5">
-          <RefreshCw className="w-3.5 h-3.5" />
-        </Button>
-
-        <Button size="sm" onClick={() => openAdd('inbound')} className="gap-1.5 h-9 bg-teal-600 hover:bg-teal-700">
-          <ArrowDownToLine className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Add Received</span>
-          <span className="sm:hidden">Received</span>
-        </Button>
-        <Button size="sm" onClick={() => openAdd('outbound')} className="gap-1.5 h-9">
-          <Send className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Add Dispatch</span>
-          <span className="sm:hidden">Dispatch</span>
+        <Button variant="outline" size="sm" onClick={load} className="h-9 px-2.5 gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
@@ -733,13 +763,20 @@ export function DispatchManager() {
 
       {/* ── Form Dialog ── */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {form.dispatch_type === 'inbound'
-                ? <><ArrowDownToLine className="w-5 h-5 text-teal-600" /> {editItem ? 'Edit Received Entry' : 'Add Received Document'}</>
-                : <><Send className="w-5 h-5 text-blue-600" /> {editItem ? 'Edit Dispatch Entry' : 'Add Dispatch'}</>
-              }
+            <DialogTitle className="flex items-center gap-2.5">
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${form.dispatch_type === 'inbound' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
+                {form.dispatch_type === 'inbound' ? <ArrowDownToLine className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              </span>
+              <span className="flex flex-col">
+                <span className="text-base font-bold leading-tight">
+                  {form.dispatch_type === 'inbound'
+                    ? (editItem ? 'Edit Received Entry' : 'Add Received Document')
+                    : (editItem ? 'Edit Dispatch Entry' : 'Add Dispatch')}
+                </span>
+                <span className="text-xs font-normal text-gray-400">Fill student & document details below</span>
+              </span>
             </DialogTitle>
           </DialogHeader>
 
@@ -976,14 +1013,16 @@ export function DispatchManager() {
               </div>
             )}
 
-            <div className="flex gap-3 justify-end pt-2">
+            <div className="flex gap-3 justify-end pt-3 mt-1 border-t border-gray-100 sticky bottom-0 bg-white">
               <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
               <Button
                 onClick={handleSave}
                 disabled={saving || !form.student_name || !form.student_phone || !form.father_name}
-                className={`min-w-24 ${form.dispatch_type === 'inbound' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
+                className={`min-w-28 gap-1.5 ${form.dispatch_type === 'inbound' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
               >
-                {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : editItem ? 'Update' : 'Save'}
+                {saving
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <>{form.dispatch_type === 'inbound' ? <ArrowDownToLine className="w-4 h-4" /> : <Send className="w-4 h-4" />} {editItem ? 'Update' : 'Save'}</>}
               </Button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, GraduationCap, RefreshCw, IndianRupee,
   Users, Search, Award, UserCog, Clock, ClipboardList, Download, FileText, X,
+  ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -74,6 +75,7 @@ export default function MentorshipDashboardPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [previewImg, setPreviewImg] = useState<string | null>(null)
+  const [expandedApproved, setExpandedApproved] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -407,10 +409,12 @@ export default function MentorshipDashboardPage() {
       acc[key].latestApprovedAt = rowDate
     }
     return acc
-  }, {})).map((g: any) => ({
-    ...g,
-    dueAmount: Math.max(Number(g.totalAmount ?? 0) - Number(g.paidAmount ?? 0), 0),
-  })).filter((g: any) => !g.student?.id || filteredStudentIds.has(g.student.id))
+  }, {})).map((g: any) => {
+    // Total can never be less than what was actually collected/approved — if the
+    // case total wasn't set (or extra installments were approved), fall back to paid.
+    const total = Math.max(Number(g.totalAmount ?? 0), Number(g.paidAmount ?? 0))
+    return { ...g, totalAmount: total, dueAmount: Math.max(total - Number(g.paidAmount ?? 0), 0) }
+  }).filter((g: any) => !g.student?.id || filteredStudentIds.has(g.student.id))
     .sort((a: any, b: any) => new Date(b.latestApprovedAt).getTime() - new Date(a.latestApprovedAt).getTime()), [approvedMentorships, filteredStudentIds])
 
   const approvedTotals = useMemo(() => approvedGroups.reduce((acc: any, g: any) => {
@@ -783,74 +787,91 @@ export default function MentorshipDashboardPage() {
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Approved Student-wise Summary</span>
                 <span className="text-xs text-emerald-700 font-semibold">{approvedGroups.length} student{approvedGroups.length !== 1 ? 's' : ''}</span>
               </div>
-              <div className="divide-y">
-                {approvedGroups.map((group: any) => {
-                  const stu = group.student
-                  return (
-                    <div key={group.id} className="px-4 py-4">
-                      <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-gray-900">{stu?.full_name ?? '—'}</span>
-                            {stu?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</span>}
-                            <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{group.payments.length} installment{group.payments.length > 1 ? 's' : ''}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Mentor: <span className="font-semibold text-gray-700">{group.mentorName ?? '—'}</span>
-                            <> · Latest approval {format(new Date(group.latestApprovedAt), 'dd MMM yyyy')}</>
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-right min-w-[280px]">
-                          <div className="rounded-lg bg-gray-50 px-3 py-2">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Total</p>
-                            <p className="text-sm font-bold text-gray-800">₹{Number(group.totalAmount).toLocaleString('en-IN')}</p>
-                          </div>
-                          <div className="rounded-lg bg-emerald-50 px-3 py-2">
-                            <p className="text-[10px] font-bold text-emerald-500 uppercase">Paid</p>
-                            <p className="text-sm font-bold text-emerald-700">₹{Number(group.paidAmount).toLocaleString('en-IN')}</p>
-                          </div>
-                          <div className="rounded-lg bg-amber-50 px-3 py-2">
-                            <p className="text-[10px] font-bold text-amber-500 uppercase">Due</p>
-                            <p className="text-sm font-bold text-amber-700">₹{Number(group.dueAmount).toLocaleString('en-IN')}</p>
-                          </div>
-                          <div className="rounded-lg bg-blue-50 px-3 py-2">
-                            <p className="text-[10px] font-bold text-blue-500 uppercase">Incentive</p>
-                            <p className="text-sm font-bold text-blue-700">₹{Number(group.incentiveAmount).toLocaleString('en-IN')}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-gray-100 overflow-hidden">
-                        {group.payments.map((m: any) => (
-                          <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-50/60 border-b last:border-b-0 flex-wrap">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-gray-800">
-                                {m.note ?? 'Payment'} · ₹{Number(m.amount ?? 0).toLocaleString('en-IN')}
-                              </p>
-                              <p className="text-[11px] text-gray-400">
-                                Paid {m.paid_on ? format(new Date(m.paid_on), 'dd MMM yyyy') : '—'}
-                                {m.approved_at && <> · Approved {format(new Date(m.approved_at), 'dd MMM yyyy')}</>}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-lg">
-                                Incentive ₹{Number(m.incentive_amount ?? m.salary_percentage ?? 0).toLocaleString('en-IN')}
-                              </span>
-                              {m.screenshot_url && (
-                                <button
-                                  onClick={() => setPreviewImg(m.screenshot_url)}
-                                  className="inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50"
-                                >
-                                  <FileText className="w-3 h-3" /> Proof
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 text-left">
+                      <th className="px-3 py-2.5 font-bold w-12">S.No</th>
+                      <th className="px-3 py-2.5 font-bold">Student</th>
+                      <th className="px-3 py-2.5 font-bold">Mentor</th>
+                      <th className="px-3 py-2.5 font-bold text-center">Inst.</th>
+                      <th className="px-3 py-2.5 font-bold text-right">Total</th>
+                      <th className="px-3 py-2.5 font-bold text-right">Paid</th>
+                      <th className="px-3 py-2.5 font-bold text-right">Due</th>
+                      <th className="px-3 py-2.5 font-bold text-right">Incentive</th>
+                      <th className="px-3 py-2.5 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {approvedGroups.map((group: any, i: number) => {
+                      const stu = group.student
+                      const open = expandedApproved === group.id
+                      return (
+                        <Fragment key={group.id}>
+                          <tr
+                            onClick={() => setExpandedApproved(open ? null : group.id)}
+                            className={`cursor-pointer transition-colors ${open ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
+                          >
+                            <td className="px-3 py-3 text-gray-400 font-semibold">{i + 1}</td>
+                            <td className="px-3 py-3">
+                              <p className="font-bold text-gray-900 whitespace-nowrap">{stu?.full_name ?? '—'}</p>
+                              {stu?.enrollment_number && <p className="text-[11px] text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</p>}
+                            </td>
+                            <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{group.mentorName ?? '—'}</td>
+                            <td className="px-3 py-3 text-center">
+                              <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{group.payments.length}</span>
+                            </td>
+                            <td className="px-3 py-3 text-right font-bold text-gray-800 whitespace-nowrap">₹{Number(group.totalAmount).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-3 text-right font-bold text-emerald-700 whitespace-nowrap">₹{Number(group.paidAmount).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-3 text-right font-bold text-amber-700 whitespace-nowrap">₹{Number(group.dueAmount).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-3 text-right font-bold text-blue-700 whitespace-nowrap">₹{Number(group.incentiveAmount).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-3 text-gray-400">{open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
+                          </tr>
+                          {open && (
+                            <tr className="bg-gray-50/60">
+                              <td colSpan={9} className="px-4 py-3">
+                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">
+                                  Subject-wise installments · {group.mentorName ?? '—'}
+                                </p>
+                                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden divide-y">
+                                  {group.payments.map((m: any, idx: number) => (
+                                    <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 flex-wrap">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{idx + 1}</span>
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-semibold text-gray-800">
+                                            {m.note ?? 'Payment'} · ₹{Number(m.amount ?? 0).toLocaleString('en-IN')}
+                                          </p>
+                                          <p className="text-[11px] text-gray-400">
+                                            Paid {m.paid_on ? format(new Date(m.paid_on), 'dd MMM yyyy') : '—'}
+                                            {m.approved_at && <> · Approved {format(new Date(m.approved_at), 'dd MMM yyyy')}</>}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                                          Incentive ₹{Number(m.incentive_amount ?? m.salary_percentage ?? 0).toLocaleString('en-IN')}
+                                        </span>
+                                        {m.screenshot_url && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setPreviewImg(m.screenshot_url) }}
+                                            className="inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50"
+                                          >
+                                            <FileText className="w-3 h-3" /> Proof
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

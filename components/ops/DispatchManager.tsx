@@ -10,21 +10,34 @@ import {
 import { toast } from 'sonner'
 import {
   Truck, Search, RefreshCw, ChevronDown, Pencil, Trash2,
-  Package, X, ArrowDownToLine, Send, ChevronRight,
+  Package, X, ArrowDownToLine, Send, ChevronRight, Plus, Printer,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = [
-  { value: 'marksheet',         label: 'Marksheet' },
-  { value: 'certificate',       label: 'Certificate' },
-  { value: 'id_card',           label: 'ID Card' },
-  { value: 'enrollment_letter', label: 'Enrollment Letter' },
-  { value: 'admit_card',        label: 'Admit Card' },
-  { value: 'degree',            label: 'Degree / Diploma' },
-  { value: 'other',             label: 'Other' },
+  { value: 'migration',                label: 'Migration' },
+  { value: 'transfer_certificate',     label: 'Transfer Certificate' },
+  { value: 'duplicate_marksheet',      label: 'Duplicate Marksheet' },
+  { value: 'consolidated_marksheet',   label: 'Consolidated Marksheet' },
+  { value: 'verification_certificate', label: 'Verification Certificate' },
+  { value: 'transcript',               label: 'Transcript' },
+  { value: 'slc_clc',                  label: 'SLC / CLC' },
+  { value: 'degree_certificate',       label: 'Degree / Certificate' },
+  { value: 'id_card',                  label: 'ID Card' },
+  { value: 'admit_card',               label: 'Admit Card' },
+  { value: 'enrollment_letter',        label: 'Enrollment Letter' },
 ]
+
+// Legacy values kept only for displaying older records correctly
+const LEGACY_DOC_LABELS: Record<string, string> = {
+  marksheet: 'Marksheet', certificate: 'Certificate', degree: 'Degree / Diploma', other: 'Other',
+}
+const docLabelOf = (v: string) =>
+  DOCUMENT_TYPES.find(t => t.value === v)?.label ?? LEGACY_DOC_LABELS[v] ?? v
+
+const newDocRow = () => ({ document_type: 'migration', status: 'pending', remarks: '' })
 
 const COURIERS = ['Speed Post', 'DTDC', 'Blue Dart', 'Delhivery', 'India Post', 'Ekart', 'Xpressbees', 'Other']
 
@@ -92,13 +105,11 @@ const EMPTY_FORM = {
   father_name: '',
   enrollment_number: '',
   associate_id: '',
-  document_type: 'marksheet',
   courier: '',
   tracking_number: '',
   dispatch_date: '',
   expected_delivery: '',
-  status: 'pending',
-  remarks: '',
+  documents: [newDocRow()] as { document_type: string; status: string; remarks: string }[],
 }
 
 // ── Student Search Combobox ───────────────────────────────────────────────────
@@ -272,13 +283,11 @@ export function DispatchManager() {
       father_name: d.father_name ?? '',
       enrollment_number: d.enrollment_number ?? '',
       associate_id: d.associate_id ?? '',
-      document_type: d.document_type,
       courier: d.courier ?? '',
       tracking_number: d.tracking_number ?? '',
       dispatch_date: d.dispatch_date ?? '',
       expected_delivery: d.expected_delivery ?? '',
-      status: d.status,
-      remarks: d.remarks ?? '',
+      documents: [{ document_type: d.document_type, status: d.status, remarks: d.remarks ?? '' }],
     })
     setShowOptional(!!(d.courier || d.tracking_number || d.expected_delivery || d.remarks))
     setFormOpen(true)
@@ -304,34 +313,39 @@ export function DispatchManager() {
     if (!form.student_name.trim()) { toast.error('Student name is required'); return }
     if (!form.student_phone.trim()) { toast.error('Phone number is required'); return }
     if (!form.father_name.trim()) { toast.error("Father's name is required"); return }
+    const docs = form.documents.filter(d => d.document_type)
+    if (docs.length === 0) { toast.error('Add at least one document'); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const payload = {
+    // Fields shared across every document row in this entry
+    const base = {
       dispatch_type: form.dispatch_type,
       student_name: form.student_name.trim(),
       student_phone: form.student_phone.trim() || null,
       father_name: form.father_name.trim() || null,
       enrollment_number: form.enrollment_number.trim() || null,
       associate_id: form.associate_id || null,
-      document_type: form.document_type,
       courier: form.courier || null,
       tracking_number: form.tracking_number.trim() || null,
       dispatch_date: form.dispatch_date || null,
       expected_delivery: form.expected_delivery || null,
-      status: form.status,
-      remarks: form.remarks.trim() || null,
       dispatched_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     }
     try {
       if (editItem) {
-        const { error } = await db.from('student_dispatches').update(payload).eq('id', editItem.id)
+        const d0 = docs[0]
+        const { error } = await db.from('student_dispatches')
+          .update({ ...base, document_type: d0.document_type, status: d0.status, remarks: d0.remarks.trim() || null })
+          .eq('id', editItem.id)
         if (error) { toast.error(error.message); return }
         toast.success('Updated')
       } else {
-        const { error } = await db.from('student_dispatches').insert(payload)
+        // one row per document, all sharing the same student / courier / date
+        const rows = docs.map(d => ({ ...base, document_type: d.document_type, status: d.status, remarks: d.remarks.trim() || null }))
+        const { error } = await db.from('student_dispatches').insert(rows)
         if (error) { toast.error(error.message); return }
-        toast.success(form.dispatch_type === 'inbound' ? 'Receive entry added' : 'Dispatch entry added')
+        toast.success(`${rows.length} ${form.dispatch_type === 'inbound' ? 'receive' : 'dispatch'} ${rows.length > 1 ? 'entries' : 'entry'} added`)
       }
       setFormOpen(false)
       load()
@@ -351,6 +365,78 @@ export function DispatchManager() {
     if (error) { toast.error('Failed to delete'); return }
     toast.success('Deleted')
     setDispatches(prev => prev.filter(d => d.id !== id))
+  }
+
+  // Build a printable receipt for the student. Groups all documents that belong
+  // to the same dispatch (same student / type / date / courier / tracking).
+  function downloadReceipt(d: Dispatch) {
+    const isInbound = d.dispatch_type === 'inbound'
+    const siblings = dispatches.filter(x =>
+      x.dispatch_type === d.dispatch_type &&
+      x.student_name === d.student_name &&
+      (x.enrollment_number ?? '') === (d.enrollment_number ?? '') &&
+      (x.dispatch_date ?? '') === (d.dispatch_date ?? '') &&
+      (x.tracking_number ?? '') === (d.tracking_number ?? '') &&
+      (x.courier ?? '') === (d.courier ?? '')
+    )
+    const docs = siblings.length ? siblings : [d]
+    const fmtDate = (v: string | null) => v ? format(new Date(v + 'T00:00:00'), 'dd MMM yyyy') : '—'
+    const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+    const receiptNo = `DCW-${(isInbound ? 'R' : 'D')}${(d.created_at ? new Date(d.created_at).getTime() : Date.now()).toString().slice(-8)}`
+    const rows = docs.map((x, i) => `
+      <tr>
+        <td style="text-align:center">${i + 1}</td>
+        <td>${esc(docLabelOf(x.document_type))}</td>
+        <td>${esc(statusMeta(x.status, x.dispatch_type).label)}</td>
+        <td>${esc(x.remarks ?? '—')}</td>
+      </tr>`).join('')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${receiptNo}</title>
+    <style>
+      *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+      body{margin:0;padding:32px;color:#1e293b}
+      .wrap{max-width:720px;margin:0 auto;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}
+      .head{background:linear-gradient(135deg,#2563eb,#4338ca);color:#fff;padding:22px 26px}
+      .head h1{margin:0;font-size:22px;letter-spacing:.3px}
+      .head p{margin:4px 0 0;font-size:12px;opacity:.85}
+      .body{padding:24px 26px}
+      .title{font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#2563eb;margin:0 0 14px}
+      .meta{display:flex;flex-wrap:wrap;gap:14px 28px;margin-bottom:18px}
+      .meta div{font-size:13px}
+      .meta label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:2px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      th,td{border:1px solid #e2e8f0;padding:8px 10px;font-size:13px;text-align:left}
+      th{background:#f8fafc;text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:#64748b}
+      .sign{display:flex;justify-content:space-between;margin-top:42px;font-size:12px;color:#64748b}
+      .foot{text-align:center;font-size:11px;color:#94a3b8;padding:14px;border-top:1px dashed #e2e8f0}
+    </style></head><body>
+      <div class="wrap">
+        <div class="head"><h1>Distance Courses Wala</h1><p>Document ${isInbound ? 'Received Acknowledgement' : 'Dispatch Receipt'}</p></div>
+        <div class="body">
+          <p class="title">${isInbound ? 'Received Acknowledgement' : 'Dispatch Receipt'}</p>
+          <div class="meta">
+            <div><label>Receipt No.</label>${receiptNo}</div>
+            <div><label>${isInbound ? 'Received Date' : 'Dispatch Date'}</label>${fmtDate(d.dispatch_date)}</div>
+            <div><label>Student</label>${esc(d.student_name)}</div>
+            ${d.father_name ? `<div><label>Father's Name</label>${esc(d.father_name)}</div>` : ''}
+            ${d.enrollment_number ? `<div><label>Enrollment No.</label>${esc(d.enrollment_number)}</div>` : ''}
+            ${d.student_phone ? `<div><label>Phone</label>${esc(d.student_phone)}</div>` : ''}
+            ${d.courier ? `<div><label>Courier</label>${esc(d.courier)}</div>` : ''}
+            ${d.tracking_number ? `<div><label>Tracking No.</label>${esc(d.tracking_number)}</div>` : ''}
+          </div>
+          <table>
+            <thead><tr><th style="width:42px;text-align:center">#</th><th>Document</th><th>Status</th><th>Remarks</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="sign"><span>Receiver's Signature</span><span>Authorised Signatory</span></div>
+        </div>
+        <div class="foot">This is a system-generated receipt from Distance Courses Wala · crmrahul.vercel.app</div>
+      </div>
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+    </body></html>`
+    const w = window.open('', '_blank')
+    if (!w) { toast.error('Allow pop-ups to download the receipt'); return }
+    w.document.write(html)
+    w.document.close()
   }
 
   const tabFiltered = dispatches.filter(d => activeTab === 'all' || d.dispatch_type === activeTab)
@@ -473,7 +559,7 @@ export function DispatchManager() {
           <div className="md:hidden space-y-2">
             {filtered.map(d => {
               const sm = statusMeta(d.status, d.dispatch_type)
-              const docLabel = DOCUMENT_TYPES.find(t => t.value === d.document_type)?.label ?? d.document_type
+              const docLabel = docLabelOf(d.document_type)
               const isInbound = d.dispatch_type === 'inbound'
               const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
               return (
@@ -506,6 +592,9 @@ export function DispatchManager() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      <button onClick={() => downloadReceipt(d)} title="Download receipt" className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => openEdit(d)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -570,7 +659,7 @@ export function DispatchManager() {
                 <tbody className="divide-y">
                   {filtered.map(d => {
                     const sm = statusMeta(d.status, d.dispatch_type)
-                    const docLabel = DOCUMENT_TYPES.find(t => t.value === d.document_type)?.label ?? d.document_type
+                    const docLabel = docLabelOf(d.document_type)
                     const isInbound = d.dispatch_type === 'inbound'
                     const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
                     return (
@@ -621,6 +710,7 @@ export function DispatchManager() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50" title="Download receipt" onClick={() => downloadReceipt(d)}><Printer className="w-3.5 h-3.5" /></Button>
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(d)}><Pencil className="w-3.5 h-3.5" /></Button>
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(d.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
                           </div>
@@ -653,13 +743,13 @@ export function DispatchManager() {
             {!editItem && (
               <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
                 <button
-                  onClick={() => setForm(p => ({ ...p, dispatch_type: 'inbound', status: 'pending' }))}
+                  onClick={() => setForm(p => ({ ...p, dispatch_type: 'inbound', documents: p.documents.map(d => ({ ...d, status: 'pending' })) }))}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${form.dispatch_type === 'inbound' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   <ArrowDownToLine className="w-3.5 h-3.5" /> Received
                 </button>
                 <button
-                  onClick={() => setForm(p => ({ ...p, dispatch_type: 'outbound', status: 'pending' }))}
+                  onClick={() => setForm(p => ({ ...p, dispatch_type: 'outbound', documents: p.documents.map(d => ({ ...d, status: 'pending' })) }))}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${form.dispatch_type === 'outbound' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   <Send className="w-3.5 h-3.5" /> Dispatch
@@ -755,30 +845,70 @@ export function DispatchManager() {
               )}
             </div>
 
-            {/* Document type + Status */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Document *</Label>
-                <select
-                  value={form.document_type}
-                  onChange={e => setForm(p => ({ ...p, document_type: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {DOCUMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+            {/* Documents — one or more, each with its own status & remarks */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">Documents *</Label>
+                {!editItem && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, documents: [...p.documents, { ...newDocRow(), status: p.documents[0]?.status ?? 'pending' }] }))}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add document
+                  </button>
+                )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Status</Label>
-                <select
-                  value={form.status}
-                  onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {(form.dispatch_type === 'inbound' ? INBOUND_STATUSES : OUTBOUND_STATUSES).map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
+              {form.documents.map((doc, idx) => (
+                <div key={idx} className="rounded-lg border border-gray-200 bg-slate-50/60 p-2.5 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">Document</Label>
+                      <select
+                        value={doc.document_type}
+                        onChange={e => setForm(p => ({ ...p, documents: p.documents.map((d, i) => i === idx ? { ...d, document_type: e.target.value } : d) }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {DOCUMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">Status</Label>
+                      <select
+                        value={doc.status}
+                        onChange={e => setForm(p => ({ ...p, documents: p.documents.map((d, i) => i === idx ? { ...d, status: e.target.value } : d) }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {(form.dispatch_type === 'inbound' ? INBOUND_STATUSES : OUTBOUND_STATUSES).map(s => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-500 uppercase">Remarks / Details</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Enter details for this document…"
+                        value={doc.remarks}
+                        onChange={e => setForm(p => ({ ...p, documents: p.documents.map((d, i) => i === idx ? { ...d, remarks: e.target.value } : d) }))}
+                        className="flex-1 border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {!editItem && form.documents.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, documents: p.documents.filter((_, i) => i !== idx) }))}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                          title="Remove document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Date */}
@@ -801,7 +931,7 @@ export function DispatchManager() {
               className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium"
             >
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showOptional ? 'rotate-90' : ''}`} />
-              {showOptional ? 'Hide' : 'Add'} courier, tracking & remarks
+              {showOptional ? 'Hide' : 'Add'} courier & tracking
             </button>
 
             {showOptional && (
@@ -836,16 +966,6 @@ export function DispatchManager() {
                     value={form.expected_delivery}
                     onChange={e => setForm(p => ({ ...p, expected_delivery: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Remarks</Label>
-                  <input
-                    type="text"
-                    placeholder="Any notes…"
-                    value={form.remarks}
-                    onChange={e => setForm(p => ({ ...p, remarks: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>

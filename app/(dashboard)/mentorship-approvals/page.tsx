@@ -51,7 +51,7 @@ function inits(name: string) { return name.split(' ').map(w=>w[0]).slice(0,2).jo
 export default function MentorshipDashboardPage() {
   const supabase = createClient()
 
-  const [tab, setTab] = useState<'students' | 'approvals'>('students')
+  const [tab, setTab] = useState<'students' | 'approvals' | 'approved'>('students')
   const [students, setStudents] = useState<StudentRow[]>([])
   const [counselors, setCounselors] = useState<Counselor[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +67,7 @@ export default function MentorshipDashboardPage() {
 
   // approvals
   const [mentorships, setMentorships] = useState<any[]>([])
+  const [approvedMentorships, setApprovedMentorships] = useState<any[]>([])
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [salaryPct, setSalaryPct] = useState<Record<string, string>>({})
   const [adminRemarks, setAdminRemarks] = useState<Record<string, string>>({})
@@ -77,7 +78,12 @@ export default function MentorshipDashboardPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [studRes, conRes, pendRes] = await Promise.all([
+      const paymentSelect = `*, mentorship:student_mentorships!mentorship_payments_mentorship_id_fkey(
+            managed_by, total_amount,
+            student:students(id, full_name, enrollment_number, phone),
+            telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)
+          )`
+      const [studRes, conRes, pendRes, approvedRes] = await Promise.all([
         (supabase as any).from('students')
           .select(`id, full_name, guardian_name, enrollment_number, phone, mode, mentor_telecaller_id,
             course:courses(name), department:departments(name),
@@ -86,16 +92,16 @@ export default function MentorshipDashboardPage() {
         (supabase as any).from('profiles').select('id, full_name')
           .in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
         (supabase as any).from('mentorship_payments')
-          .select(`*, mentorship:student_mentorships!mentorship_payments_mentorship_id_fkey(
-            managed_by, total_amount,
-            student:students(id, full_name, enrollment_number, phone),
-            telecaller:profiles!student_mentorships_telecaller_id_fkey(id, full_name)
-          )`)
+          .select(paymentSelect)
           .eq('status', 'pending').order('created_at', { ascending: false }),
+        (supabase as any).from('mentorship_payments')
+          .select(paymentSelect)
+          .eq('status', 'approved').order('approved_at', { ascending: false }),
       ])
       setStudents((studRes.data ?? []) as StudentRow[])
       setCounselors((conRes.data ?? []) as Counselor[])
       setMentorships(pendRes.data ?? [])
+      setApprovedMentorships(approvedRes.data ?? [])
     } catch {
       toast.error('Failed to load mentorship data')
     } finally {
@@ -372,6 +378,46 @@ export default function MentorshipDashboardPage() {
     return acc
   }, {})).sort((a: any, b: any) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime()), [mentorships])
 
+  const approvedGroups = useMemo(() => Object.values(approvedMentorships.reduce((acc: Record<string, any>, m: any) => {
+    const key = m.mentorship?.student?.id ?? m.mentorship_id ?? m.id
+    if (!acc[key]) {
+      acc[key] = {
+        id: key,
+        student: m.mentorship?.student,
+        mentorName: m.mentorship?.telecaller?.full_name,
+        totalAmount: 0,
+        paidAmount: 0,
+        incentiveAmount: 0,
+        latestApprovedAt: m.approved_at ?? m.created_at,
+        caseIds: new Set<string>(),
+        payments: [],
+      }
+    }
+    if (m.mentorship_id && !acc[key].caseIds.has(m.mentorship_id)) {
+      acc[key].caseIds.add(m.mentorship_id)
+      acc[key].totalAmount += Number(m.mentorship?.total_amount ?? 0)
+    }
+    acc[key].paidAmount += Number(m.amount ?? 0)
+    acc[key].incentiveAmount += Number(m.incentive_amount ?? m.salary_percentage ?? 0)
+    acc[key].payments.push(m)
+    const rowDate = m.approved_at ?? m.created_at
+    if (new Date(rowDate) > new Date(acc[key].latestApprovedAt)) {
+      acc[key].latestApprovedAt = rowDate
+    }
+    return acc
+  }, {})).map((g: any) => ({
+    ...g,
+    dueAmount: Math.max(Number(g.totalAmount ?? 0) - Number(g.paidAmount ?? 0), 0),
+  })).sort((a: any, b: any) => new Date(b.latestApprovedAt).getTime() - new Date(a.latestApprovedAt).getTime()), [approvedMentorships])
+
+  const approvedTotals = useMemo(() => approvedGroups.reduce((acc: any, g: any) => {
+    acc.total += Number(g.totalAmount ?? 0)
+    acc.paid += Number(g.paidAmount ?? 0)
+    acc.due += Number(g.dueAmount ?? 0)
+    acc.incentive += Number(g.incentiveAmount ?? 0)
+    return acc
+  }, { total: 0, paid: 0, due: 0, incentive: 0 }), [approvedGroups])
+
   return (
     <div className="space-y-5">
       {/* Hero */}
@@ -389,12 +435,13 @@ export default function MentorshipDashboardPage() {
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
         </div>
-        <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+        <div className="relative grid grid-cols-2 md:grid-cols-5 gap-3 mt-5">
           {[
             { icon: Users, label: 'Total Students', value: students.length },
             { icon: UserCog, label: 'With Mentor', value: withMentor },
             { icon: GraduationCap, label: 'Without Mentor', value: withoutMentor },
             { icon: Clock, label: 'Pending Approvals', value: mentorships.length },
+            { icon: CheckCircle2, label: 'Approved', value: approvedMentorships.length },
           ].map(s => (
             <div key={s.label} className="bg-white/15 rounded-xl px-3 py-3 backdrop-blur-sm">
               <s.icon className="w-4 h-4 text-white/70 mb-1" />
@@ -415,6 +462,11 @@ export default function MentorshipDashboardPage() {
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='approvals' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
           <ClipboardList className="w-4 h-4" /> Approvals
           {mentorships.length > 0 && <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{mentorships.length}</span>}
+        </button>
+        <button onClick={() => setTab('approved')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab==='approved' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          <CheckCircle2 className="w-4 h-4" /> Approved
+          {approvedMentorships.length > 0 && <span className="bg-emerald-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{approvedMentorships.length}</span>}
         </button>
       </div>
 
@@ -555,7 +607,7 @@ export default function MentorshipDashboardPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : tab === 'approvals' ? (
         /* ── APPROVALS TAB ── */
         mentorships.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground bg-white border rounded-xl">
@@ -693,6 +745,107 @@ export default function MentorshipDashboardPage() {
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )
+      ) : (
+        /* ── APPROVED TAB ── */
+        approvedGroups.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground bg-white border rounded-xl">
+            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">No approved mentorship payments</p>
+            <p className="text-xs mt-1">Approved mentorship earnings will appear student-wise here</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Total Mentorship', value: approvedTotals.total, cls: 'text-gray-900 bg-gray-50' },
+                { label: 'Paid', value: approvedTotals.paid, cls: 'text-emerald-700 bg-emerald-50' },
+                { label: 'Due', value: approvedTotals.due, cls: 'text-amber-700 bg-amber-50' },
+                { label: 'Approved Incentive', value: approvedTotals.incentive, cls: 'text-blue-700 bg-blue-50' },
+              ].map(item => (
+                <div key={item.label} className={`rounded-xl border px-4 py-3 ${item.cls}`}>
+                  <p className="text-[11px] uppercase tracking-wide font-bold opacity-70">{item.label}</p>
+                  <p className="text-xl font-extrabold">₹{Number(item.value).toLocaleString('en-IN')}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border overflow-hidden bg-white">
+              <div className="px-4 py-2.5 bg-emerald-50 border-b flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Approved Student-wise Summary</span>
+                <span className="text-xs text-emerald-700 font-semibold">{approvedGroups.length} student{approvedGroups.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="divide-y">
+                {approvedGroups.map((group: any) => {
+                  const stu = group.student
+                  return (
+                    <div key={group.id} className="px-4 py-4">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-gray-900">{stu?.full_name ?? '—'}</span>
+                            {stu?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</span>}
+                            <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{group.payments.length} installment{group.payments.length > 1 ? 's' : ''}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Mentor: <span className="font-semibold text-gray-700">{group.mentorName ?? '—'}</span>
+                            <> · Latest approval {format(new Date(group.latestApprovedAt), 'dd MMM yyyy')}</>
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-right min-w-[280px]">
+                          <div className="rounded-lg bg-gray-50 px-3 py-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Total</p>
+                            <p className="text-sm font-bold text-gray-800">₹{Number(group.totalAmount).toLocaleString('en-IN')}</p>
+                          </div>
+                          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                            <p className="text-[10px] font-bold text-emerald-500 uppercase">Paid</p>
+                            <p className="text-sm font-bold text-emerald-700">₹{Number(group.paidAmount).toLocaleString('en-IN')}</p>
+                          </div>
+                          <div className="rounded-lg bg-amber-50 px-3 py-2">
+                            <p className="text-[10px] font-bold text-amber-500 uppercase">Due</p>
+                            <p className="text-sm font-bold text-amber-700">₹{Number(group.dueAmount).toLocaleString('en-IN')}</p>
+                          </div>
+                          <div className="rounded-lg bg-blue-50 px-3 py-2">
+                            <p className="text-[10px] font-bold text-blue-500 uppercase">Incentive</p>
+                            <p className="text-sm font-bold text-blue-700">₹{Number(group.incentiveAmount).toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-gray-100 overflow-hidden">
+                        {group.payments.map((m: any) => (
+                          <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-50/60 border-b last:border-b-0 flex-wrap">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-800">
+                                {m.note ?? 'Payment'} · ₹{Number(m.amount ?? 0).toLocaleString('en-IN')}
+                              </p>
+                              <p className="text-[11px] text-gray-400">
+                                Paid {m.paid_on ? format(new Date(m.paid_on), 'dd MMM yyyy') : '—'}
+                                {m.approved_at && <> · Approved {format(new Date(m.approved_at), 'dd MMM yyyy')}</>}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-lg">
+                                Incentive ₹{Number(m.incentive_amount ?? m.salary_percentage ?? 0).toLocaleString('en-IN')}
+                              </span>
+                              {m.screenshot_url && (
+                                <button
+                                  onClick={() => setPreviewImg(m.screenshot_url)}
+                                  className="inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50"
+                                >
+                                  <FileText className="w-3 h-3" /> Proof
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )

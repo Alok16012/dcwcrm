@@ -136,13 +136,6 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
     }
   }
 
-  // For lead: total from students, paid from payroll rows with status=paid
-  const totalIncentive = (role === 'lead' || role === 'counselor')
-    ? studentIncentives.reduce((s, r) => s + (r.incentive_amount ?? 0), 0)
-    : payrollRows.reduce((s, r) => s + (r.incentive ?? 0), 0)
-  const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
-  const unpaidIncentive = totalIncentive - paidIncentive
-  const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i))
   const mentorIncentiveGroups = Object.values(mentorIncentives.reduce((acc, item) => {
     const key = item.studentId ?? item.studentName
     if (!acc[key]) {
@@ -162,6 +155,14 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
     return acc
   }, {} as Record<string, { id: string; studentName: string; amount: number; count: number; latestDate: string }>))
     .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
+  const studentEnrollmentTotal = studentIncentives.reduce((s, r) => s + (r.incentive_amount ?? 0), 0)
+  const mentorshipTotal = mentorIncentives.reduce((s, r) => s + Number(r.amount), 0)
+  const totalIncentive = (role === 'lead' || role === 'counselor')
+    ? studentEnrollmentTotal + mentorshipTotal
+    : payrollRows.reduce((s, r) => s + (r.incentive ?? 0), 0)
+  const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
+  const unpaidIncentive = totalIncentive - paidIncentive
+  const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i))
 
   return (
     <div className="space-y-6">
@@ -250,13 +251,38 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
         )}
       </div>
 
+      {/* Mentorship incentives (credited on payment approval) */}
+      {mentorIncentives.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-base">Mentorship Incentives</h3>
+            <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
+              Total: {fmt(mentorshipTotal)}
+            </span>
+          </div>
+          <div className="rounded-lg border overflow-hidden bg-white divide-y">
+            {mentorIncentiveGroups.map(mi => (
+              <div key={mi.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">Mentorship — {mi.studentName}</p>
+                  <p className="text-xs text-gray-400">
+                    {mi.count} payment{mi.count > 1 ? 's' : ''} · Latest {format(new Date(mi.latestDate), 'dd MMM yyyy')}
+                  </p>
+                </div>
+                <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Student-wise incentive detail — only for lead/telecaller */}
       {(role === 'lead' || role === 'counselor') && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-base">My Student Enrollments — Month-wise</h3>
             <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
-              Total: {fmt(studentIncentives.reduce((s, r) => s + r.incentive_amount, 0))}
+              Total: {fmt(studentEnrollmentTotal)}
             </span>
           </div>
 
@@ -322,31 +348,6 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
               </div>
             )
           })()}
-        </div>
-      )}
-
-      {/* Mentorship incentives (credited on payment approval) */}
-      {mentorIncentives.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-base">Mentorship Incentives</h3>
-            <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
-              Total: {fmt(mentorIncentives.reduce((s, r) => s + Number(r.amount), 0))}
-            </span>
-          </div>
-          <div className="rounded-lg border overflow-hidden bg-white divide-y">
-            {mentorIncentiveGroups.map(mi => (
-              <div key={mi.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">Mentorship — {mi.studentName}</p>
-                  <p className="text-xs text-gray-400">
-                    {mi.count} payment{mi.count > 1 ? 's' : ''} · Latest {format(new Date(mi.latestDate), 'dd MMM yyyy')}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 

@@ -332,18 +332,23 @@ export function DispatchManager() {
       dispatched_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     }
+    // If the DB hasn't got the father_name column yet, drop it and retry once
+    // so saving still works before migration 086 is applied.
+    const stripFather = (obj: any) => { const { father_name, ...rest } = obj; return rest }
+    const isFatherColErr = (e: any) => /father_name/.test(e?.message ?? '') && /column|schema/.test(e?.message ?? '')
     try {
       if (editItem) {
         const d0 = docs[0]
-        const { error } = await db.from('student_dispatches')
-          .update({ ...base, document_type: d0.document_type, status: d0.status, remarks: d0.remarks.trim() || null })
-          .eq('id', editItem.id)
+        const row = { ...base, document_type: d0.document_type, status: d0.status, remarks: d0.remarks.trim() || null }
+        let { error } = await db.from('student_dispatches').update(row).eq('id', editItem.id)
+        if (error && isFatherColErr(error)) ({ error } = await db.from('student_dispatches').update(stripFather(row)).eq('id', editItem.id))
         if (error) { toast.error(error.message); return }
         toast.success('Updated')
       } else {
         // one row per document, all sharing the same student / courier / date
         const rows = docs.map(d => ({ ...base, document_type: d.document_type, status: d.status, remarks: d.remarks.trim() || null }))
-        const { error } = await db.from('student_dispatches').insert(rows)
+        let { error } = await db.from('student_dispatches').insert(rows)
+        if (error && isFatherColErr(error)) ({ error } = await db.from('student_dispatches').insert(rows.map(stripFather)))
         if (error) { toast.error(error.message); return }
         toast.success(`${rows.length} ${form.dispatch_type === 'inbound' ? 'receive' : 'dispatch'} ${rows.length > 1 ? 'entries' : 'entry'} added`)
       }

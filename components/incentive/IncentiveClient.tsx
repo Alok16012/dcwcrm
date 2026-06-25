@@ -93,22 +93,33 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
         .maybeSingle()
 
       if (existing) {
-        const diff = incentiveAmt - ((existing as any).incentive ?? 0)
+        // Add on top of whatever incentive is already there (e.g. mentorship credit)
+        // so the entered incentive and mentorship amount both count.
         await supabase.from('payroll').update({
-          incentive: incentiveAmt,
-          gross: ((existing as any).gross ?? 0) + diff,
-          net: ((existing as any).net ?? 0) + diff,
+          incentive: ((existing as any).incentive ?? 0) + incentiveAmt,
+          gross: ((existing as any).gross ?? 0) + incentiveAmt,
+          net: ((existing as any).net ?? 0) + incentiveAmt,
         } as never).eq('id', (existing as any).id)
       } else {
+        // No payroll yet this month — build a full row from the employee's salary
+        // structure so basic/HRA/allowances aren't lost.
+        const { data: emp } = await (supabase as any).from('employees')
+          .select('basic_salary, hra, allowances, pf_deduction, tds_deduction').eq('id', selectedEmployee).maybeSingle()
+        const basic = Number(emp?.basic_salary ?? 0)
+        const hra = Number(emp?.hra ?? 0)
+        const allowances = Number(emp?.allowances ?? 0)
+        const pf = Number(emp?.pf_deduction ?? 0)
+        const tds = Number(emp?.tds_deduction ?? 0)
+        const gross = basic + hra + allowances + incentiveAmt
         await supabase.from('payroll').insert({
           employee_id: selectedEmployee,
           month: Number(addMonth),
           year: Number(addYear),
-          basic: 0, hra: 0, allowances: 0,
+          basic, hra, allowances,
           incentive: incentiveAmt,
-          gross: incentiveAmt,
-          pf: 0, tds: 0, other_deductions: 0, leave_deduction: 0,
-          net: incentiveAmt,
+          gross,
+          pf, tds, other_deductions: 0, leave_deduction: 0,
+          net: gross - pf - tds,
           status: 'draft',
         } as never)
       }

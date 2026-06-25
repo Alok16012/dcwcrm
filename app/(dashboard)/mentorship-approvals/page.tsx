@@ -356,6 +356,7 @@ export default function MentorshipDashboardPage() {
     }
     return true
   }), [students, counselorFilter, departmentFilter, courseFilter, boardFilter, sessionFilter, search])
+  const filteredStudentIds = useMemo(() => new Set(filtered.map(s => s.id)), [filtered])
 
   const approvalGroups = useMemo(() => Object.values(mentorships.reduce((acc: Record<string, any>, m: any) => {
     const key = m.mentorship_id ?? m.mentorship?.student?.id ?? m.id
@@ -376,7 +377,8 @@ export default function MentorshipDashboardPage() {
       acc[key].latestCreatedAt = m.created_at
     }
     return acc
-  }, {})).sort((a: any, b: any) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime()), [mentorships])
+  }, {})).filter((g: any) => !g.student?.id || filteredStudentIds.has(g.student.id))
+    .sort((a: any, b: any) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime()), [mentorships, filteredStudentIds])
 
   const approvedGroups = useMemo(() => Object.values(approvedMentorships.reduce((acc: Record<string, any>, m: any) => {
     const key = m.mentorship?.student?.id ?? m.mentorship_id ?? m.id
@@ -408,7 +410,8 @@ export default function MentorshipDashboardPage() {
   }, {})).map((g: any) => ({
     ...g,
     dueAmount: Math.max(Number(g.totalAmount ?? 0) - Number(g.paidAmount ?? 0), 0),
-  })).sort((a: any, b: any) => new Date(b.latestApprovedAt).getTime() - new Date(a.latestApprovedAt).getTime()), [approvedMentorships])
+  })).filter((g: any) => !g.student?.id || filteredStudentIds.has(g.student.id))
+    .sort((a: any, b: any) => new Date(b.latestApprovedAt).getTime() - new Date(a.latestApprovedAt).getTime()), [approvedMentorships, filteredStudentIds])
 
   const approvedTotals = useMemo(() => approvedGroups.reduce((acc: any, g: any) => {
     acc.total += Number(g.totalAmount ?? 0)
@@ -472,8 +475,9 @@ export default function MentorshipDashboardPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
-      ) : tab === 'students' ? (
+      ) : (
         <>
+          {/* Shared filter bar — visible on all tabs so any student can be found */}
           {/* Counselor chips */}
           <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setCounselorFilter('all')}
@@ -543,6 +547,8 @@ export default function MentorshipDashboardPage() {
             </Button>
           </div>
 
+          {tab === 'students' ? (
+          <>
           {/* Table */}
           {filtered.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
@@ -849,6 +855,8 @@ export default function MentorshipDashboardPage() {
             </div>
           </div>
         )
+      )}
+        </>
       )}
 
       {/* Screenshot preview */}

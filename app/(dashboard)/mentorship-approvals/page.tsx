@@ -151,36 +151,52 @@ export default function MentorshipDashboardPage() {
     }
   }
 
+  function incentiveAmountFor(id: string) {
+    const raw = salaryPct[id]?.trim()
+    const amount = raw ? Number(raw) : NaN
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('Enter mentor incentive amount before approval')
+    }
+    return amount
+  }
+
+  function hasValidIncentive(id: string) {
+    const raw = salaryPct[id]?.trim()
+    const amount = raw ? Number(raw) : NaN
+    return Number.isFinite(amount) && amount > 0
+  }
+
+  function missingIncentiveCount(ids: string[]) {
+    return ids.filter(id => !hasValidIncentive(id)).length
+  }
+
   // Approve a payment + credit the mentor's incentive (best-effort ledger)
   async function markApproved(id: string, userId?: string) {
-    const amt = salaryPct[id] ? parseFloat(salaryPct[id]) : null
+    const amt = incentiveAmountFor(id)
     const { error } = await (supabase as any).from('mentorship_payments').update({
       status: 'approved',
+      incentive_amount: amt,
       admin_remarks: adminRemarks[id] || null,
       approved_by: userId ?? null,
       approved_at: new Date().toISOString(),
     }).eq('id', id)
     if (error) throw error
-    if (amt && amt > 0) {
-      // store the exact incentive amount (₹) on the payment — ignore if column absent
-      try { await (supabase as any).from('mentorship_payments').update({ incentive_amount: amt }).eq('id', id) } catch {}
-      const m = mentorships.find(x => x.id === id)
-      const mentorId = m?.mentorship?.telecaller?.id
-      if (mentorId) {
-        // detailed ledger entry (best-effort)
-        try {
-          await (supabase as any).from('mentor_incentives').insert({
-            mentor_id: mentorId,
-            payment_id: id,
-            student_id: m?.mentorship?.student?.id ?? null,
-            amount: amt,
-            reason: `Mentorship — ${m?.mentorship?.student?.full_name ?? 'student'}`,
-            created_by: userId ?? null,
-          })
-        } catch {}
-        // credit the mentor's payroll incentive for the current month → reflects in HRMS + Incentive page
-        try { await creditPayrollIncentive(mentorId, amt) } catch {}
-      }
+    const m = mentorships.find(x => x.id === id)
+    const mentorId = m?.mentorship?.telecaller?.id
+    if (mentorId) {
+      // detailed ledger entry (best-effort)
+      try {
+        await (supabase as any).from('mentor_incentives').insert({
+          mentor_id: mentorId,
+          payment_id: id,
+          student_id: m?.mentorship?.student?.id ?? null,
+          amount: amt,
+          reason: `Mentorship — ${m?.mentorship?.student?.full_name ?? 'student'}`,
+          created_by: userId ?? null,
+        })
+      } catch {}
+      // credit the mentor's payroll incentive for the current month → reflects in HRMS + Incentive page
+      try { await creditPayrollIncentive(mentorId, amt) } catch {}
     }
   }
 
@@ -264,6 +280,11 @@ export default function MentorshipDashboardPage() {
 
   async function approveIds(ids: string[]) {
     if (ids.length === 0) return
+    const missingCount = missingIncentiveCount(ids)
+    if (missingCount > 0) {
+      toast.error(`Enter mentor incentive for ${missingCount} selected payment${missingCount !== 1 ? 's' : ''}`)
+      return
+    }
     setBulkBusy(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -558,7 +579,7 @@ export default function MentorshipDashboardPage() {
               {selectedIds.size > 0 ? (
                 <div className="flex items-center gap-2 ml-auto">
                   <span className="text-xs font-semibold text-blue-700">{selectedIds.size} selected</span>
-                  <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700" disabled={bulkBusy} onClick={bulkApprove}>
+                  <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50" disabled={bulkBusy || missingIncentiveCount(Array.from(selectedIds)) > 0} onClick={bulkApprove}>
                     {bulkBusy ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve {selectedIds.size}</>}
                   </Button>
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50" disabled={bulkBusy} onClick={bulkReject}>
@@ -632,12 +653,15 @@ export default function MentorshipDashboardPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <div className="flex items-center gap-1 border border-gray-300 rounded px-2 h-7 bg-white">
+                                <div className={`flex items-center gap-1 border rounded px-2 h-7 bg-white ${hasValidIncentive(m.id) ? 'border-gray-300' : 'border-red-300 bg-red-50/40'}`}>
                                   <span className="text-gray-400 text-xs font-bold">₹</span>
                                   <input type="number" min="0" step="1" placeholder="Incentive"
                                     value={salaryPct[m.id] ?? ''} onChange={e => setSalaryPct(p => ({ ...p, [m.id]: e.target.value }))}
-                                    className="w-28 h-full text-xs focus:outline-none" />
+                                    required
+                                    aria-invalid={!hasValidIncentive(m.id)}
+                                    className={`w-28 h-full text-xs focus:outline-none ${hasValidIncentive(m.id) ? '' : 'placeholder:text-red-400'}`} />
                                 </div>
+                                {!hasValidIncentive(m.id) && <span className="text-[10px] font-semibold text-red-500">Required</span>}
                                 <input type="text" placeholder="Admin remarks"
                                   value={adminRemarks[m.id] ?? ''} onChange={e => setAdminRemarks(p => ({ ...p, [m.id]: e.target.value }))}
                                   className="flex-1 min-w-[160px] h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
@@ -658,7 +682,7 @@ export default function MentorshipDashboardPage() {
                         </div>
                       </div>
                       <div className="flex sm:flex-col gap-2 flex-shrink-0">
-                        <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 flex-1" disabled={bulkBusy} onClick={() => approveIds(groupIds)}>
+                        <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 flex-1 disabled:opacity-50" disabled={bulkBusy || missingIncentiveCount(groupIds) > 0} onClick={() => approveIds(groupIds)}>
                           {bulkBusy ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve All</>}
                         </Button>
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50 flex-1" disabled={bulkBusy} onClick={() => rejectIds(groupIds)}>

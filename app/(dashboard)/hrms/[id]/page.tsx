@@ -68,7 +68,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
     supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
     supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
     (supabase as any).from('mentorship_payments')
-      .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(full_name))')
+      .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name))')
       .eq('status', 'approved').eq('mentorship.telecaller_id', employee.profile_id)
       .order('approved_at', { ascending: false }),
   ])
@@ -76,12 +76,33 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
   const mentorIncentives = ((mentorIncRes?.data ?? []) as any[])
     .map(p => ({
       id: p.id as string,
+      studentId: p.mentorship?.student?.id as string | undefined,
+      studentName: (p.mentorship?.student?.full_name ?? 'student') as string,
       amount: Number(p.incentive_amount ?? p.salary_percentage ?? 0),
       reason: `Mentorship — ${p.mentorship?.student?.full_name ?? 'student'}`,
       created_at: (p.approved_at ?? p.created_at) as string,
     }))
     .filter(m => m.amount > 0)
   const mentorIncTotal = mentorIncentives.reduce((s, m) => s + Number(m.amount), 0)
+  const mentorIncentiveGroups = Object.values(mentorIncentives.reduce((acc, item) => {
+    const key = item.studentId ?? item.studentName
+    if (!acc[key]) {
+      acc[key] = {
+        id: key,
+        studentName: item.studentName,
+        amount: 0,
+        count: 0,
+        latestDate: item.created_at,
+      }
+    }
+    acc[key].amount += Number(item.amount)
+    acc[key].count += 1
+    if (new Date(item.created_at) > new Date(acc[key].latestDate)) {
+      acc[key].latestDate = item.created_at
+    }
+    return acc
+  }, {} as Record<string, { id: string; studentName: string; amount: number; count: number; latestDate: string }>))
+    .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
 
   const attendanceRaw = attRes.data as { date: string; status: string }[] | null
   const payrollData = payrollRes.data as Record<string, unknown>[] | null
@@ -208,11 +229,13 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
                 <span className="text-sm font-bold text-emerald-700">{fmt(mentorIncTotal)}</span>
               </div>
               <div className="divide-y bg-white">
-                {mentorIncentives.map(mi => (
-                  <div key={mi.id} className="flex items-center justify-between px-4 py-2.5">
+                {mentorIncentiveGroups.map(mi => (
+                  <div key={mi.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{mi.reason ?? 'Mentorship'}</p>
-                      <p className="text-xs text-gray-400">{format(new Date(mi.created_at), 'dd MMM yyyy')}</p>
+                      <p className="text-sm font-medium text-gray-800 truncate">Mentorship — {mi.studentName}</p>
+                      <p className="text-xs text-gray-400">
+                        {mi.count} payment{mi.count > 1 ? 's' : ''} · Latest {format(new Date(mi.latestDate), 'dd MMM yyyy')}
+                      </p>
                     </div>
                     <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
                   </div>

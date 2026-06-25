@@ -38,7 +38,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
   const [addYear, setAddYear] = useState(String(new Date().getFullYear()))
   const [addIncentive, setAddIncentive] = useState('')
   const [saving, setSaving] = useState(false)
-  const [mentorIncentives, setMentorIncentives] = useState<{ id: string; amount: number; reason: string | null; created_at: string }[]>([])
+  const [mentorIncentives, setMentorIncentives] = useState<{ id: string; studentId?: string; studentName: string; amount: number; reason: string | null; created_at: string }[]>([])
   const supabase = createClient()
 
   useEffect(() => {
@@ -47,12 +47,14 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
       if (!user) return
       // read approved mentorship payments for this mentor (shows old + new)
       const { data } = await (supabase as any).from('mentorship_payments')
-        .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(full_name))')
+        .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name))')
         .eq('status', 'approved').eq('mentorship.telecaller_id', user.id)
         .order('approved_at', { ascending: false })
       const rows = ((data ?? []) as any[])
         .map(p => ({
           id: p.id as string,
+          studentId: p.mentorship?.student?.id as string | undefined,
+          studentName: (p.mentorship?.student?.full_name ?? 'student') as string,
           amount: Number(p.incentive_amount ?? p.salary_percentage ?? 0),
           reason: `Mentorship — ${p.mentorship?.student?.full_name ?? 'student'}`,
           created_at: (p.approved_at ?? p.created_at) as string,
@@ -141,6 +143,25 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
   const paidIncentive = payrollRows.filter((r) => r.status === 'paid').reduce((s, r) => s + (r.incentive ?? 0), 0)
   const unpaidIncentive = totalIncentive - paidIncentive
   const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i))
+  const mentorIncentiveGroups = Object.values(mentorIncentives.reduce((acc, item) => {
+    const key = item.studentId ?? item.studentName
+    if (!acc[key]) {
+      acc[key] = {
+        id: key,
+        studentName: item.studentName,
+        amount: 0,
+        count: 0,
+        latestDate: item.created_at,
+      }
+    }
+    acc[key].amount += Number(item.amount)
+    acc[key].count += 1
+    if (new Date(item.created_at) > new Date(acc[key].latestDate)) {
+      acc[key].latestDate = item.created_at
+    }
+    return acc
+  }, {} as Record<string, { id: string; studentName: string; amount: number; count: number; latestDate: string }>))
+    .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
 
   return (
     <div className="space-y-6">
@@ -314,11 +335,13 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
             </span>
           </div>
           <div className="rounded-lg border overflow-hidden bg-white divide-y">
-            {mentorIncentives.map(mi => (
-              <div key={mi.id} className="flex items-center justify-between px-4 py-3">
+            {mentorIncentiveGroups.map(mi => (
+              <div key={mi.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{mi.reason ?? 'Mentorship'}</p>
-                  <p className="text-xs text-gray-400">{format(new Date(mi.created_at), 'dd MMM yyyy')}</p>
+                  <p className="text-sm font-medium text-gray-800 truncate">Mentorship — {mi.studentName}</p>
+                  <p className="text-xs text-gray-400">
+                    {mi.count} payment{mi.count > 1 ? 's' : ''} · Latest {format(new Date(mi.latestDate), 'dd MMM yyyy')}
+                  </p>
                 </div>
                 <span className="text-sm font-bold text-emerald-600 font-mono">+{fmt(Number(mi.amount))}</span>
               </div>

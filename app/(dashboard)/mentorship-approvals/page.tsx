@@ -186,7 +186,8 @@ export default function MentorshipDashboardPage() {
 
   // Add the incentive to the mentor's payroll (current month) so it shows in HRMS + their Incentive page
   async function creditPayrollIncentive(mentorProfileId: string, amount: number) {
-    const { data: emp } = await (supabase as any).from('employees').select('id').eq('profile_id', mentorProfileId).maybeSingle()
+    const { data: emp } = await (supabase as any).from('employees')
+      .select('id, basic_salary, hra, allowances, pf_deduction, tds_deduction').eq('profile_id', mentorProfileId).maybeSingle()
     if (!emp) return
     const now = new Date()
     const month = now.getMonth() + 1
@@ -200,10 +201,19 @@ export default function MentorshipDashboardPage() {
         net: (existing.net ?? 0) + amount,
       }).eq('id', existing.id)
     } else {
+      // No payroll generated yet this month — build a full row from the employee's
+      // salary structure so basic/HRA/allowances aren't lost (mentorship incentive added on top)
+      const basic = Number(emp.basic_salary ?? 0)
+      const hra = Number(emp.hra ?? 0)
+      const allowances = Number(emp.allowances ?? 0)
+      const pf = Number(emp.pf_deduction ?? 0)
+      const tds = Number(emp.tds_deduction ?? 0)
+      const gross = basic + hra + allowances + amount
+      const net = gross - pf - tds
       await (supabase as any).from('payroll').insert({
         employee_id: emp.id, month, year,
-        basic: 0, hra: 0, allowances: 0, incentive: amount, gross: amount,
-        pf: 0, tds: 0, other_deductions: 0, leave_deduction: 0, net: amount, status: 'draft',
+        basic, hra, allowances, incentive: amount, gross,
+        pf, tds, other_deductions: 0, leave_deduction: 0, net, status: 'draft',
       })
     }
   }

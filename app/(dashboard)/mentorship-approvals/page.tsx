@@ -187,11 +187,20 @@ export default function MentorshipDashboardPage() {
   // Add the incentive to the mentor's payroll (current month) so it shows in HRMS + their Incentive page
   async function creditPayrollIncentive(mentorProfileId: string, amount: number) {
     const { data: emp } = await (supabase as any).from('employees')
-      .select('id, basic_salary, hra, allowances, pf_deduction, tds_deduction').eq('profile_id', mentorProfileId).maybeSingle()
+      .select('id, basic_salary, hra, allowances, pf_deduction, tds_deduction, salary_cycle_start_day').eq('profile_id', mentorProfileId).maybeSingle()
     if (!emp) return
+    // Map today's date to the employee's billing cycle. e.g. cycle start 22 →
+    // June payroll covers 22 May–21 June, so a date on/after the 22nd belongs to
+    // the next month's payroll period.
     const now = new Date()
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
+    const cycleStartDay = Number(emp.salary_cycle_start_day ?? 1)
+    let m = now.getMonth() // 0-based
+    let year = now.getFullYear()
+    if (cycleStartDay > 1 && now.getDate() >= cycleStartDay) {
+      m += 1
+      if (m > 11) { m = 0; year += 1 }
+    }
+    const month = m + 1
     const { data: existing } = await (supabase as any).from('payroll')
       .select('id, incentive, gross, net').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
     if (existing) {

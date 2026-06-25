@@ -1,7 +1,9 @@
--- One-time fix: mentorship-incentive credit had created June 2026 payroll rows
--- with basic/HRA/allowances = 0 (only the incentive). Restore the salary
--- structure from the employee while KEEPING the already-credited incentive
--- (regular + mentorship), and recompute gross & net.
+-- One-time fix: the mentorship-incentive credit had created payroll rows with
+-- basic/HRA/allowances = 0 (only the incentive amount), wiping the employee's
+-- salary. Restore the salary structure from the employee on any such DRAFT stub
+-- row (not yet paid), keep the already-credited incentive, and recompute
+-- gross & net. Month-agnostic so it fixes whichever billing-cycle month the
+-- credit landed in (e.g. June or July).
 
 update payroll p
 set basic      = e.basic_salary,
@@ -15,7 +17,6 @@ set basic      = e.basic_salary,
                  - coalesce(p.other_deductions,0) - coalesce(p.leave_deduction,0)
 from employees e
 where p.employee_id = e.id
-  and p.month = 6
-  and p.year  = 2026
-  and coalesce(p.basic, 0) = 0          -- only the broken stub rows
-  and coalesce(e.basic_salary, 0) > 0;   -- only employees that actually have a salary
+  and p.status = 'draft'                 -- never touch processed/paid rows
+  and coalesce(p.basic, 0) = 0           -- only the broken stub rows
+  and coalesce(e.basic_salary, 0) > 0;   -- only employees that have a salary set

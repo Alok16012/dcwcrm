@@ -47,6 +47,8 @@ interface SubjectRow {
 type StageState = Record<StageKey, SubjectRow[]>
 const subjCollected = (sub: SubjectRow) => sub.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
 const emptyStages = (): StageState => ({ practical: [], assignment: [], theory: [] })
+const paymentKey = (amount: number, date: string | null, note: string, proofUrl: string | null) =>
+  [amount.toFixed(2), date ?? '', note.trim().toLowerCase(), proofUrl ?? ''].join('|')
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   not_started: { label: 'Not Started', cls: 'bg-gray-100 text-gray-600' },
@@ -257,27 +259,45 @@ export default function MentorshipClient() {
       // Create a verification request (mentorship_payments) for each NEW installment
       if (caseMode === 'dcw' && savedCaseId) {
         const STAGE_LBL: Record<string, string> = { practical: 'Practical', assignment: 'Assignment', theory: 'Theory' }
-        let createdAny = false
+        const { data: existingPayments } = await (supabase as any).from('mentorship_payments')
+          .select('id, amount, paid_on, screenshot_url, note, status')
+          .eq('mentorship_id', savedCaseId)
+          .neq('status', 'rejected')
+        const existingByKey = ((existingPayments ?? []) as any[]).reduce((acc, row) => {
+          const key = paymentKey(Number(row.amount ?? 0), row.paid_on ?? null, row.note ?? '', row.screenshot_url ?? null)
+          if (!acc[key]) acc[key] = []
+          acc[key].push(row)
+          return acc
+        }, {} as Record<string, any[]>)
+        let shouldResaveStages = false
         for (const st of built) {
           for (const sub of st.subjects as any[]) {
             for (const p of sub.payments as any[]) {
               if (!p.payment_id && p.amount > 0) {
+                const note = `${STAGE_LBL[p.stage] ?? p.stage} · ${sub.name}`
+                const key = paymentKey(Number(p.amount), p.date, note, p.proof_url)
+                const existing = existingByKey[key]?.shift()
+                if (existing) {
+                  p.payment_id = existing.id
+                  shouldResaveStages = true
+                  continue
+                }
                 const { data: pay, error: payErr } = await (supabase as any).from('mentorship_payments').insert({
                   mentorship_id: savedCaseId,
                   amount: p.amount,
                   paid_on: p.date,
                   screenshot_url: p.proof_url,
-                  note: `${STAGE_LBL[p.stage] ?? p.stage} · ${sub.name}`,
+                  note,
                   status: 'pending',
                   created_by: user.id,
                 }).select('id').single()
-                if (!payErr && pay) { p.payment_id = pay.id; createdAny = true }
+                if (!payErr && pay) { p.payment_id = pay.id; shouldResaveStages = true }
               }
             }
           }
         }
         // re-save stages with the new payment_ids so re-saving doesn't duplicate
-        if (createdAny) {
+        if (shouldResaveStages) {
           await (supabase as any).from('student_mentorships').update({ stages: built }).eq('id', savedCaseId)
         }
       }

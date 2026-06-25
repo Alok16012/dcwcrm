@@ -259,28 +259,44 @@ export default function MentorshipDashboardPage() {
 
   async function bulkApprove() {
     if (selectedIds.size === 0) return
+    await approveIds(Array.from(selectedIds))
+  }
+
+  async function approveIds(ids: string[]) {
+    if (ids.length === 0) return
     setBulkBusy(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const ids = Array.from(selectedIds)
       for (const id of ids) await markApproved(id, user?.id)
       toast.success(`Approved ${ids.length} payment${ids.length !== 1 ? 's' : ''}`)
-      setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
-      setSelectedIds(new Set())
+      setMentorships(prev => prev.filter(m => !ids.includes(m.id)))
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        ids.forEach(id => next.delete(id))
+        return next
+      })
     } catch (e: any) { toast.error(e?.message ?? 'Bulk approve failed') } finally { setBulkBusy(false) }
   }
 
   async function bulkReject() {
     if (selectedIds.size === 0) return
+    await rejectIds(Array.from(selectedIds))
+  }
+
+  async function rejectIds(ids: string[]) {
+    if (ids.length === 0) return
     setBulkBusy(true)
     try {
-      const ids = Array.from(selectedIds)
       const { error } = await (supabase as any).from('mentorship_payments')
         .update({ status: 'rejected' }).in('id', ids)
       if (error) throw error
       toast.success(`Rejected ${ids.length} record${ids.length !== 1 ? 's' : ''}`)
-      setMentorships(prev => prev.filter(m => !selectedIds.has(m.id)))
-      setSelectedIds(new Set())
+      setMentorships(prev => prev.filter(m => !ids.includes(m.id)))
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        ids.forEach(id => next.delete(id))
+        return next
+      })
     } catch { toast.error('Bulk reject failed') } finally { setBulkBusy(false) }
   }
 
@@ -313,6 +329,27 @@ export default function MentorshipDashboardPage() {
     }
     return true
   }), [students, counselorFilter, departmentFilter, courseFilter, boardFilter, sessionFilter, search])
+
+  const approvalGroups = useMemo(() => Object.values(mentorships.reduce((acc: Record<string, any>, m: any) => {
+    const key = m.mentorship_id ?? m.mentorship?.student?.id ?? m.id
+    if (!acc[key]) {
+      acc[key] = {
+        id: key,
+        student: m.mentorship?.student,
+        mentorName: m.mentorship?.telecaller?.full_name,
+        totalAmount: m.mentorship?.total_amount,
+        pendingAmount: 0,
+        latestCreatedAt: m.created_at,
+        payments: [],
+      }
+    }
+    acc[key].pendingAmount += Number(m.amount ?? 0)
+    acc[key].payments.push(m)
+    if (new Date(m.created_at) > new Date(acc[key].latestCreatedAt)) {
+      acc[key].latestCreatedAt = m.created_at
+    }
+    return acc
+  }, {})).sort((a: any, b: any) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime()), [mentorships])
 
   return (
     <div className="space-y-5">
@@ -533,62 +570,99 @@ export default function MentorshipDashboardPage() {
               )}
             </div>
             <div className="divide-y">
-              {mentorships.map((m: any) => {
-                const stu = m.mentorship?.student
-                const mentorName = m.mentorship?.telecaller?.full_name
+              {approvalGroups.map((group: any) => {
+                const stu = group.student
+                const groupIds = group.payments.map((p: any) => p.id)
+                const selectedCount = groupIds.filter((id: string) => selectedIds.has(id)).length
+                const allSelected = selectedCount === groupIds.length
                 return (
-                  <div key={m.id} className={`px-4 py-4 ${selectedIds.has(m.id) ? 'bg-blue-50/40' : ''}`}>
+                  <div key={group.id} className={`px-4 py-4 ${selectedCount > 0 ? 'bg-blue-50/40' : ''}`}>
                     <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
                       <input
                         type="checkbox"
                         className="h-4 w-4 mt-1 rounded border-gray-300 accent-blue-600 cursor-pointer flex-shrink-0"
-                        checked={selectedIds.has(m.id)}
-                        onChange={() => toggleSelect(m.id)}
+                        checked={allSelected}
+                        ref={el => { if (el) el.indeterminate = selectedCount > 0 && selectedCount < groupIds.length }}
+                        onChange={() => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            if (allSelected) groupIds.forEach((id: string) => next.delete(id))
+                            else groupIds.forEach((id: string) => next.add(id))
+                            return next
+                          })
+                        }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-bold text-gray-800">{stu?.full_name ?? '—'}</span>
                           {stu?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</span>}
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 flex items-center gap-0.5">
-                            <IndianRupee className="w-2.5 h-2.5" />{Number(m.amount).toLocaleString('en-IN')} payment
+                            <IndianRupee className="w-2.5 h-2.5" />{Number(group.pendingAmount).toLocaleString('en-IN')} received
                           </span>
-                          {m.note && <span className="text-xs font-semibold text-gray-700">{m.note}</span>}
+                          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {group.payments.length} installment{group.payments.length > 1 ? 's' : ''}
+                          </span>
                         </div>
                         <p className="text-xs text-gray-500">
-                          Mentor: <span className="font-semibold text-gray-700">{mentorName ?? '—'}</span>
-                          {m.mentorship?.total_amount != null && <> · Case total ₹{m.mentorship.total_amount}</>}
-                          <> · {format(new Date(m.created_at), 'dd MMM yyyy')}</>
+                          Mentor: <span className="font-semibold text-gray-700">{group.mentorName ?? '—'}</span>
+                          {group.totalAmount != null && <> · Case total ₹{group.totalAmount}</>}
+                          <> · Latest {format(new Date(group.latestCreatedAt), 'dd MMM yyyy')}</>
                         </p>
-                        {m.screenshot_url ? (
-                          <button
-                            onClick={() => setPreviewImg(m.screenshot_url)}
-                            className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-100"
-                          >
-                            <FileText className="w-3.5 h-3.5" /> View Screenshot / Proof
-                          </button>
-                        ) : (
-                          <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                            <XCircle className="w-3 h-3" /> No screenshot uploaded
-                          </p>
-                        )}
+                        <div className="mt-3 rounded-lg border border-gray-100 overflow-hidden">
+                          {group.payments.map((m: any) => (
+                            <div key={m.id} className="px-3 py-2 bg-gray-50/60 border-b last:border-b-0">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-gray-800">
+                                    {m.note ?? 'Payment'} · ₹{Number(m.amount ?? 0).toLocaleString('en-IN')}
+                                  </p>
+                                  <p className="text-[11px] text-gray-400">{m.paid_on ? format(new Date(m.paid_on), 'dd MMM yyyy') : format(new Date(m.created_at), 'dd MMM yyyy')}</p>
+                                </div>
+                                {m.screenshot_url ? (
+                                  <button
+                                    onClick={() => setPreviewImg(m.screenshot_url)}
+                                    className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-100"
+                                  >
+                                    <FileText className="w-3 h-3" /> Proof
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                    <XCircle className="w-3 h-3" /> No proof
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <div className="flex items-center gap-1 border border-gray-300 rounded px-2 h-7 bg-white">
+                                  <span className="text-gray-400 text-xs font-bold">₹</span>
+                                  <input type="number" min="0" step="1" placeholder="Incentive"
+                                    value={salaryPct[m.id] ?? ''} onChange={e => setSalaryPct(p => ({ ...p, [m.id]: e.target.value }))}
+                                    className="w-28 h-full text-xs focus:outline-none" />
+                                </div>
+                                <input type="text" placeholder="Admin remarks"
+                                  value={adminRemarks[m.id] ?? ''} onChange={e => setAdminRemarks(p => ({ ...p, [m.id]: e.target.value }))}
+                                  className="flex-1 min-w-[160px] h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+                                <Button size="sm" className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700" disabled={approvingId === m.id || bulkBusy} onClick={() => approve(m.id)}>
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-red-600 border-red-200 hover:bg-red-50" disabled={approvingId === m.id || bulkBusy} onClick={() => reject(m.id)}>
+                                  <XCircle className="w-3.5 h-3.5" /> Reject
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
-                          <div className="flex items-center gap-1 border border-gray-300 rounded px-2 h-7">
-                            <span className="text-gray-400 text-xs font-bold">₹</span>
-                            <input type="number" min="0" step="1" placeholder="Incentive to mentor"
-                              value={salaryPct[m.id] ?? ''} onChange={e => setSalaryPct(p => ({ ...p, [m.id]: e.target.value }))}
-                              className="w-36 h-full text-xs focus:outline-none" />
+                          <div className="text-xs text-gray-500">
+                            Selected: <span className="font-semibold text-gray-700">{selectedCount}/{groupIds.length}</span>
                           </div>
-                          <input type="text" placeholder="Admin remarks (optional)"
-                            value={adminRemarks[m.id] ?? ''} onChange={e => setAdminRemarks(p => ({ ...p, [m.id]: e.target.value }))}
-                            className="flex-1 min-w-[160px] h-7 text-xs border border-gray-300 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                         </div>
                       </div>
                       <div className="flex sm:flex-col gap-2 flex-shrink-0">
-                        <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 flex-1" disabled={approvingId === m.id} onClick={() => approve(m.id)}>
-                          {approvingId === m.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve</>}
+                        <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 flex-1" disabled={bulkBusy} onClick={() => approveIds(groupIds)}>
+                          {bulkBusy ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve All</>}
                         </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50 flex-1" disabled={approvingId === m.id} onClick={() => reject(m.id)}>
-                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50 flex-1" disabled={bulkBusy} onClick={() => rejectIds(groupIds)}>
+                          <XCircle className="w-3.5 h-3.5" /> Reject All
                         </Button>
                       </div>
                     </div>

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, GraduationCap, RefreshCw, IndianRupee,
   Users, Search, Award, UserCog, Clock, ClipboardList, Download, FileText, X,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, Trash2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -76,6 +76,7 @@ export default function MentorshipDashboardPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [previewImg, setPreviewImg] = useState<string | null>(null)
   const [expandedApproved, setExpandedApproved] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -248,6 +249,54 @@ export default function MentorshipDashboardPage() {
         basic, hra, allowances, incentive: amount, gross,
         pf, tds, other_deductions: 0, leave_deduction: 0, net, status: 'draft',
       })
+    }
+  }
+
+  // Subtract a previously-credited incentive from the mentor's payroll for the
+  // billing cycle the payment was approved in (used when deleting an installment).
+  async function reversePayrollIncentive(mentorProfileId: string, amount: number, refDate?: string | null) {
+    if (!mentorProfileId || !amount) return
+    const { data: emp } = await (supabase as any).from('employees')
+      .select('id, salary_cycle_start_day').eq('profile_id', mentorProfileId).maybeSingle()
+    if (!emp) return
+    const d = refDate ? new Date(refDate) : new Date()
+    const cycleStartDay = Number(emp.salary_cycle_start_day ?? 1)
+    let m = d.getMonth()
+    let year = d.getFullYear()
+    if (cycleStartDay > 1 && d.getDate() >= cycleStartDay) {
+      m += 1
+      if (m > 11) { m = 0; year += 1 }
+    }
+    const month = m + 1
+    const { data: existing } = await (supabase as any).from('payroll')
+      .select('id, incentive, gross, net').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
+    if (!existing) return
+    const newInc = Math.max((existing.incentive ?? 0) - amount, 0)
+    const removed = (existing.incentive ?? 0) - newInc
+    await (supabase as any).from('payroll').update({
+      incentive: newInc,
+      gross: Math.max((existing.gross ?? 0) - removed, 0),
+      net: Math.max((existing.net ?? 0) - removed, 0),
+    }).eq('id', existing.id)
+  }
+
+  // Delete a single (duplicate / wrong) approved installment and reverse its incentive.
+  async function deleteApprovedPayment(m: any) {
+    if (!window.confirm(`Delete this installment?\n\n${m.note ?? 'Payment'} · ₹${Number(m.amount ?? 0).toLocaleString('en-IN')}\n\nIts incentive will also be removed from the mentor's payroll.`)) return
+    setDeletingId(m.id)
+    try {
+      const inc = Number(m.incentive_amount ?? m.salary_percentage ?? 0)
+      const mentorId = m.mentorship?.telecaller?.id
+      if (mentorId && inc > 0) { try { await reversePayrollIncentive(mentorId, inc, m.approved_at) } catch {} }
+      try { await (supabase as any).from('mentor_incentives').delete().eq('payment_id', m.id) } catch {}
+      const { error } = await (supabase as any).from('mentorship_payments').delete().eq('id', m.id)
+      if (error) throw error
+      toast.success('Installment deleted')
+      await load()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to delete installment')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -860,6 +909,16 @@ export default function MentorshipDashboardPage() {
                                             <FileText className="w-3 h-3" /> Proof
                                           </button>
                                         )}
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); deleteApprovedPayment(m) }}
+                                          disabled={deletingId === m.id}
+                                          title="Delete this installment"
+                                          className="inline-flex items-center gap-1.5 bg-white border border-red-200 text-red-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                                        >
+                                          {deletingId === m.id
+                                            ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                                            : <Trash2 className="w-3 h-3" />} Delete
+                                        </button>
                                       </div>
                                     </div>
                                   ))}

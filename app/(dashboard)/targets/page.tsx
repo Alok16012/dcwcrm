@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
-import { loadRevenueTargets } from '@/lib/revenue-target-store'
 import TargetsClient from './client'
 
 export const dynamic = 'force-dynamic'
@@ -37,14 +36,19 @@ export default async function TargetsPage() {
     { auth: { persistSession: false } }
   )
 
-  const [counselorRes, storedTargets, paymentRes, leadRes] = await Promise.all([
+  const [counselorRes, targetRes, paymentRes, leadRes] = await Promise.all([
     dataClient
       .from('profiles')
       .select('id, full_name, role')
       .in('role', ['lead', 'counselor'])
       .eq('is_active', true)
       .order('full_name'),
-    loadRevenueTargets(),
+    dataClient
+      .from('revenue_targets')
+      .select('*, assignee:profiles!revenue_targets_assignee_id_fkey(id, full_name, role)')
+      .gte('end_date', fetchStart)
+      .lte('start_date', fetchEnd)
+      .order('created_at', { ascending: false }),
     dataClient
       .from('payments')
       .select(`
@@ -65,11 +69,8 @@ export default async function TargetsPage() {
   const counselors = profile.role === 'admin'
     ? ((counselorRes.data ?? []) as any[])
     : [{ id: profile.id, full_name: profile.full_name, role: profile.role }]
-  const counselorById = new Map(counselors.map(c => [c.id, c]))
-  const targets = storedTargets
-    .filter(target => target.end_date >= fetchStart && target.start_date <= fetchEnd)
+  const targets = ((targetRes.data ?? []) as any[])
     .filter(target => profile.role === 'admin' || target.assignee_id === profile.id)
-    .map(target => ({ ...target, assignee: counselorById.get(target.assignee_id) ?? null }))
   const paymentRows = ((paymentRes.data ?? []) as any[]).filter(payment => {
     if (profile.role === 'admin') return true
     const student = one<{ assigned_counsellor: string | null }>(payment.student)
@@ -84,6 +85,7 @@ export default async function TargetsPage() {
       role={profile.role}
       counselors={counselors}
       initialTargets={targets as any[]}
+      targetSetupError={targetRes.error?.message ?? null}
       payments={paymentRows}
       leads={leadRows}
       defaultStart={defaultStart}

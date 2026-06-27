@@ -73,6 +73,7 @@ interface Props {
   role: Role
   counselors: Profile[]
   initialTargets: RevenueTarget[]
+  targetSetupError?: string | null
   payments: PaymentRow[]
   leads: LeadRow[]
   defaultStart: string
@@ -153,6 +154,7 @@ export default function TargetsClient({
   role,
   counselors,
   initialTargets,
+  targetSetupError = null,
   payments,
   leads,
   defaultStart,
@@ -341,6 +343,13 @@ export default function TargetsClient({
           </Button>
         </div>
       </div>
+
+      {targetSetupError && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-bold">Revenue target table setup pending</p>
+          <p className="mt-0.5">Supabase me `088_revenue_targets.sql` migration run karna hai. Error: {targetSetupError}</p>
+        </div>
+      )}
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">

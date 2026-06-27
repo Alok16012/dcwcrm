@@ -2,8 +2,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Home, Users, GraduationCap, Award, Wallet, Truck, Gift,
-  IndianRupee, ClockIcon, MoreHorizontal,
+  Home, Users, GraduationCap, Award, Wallet, Truck,
+  ClockIcon, MoreHorizontal, TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -16,7 +16,7 @@ const NAV: Record<string, Item[]> = {
     { label: 'Home',       href: '/dashboard',  icon: Home },
     { label: 'Leads',      href: '/leads',      icon: Users },
     { label: 'Students',   href: '/backend',    icon: GraduationCap },
-    { label: 'Mentorship', href: '/mentorship-approvals', icon: Award },
+    { label: 'Targets',    href: '/targets',    icon: TrendingUp },
   ],
   backend: [
     { label: 'Home',     href: '/dashboard', icon: Home },
@@ -27,14 +27,14 @@ const NAV: Record<string, Item[]> = {
   lead: [
     { label: 'Home',       href: '/dashboard',  icon: Home },
     { label: 'Leads',      href: '/leads',      icon: Users },
+    { label: 'Targets',    href: '/targets',    icon: TrendingUp },
     { label: 'Mentorship', href: '/mentorship', icon: Award },
-    { label: 'Incentive',  href: '/incentive',  icon: IndianRupee },
   ],
   counselor: [
     { label: 'Home',       href: '/dashboard',  icon: Home },
     { label: 'Leads',      href: '/leads',      icon: Users },
+    { label: 'Targets',    href: '/targets',    icon: TrendingUp },
     { label: 'Mentorship', href: '/mentorship', icon: Award },
-    { label: 'Incentive',  href: '/incentive',  icon: IndianRupee },
   ],
   associate: [
     { label: 'Home',     href: '/associate',            icon: Home },

@@ -239,6 +239,10 @@ export default function TargetsClient({
   const totalAchievement = pct(totals.revenue, totals.target)
   const topRow = rows[0]
   const myRow = rows.find(r => r.counselor.id === currentUserId) ?? rows[0]
+  const selectedAssigneeName = counselors.find(c => c.id === form.assignee_id)?.full_name ?? 'Select counselor'
+  const counselorFilterName = counselorFilter === 'all'
+    ? 'All Counselors'
+    : counselors.find(c => c.id === counselorFilter)?.full_name ?? 'Counselor'
   const recentPayments = payments
     .filter(p => {
       const counselorId = getPaymentCounselorId(p)
@@ -360,7 +364,7 @@ export default function TargetsClient({
           {isAdmin && (
             <Select value={counselorFilter} onValueChange={setCounselorFilter}>
               <SelectTrigger className="min-w-[190px]">
-                <SelectValue placeholder="Counselor" />
+                <SelectValue placeholder="Counselor">{counselorFilterName}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Counselors</SelectItem>
@@ -377,7 +381,7 @@ export default function TargetsClient({
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Select value={form.assignee_id} onValueChange={v => setForm(f => ({ ...f, assignee_id: v }))}>
-              <SelectTrigger><SelectValue placeholder="Counselor" /></SelectTrigger>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Counselor">{selectedAssigneeName}</SelectValue></SelectTrigger>
               <SelectContent>
                 {counselors.map(c => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}
               </SelectContent>

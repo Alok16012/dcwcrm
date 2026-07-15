@@ -21,6 +21,14 @@ function normalizePhone(raw?: string): string | null {
     return digits.length >= 11 ? digits : null
 }
 
+function slugify(s: string): string {
+    return s
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+}
+
 export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButtonProps) {
     const [loading, setLoading] = useState(false)
     const supabase = createClient()
@@ -51,14 +59,22 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
                 <InvoicePDF student={student} payments={payments} logoBase64={logoBase64} />
             ).toBlob()
 
-            const safeName = student.full_name.replace(/\s+/g, '_')
-            const fileName = `Invoice_${safeName}.pdf`
-            const file = new File([blob], fileName, { type: 'application/pdf' })
-
             const course = student.course?.name
             const standard = student.sub_course?.name
             const board = student.sub_section?.name
             const session = student.session?.name
+
+            // Branded, readable slug: dcw-{name}-{course}-{session}-{unique}
+            const idSuffix = student.id.replace(/-/g, '').slice(0, 6)
+            const slug = `${slugify(['dcw', student.full_name, course, session].filter(Boolean).join(' '))}-${idSuffix}`
+
+            const { error: upErr } = await supabase.storage
+                .from('student-documents')
+                .upload(`invoices/${slug}.pdf`, blob, { upsert: true, contentType: 'application/pdf' })
+            if (upErr) throw upErr
+
+            const invoiceUrl = `${window.location.origin}/i/${slug}`
+
             const courseText = [course, standard].filter(Boolean).join(' - ')
             const courseLine = [courseText, board, session].filter(Boolean).join(', ') || 'your course'
 
@@ -66,35 +82,13 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
                 `Dear ${student.full_name},\n\n` +
                 `Thank you for taking admission in ${courseLine} at Distance Courses Wala. ` +
                 `We truly appreciate your trust in us.\n\n` +
-                `Please find your invoice attached.\n\n` +
+                `Your invoice: ${invoiceUrl}\n\n` +
                 `- Team Distance Courses Wala`
-
-            // Preferred path: share the actual PDF file via the native share sheet
-            // (user picks WhatsApp and the contact; the PDF goes as an attachment).
-            const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean }
-            if (nav.canShare && nav.canShare({ files: [file] })) {
-                await nav.share({ files: [file], text: message, title: fileName })
-                toast.success('Share menu khula — WhatsApp aur student chunein')
-                return
-            }
-
-            // Fallback (desktop browsers without file sharing): download the PDF and
-            // open the student's WhatsApp chat with the message. Attach the file manually.
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = fileName
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            URL.revokeObjectURL(url)
 
             const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
             window.open(waUrl, '_blank', 'noopener,noreferrer')
-            toast.success('Invoice download ho gaya — WhatsApp me attach karein')
+            toast.success('WhatsApp khul gaya — Send dabana baaki hai')
         } catch (err) {
-            const name = (err as { name?: string })?.name
-            if (name === 'AbortError') return // user cancelled the share sheet
             toast.error('Invoice bhejne me dikkat aayi')
             console.error(err)
         } finally {

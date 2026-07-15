@@ -70,10 +70,10 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
                 : 'apne course'
 
             const message =
-                `Namaste ${student.full_name}! 🙏\n\n` +
-                `Distance Courses Wala me ${courseLine} me admission lene ke liye dhanyawaad. ` +
-                `Aapke bharose ke liye shukriya!\n\n` +
-                `Aapka invoice yaha se download karein:\n${invoiceUrl}\n\n` +
+                `Dear ${student.full_name}, 🙏\n\n` +
+                `Thank you for taking admission in ${courseLine} at Distance Courses Wala. ` +
+                `We truly appreciate your trust in us!\n\n` +
+                `You can download your invoice here:\n${invoiceUrl}\n\n` +
                 `- Team Distance Courses Wala`
 
             const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`

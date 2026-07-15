@@ -65,15 +65,16 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
 
             const course = student.course?.name
             const standard = student.sub_course?.name
-            const courseLine = course
-                ? standard ? `${course} (${standard})` : course
-                : 'apne course'
+            const board = student.sub_section?.name
+            const session = student.session?.name
+            const courseText = [course, standard].filter(Boolean).join(' - ')
+            const courseLine = [courseText, board, session].filter(Boolean).join(', ') || 'your course'
 
             const message =
-                `Dear ${student.full_name}, 🙏\n\n` +
-                `Thank you for taking admission in ${courseLine} at Distance Courses Wala. ` +
-                `We truly appreciate your trust in us!\n\n` +
-                `You can download your invoice here:\n${invoiceUrl}\n\n` +
+                `Dear ${student.full_name},\n\n` +
+                `🎓 Thank you for taking admission in ${courseLine} at Distance Courses Wala. ` +
+                `We truly appreciate your trust in us! 🙏\n\n` +
+                `📄 You can download your invoice here:\n${invoiceUrl}\n\n` +
                 `- Team Distance Courses Wala`
 
             const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`

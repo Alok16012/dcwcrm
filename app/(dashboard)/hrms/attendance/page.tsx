@@ -22,11 +22,11 @@ function getCycleDates(year: number, month: number, cycleStartDay: number) {
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: { month?: string; year?: string }
+  searchParams: Promise<{ month?: string; year?: string }>
 }) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
@@ -37,9 +37,10 @@ export default async function AttendancePage({
 
   if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
 
+  const sp = await searchParams
   const now = new Date()
-  const month = Number(searchParams.month ?? getMonth(now) + 1)
-  const year = Number(searchParams.year ?? getYear(now))
+  const month = Number(sp.month ?? getMonth(now) + 1)
+  const year = Number(sp.year ?? getYear(now))
 
   // Fetch employees with cycle info
   const { data: employees } = await supabase

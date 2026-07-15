@@ -27,6 +27,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Textarea } from '@/components/ui/textarea'
 import { StudentForm } from '@/components/backend/StudentForm'
 import { PrintInvoiceButton } from '@/components/backend/PrintInvoiceButton'
+import { SendInvoiceWhatsAppButton } from '@/components/backend/SendInvoiceWhatsAppButton'
 import { toast } from 'sonner'
 import { formatCurrency, type Student } from '@/types/app.types'
 
@@ -505,6 +506,9 @@ export function BackendListClient() {
             </DropdownMenuItem>
             <div onClick={(e) => e.stopPropagation()}>
               <PrintInvoiceButton student={row.original} />
+            </div>
+            <div onClick={(e) => e.stopPropagation()}>
+              <SendInvoiceWhatsAppButton student={row.original} />
             </div>
             <DropdownMenuItem
               className="text-red-500 focus:text-red-600 focus:bg-red-50"

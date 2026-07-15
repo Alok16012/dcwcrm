@@ -437,6 +437,14 @@ export function BackendListClient() {
       }
     },
     {
+      id: 'sub_course', accessorFn: (row) => row.sub_course?.name ?? '', header: 'Standard',
+      cell: ({ row }) => {
+        const sc = row.original.sub_course?.name
+        if (!sc) return <span className="text-gray-400 text-xs">-</span>
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200">{sc}</span>
+      }
+    },
+    {
       id: 'counsellor', accessorFn: (row) => row.counsellor?.full_name ?? '', header: 'Counsellor',
       cell: ({ row }) => {
         const name = row.original.counsellor?.full_name

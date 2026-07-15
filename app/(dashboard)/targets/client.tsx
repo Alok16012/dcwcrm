@@ -68,6 +68,14 @@ interface LeadRow {
   converted_at: string | null
 }
 
+interface MentorshipPaymentRow {
+  id: string
+  amount: number
+  payment_date: string
+  counselor_id: string | null
+  student_name: string | null
+}
+
 interface Props {
   currentUserId: string
   role: Role
@@ -75,6 +83,7 @@ interface Props {
   initialTargets: RevenueTarget[]
   targetSetupError?: string | null
   payments: PaymentRow[]
+  mentorshipPayments: MentorshipPaymentRow[]
   leads: LeadRow[]
   defaultStart: string
   defaultEnd: string
@@ -156,6 +165,7 @@ export default function TargetsClient({
   initialTargets,
   targetSetupError = null,
   payments,
+  mentorshipPayments,
   leads,
   defaultStart,
   defaultEnd,
@@ -203,9 +213,13 @@ export default function TargetsClient({
     const targetAmount = myTargets.reduce((s, t) => s + Number(t.target_amount ?? 0), 0)
     const leadTarget = myTargets.reduce((s, t) => s + Number(t.lead_target ?? 0), 0)
     const conversionTarget = myTargets.reduce((s, t) => s + Number(t.conversion_target ?? 0), 0)
-    const achievedRevenue = payments
+    const feeRevenue = payments
       .filter(p => getPaymentCounselorId(p) === counselor.id && inRange(p.payment_date, startDate, endDate))
       .reduce((s, p) => s + Number(p.amount ?? 0), 0)
+    const mentorshipRevenue = mentorshipPayments
+      .filter(p => p.counselor_id === counselor.id && inRange(p.payment_date, startDate, endDate))
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0)
+    const achievedRevenue = feeRevenue + mentorshipRevenue
     const leadCount = leads.filter(l => l.assigned_to === counselor.id && inRange(l.assigned_at || l.created_at, startDate, endDate)).length
     const conversionCount = leads.filter(l => l.assigned_to === counselor.id && l.status === 'converted' && inRange(l.converted_at, startDate, endDate)).length
     const achievement = pct(achievedRevenue, targetAmount)
@@ -225,7 +239,7 @@ export default function TargetsClient({
       bonus: extraRevenue * (bonusRate / 100),
       level: getLevel(achievement),
     }
-  }).sort((a, b) => b.achievement - a.achievement || b.achievedRevenue - a.achievedRevenue), [visibleCounselors, activeTargets, payments, leads, startDate, endDate])
+  }).sort((a, b) => b.achievement - a.achievement || b.achievedRevenue - a.achievedRevenue), [visibleCounselors, activeTargets, payments, mentorshipPayments, leads, startDate, endDate])
 
   const totals = rows.reduce((acc, row) => {
     acc.target += row.targetAmount
@@ -243,12 +257,24 @@ export default function TargetsClient({
   const counselorFilterName = counselorFilter === 'all'
     ? 'All Counselors'
     : counselors.find(c => c.id === counselorFilter)?.full_name ?? 'Counselor'
-  const recentPayments = payments
+  const feeEntries = payments
     .filter(p => {
       const counselorId = getPaymentCounselorId(p)
       const allowed = isAdmin ? (counselorFilter === 'all' || counselorId === counselorFilter) : counselorId === currentUserId
       return allowed && inRange(p.payment_date, startDate, endDate)
     })
+    .map(p => {
+      const lead = one(p.lead)
+      const student = one(p.student)
+      return { id: p.id, name: student?.full_name || lead?.full_name || 'Manual Income', payment_date: p.payment_date, amount: Number(p.amount ?? 0), kind: 'fee' as const }
+    })
+  const mentorshipEntries = mentorshipPayments
+    .filter(p => {
+      const allowed = isAdmin ? (counselorFilter === 'all' || p.counselor_id === counselorFilter) : p.counselor_id === currentUserId
+      return allowed && inRange(p.payment_date, startDate, endDate)
+    })
+    .map(p => ({ id: p.id, name: p.student_name || 'Mentorship', payment_date: p.payment_date, amount: Number(p.amount ?? 0), kind: 'mentorship' as const }))
+  const recentPayments = [...feeEntries, ...mentorshipEntries]
     .sort((a, b) => b.payment_date.localeCompare(a.payment_date))
     .slice(0, 8)
 
@@ -610,19 +636,18 @@ export default function TargetsClient({
           <div className="divide-y">
             {recentPayments.length === 0 ? (
               <div className="py-10 text-center text-sm text-gray-400">No revenue in selected range</div>
-            ) : recentPayments.map(payment => {
-              const lead = one(payment.lead)
-              const student = one(payment.student)
-              return (
-                <div key={payment.id} className="flex items-center justify-between gap-3 px-4 py-3">
+            ) : recentPayments.map(payment => (
+                <div key={`${payment.kind}-${payment.id}`} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-gray-900">{student?.full_name || lead?.full_name || 'Manual Income'}</p>
-                    <p className="text-xs text-gray-400">{format(parseISO(payment.payment_date), 'dd MMM yyyy')}</p>
+                    <p className="truncate text-sm font-bold text-gray-900">{payment.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {format(parseISO(payment.payment_date), 'dd MMM yyyy')}
+                      {payment.kind === 'mentorship' && <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Mentorship</span>}
+                    </p>
                   </div>
-                  <p className="font-extrabold text-emerald-700">{fmt(Number(payment.amount ?? 0))}</p>
+                  <p className="font-extrabold text-emerald-700">{fmt(payment.amount)}</p>
                 </div>
-              )
-            })}
+              ))}
           </div>
         </div>
       </div>

@@ -93,8 +93,25 @@ export async function POST(req: NextRequest) {
             .lte('date', endDate.toISOString().split('T')[0])
 
         const attendanceRows = (attendance ?? []) as AttendanceRow[]
-        const absentCount = attendanceRows.filter(a => a.status === 'absent' || a.status === 'leave').length
-        const leaveDeduction = Math.round((basic / 26) * absentCount)
+        const attCounts = attendanceRows.reduce(
+            (acc, a) => {
+                const s = a.status ?? ''
+                if (s === 'present') acc.present++
+                else if (s === 'late') acc.late++
+                else if (s === 'absent') acc.absent++
+                else if (s === 'half_day') acc.half_day++
+                else if (s === 'leave') acc.leave++
+                else if (s === 'holiday') acc.holiday++
+                return acc
+            },
+            { present: 0, late: 0, absent: 0, half_day: 0, leave: 0, holiday: 0 }
+        )
+        // Loss-of-pay days: absent = full day, leave = full day, half-day = 0.5 day.
+        // present / late / holiday are fully paid.
+        const lopDays = attCounts.absent + attCounts.leave + attCounts.half_day * 0.5
+        // Per-day rate = full monthly salary (basic + HRA + allowances) over 26 working days.
+        const perDayRate = (basic + hra + allow) / 26
+        const leaveDeduction = Math.round(perDayRate * lopDays)
 
         // Fetch incentives for this range
         const { data: studentIncentives } = await supabase
@@ -156,7 +173,7 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: updateErr.message }, { status: 400 })
             }
 
-            return NextResponse.json({ payroll: updated })
+            return NextResponse.json({ payroll: updated, attendance: attCounts })
         }
 
         const { data: inserted, error: insertErr } = await supabase
@@ -187,7 +204,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: insertErr.message }, { status: 400 })
         }
 
-        return NextResponse.json({ payroll: inserted })
+        return NextResponse.json({ payroll: inserted, attendance: attCounts })
     } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getMonth, getYear } from 'date-fns'
+import { format, getMonth, getYear } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import PayrollTable from '@/components/hrms/PayrollTable'
 import PayrollMonthSelector from '@/components/hrms/PayrollMonthSelector'
@@ -43,12 +43,39 @@ export default async function PayrollPage({
   // Fetch employee names + details
   const empIds = (payrollData ?? []).map((p) => p.employee_id)
   const { data: empsRaw } = empIds.length > 0
-    ? await supabase.from('employees').select('id, profile_id, employee_code, designation, department, bank_account').in('id', empIds)
+    ? await supabase.from('employees').select('id, profile_id, employee_code, designation, department, bank_account, salary_cycle_start_day').in('id', empIds)
     : { data: [] }
 
-  type EmpRaw = { id: string; profile_id: string; employee_code: string | null; designation: string | null; department: string | null; bank_account: string | null }
+  type EmpRaw = { id: string; profile_id: string; employee_code: string | null; designation: string | null; department: string | null; bank_account: string | null; salary_cycle_start_day: number | null }
   const emps = (empsRaw ?? []) as EmpRaw[]
   const empMap = Object.fromEntries(emps.map((e) => [e.id, e]))
+
+  // Attendance breakdown per employee for the selected cycle
+  type AttCounts = { present: number; late: number; absent: number; half_day: number; leave: number; holiday: number }
+  const attSummary: Record<string, AttCounts> = {}
+  if (empIds.length > 0) {
+    const cycleFor = (day: number) => day === 1
+      ? { start: new Date(year, month - 1, 1), end: new Date(year, month, 0) }
+      : { start: new Date(year, month - 2, day), end: new Date(year, month - 1, day - 1) }
+    const cycles = emps.map((e) => ({ id: e.id, ...cycleFor(e.salary_cycle_start_day ?? 1) }))
+    const rangeStart = new Date(Math.min(...cycles.map((c) => c.start.getTime())))
+    const rangeEnd = new Date(Math.max(...cycles.map((c) => c.end.getTime())))
+    const fmtDate = (d: Date) => format(d, 'yyyy-MM-dd')
+    const { data: attRaw } = await supabase
+      .from('attendance')
+      .select('employee_id, date, status')
+      .in('employee_id', empIds)
+      .gte('date', fmtDate(rangeStart))
+      .lte('date', fmtDate(rangeEnd))
+    const cycleMap = Object.fromEntries(cycles.map((c) => [c.id, { start: fmtDate(c.start), end: fmtDate(c.end) }]))
+    for (const a of (attRaw ?? []) as { employee_id: string; date: string; status: string }[]) {
+      const cyc = cycleMap[a.employee_id]
+      if (!cyc || a.date < cyc.start || a.date > cyc.end) continue
+      if (!attSummary[a.employee_id]) attSummary[a.employee_id] = { present: 0, late: 0, absent: 0, half_day: 0, leave: 0, holiday: 0 }
+      const s = a.status as keyof AttCounts
+      if (s in attSummary[a.employee_id]) attSummary[a.employee_id][s]++
+    }
+  }
 
   const profileIds = emps.map((e) => e.profile_id).filter(Boolean)
   const { data: profsRaw } = profileIds.length > 0
@@ -80,6 +107,7 @@ export default async function PayrollPage({
       net: p.net,
       status: p.status as 'draft' | 'processed' | 'paid',
       payment_date: p.payment_date,
+      attendance: attSummary[p.employee_id],
     }
   })
 

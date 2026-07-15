@@ -270,7 +270,7 @@ export function SalarySlipPDF({
               {[
                 { label: 'PF Deduction', value: pf },
                 { label: 'TDS', value: tds },
-                { label: 'Leave Deduction', value: leaveDeduction },
+                { label: 'Loss of Pay', value: leaveDeduction },
                 { label: 'Other Deductions', value: otherDeductions },
               ].map((item, i) => (
                 <View key={i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>

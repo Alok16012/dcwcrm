@@ -34,6 +34,7 @@ interface PayrollRow {
   net: number
   status: 'draft' | 'processed' | 'paid'
   payment_date: string | null
+  attendance?: { present: number; late: number; absent: number; half_day: number; leave: number; holiday: number }
 }
 
 interface PayrollTableProps {
@@ -185,13 +186,14 @@ export default function PayrollTable({
           const err = await res.json()
           throw new Error(err.error || 'Failed to generate payroll')
         }
-        const { payroll } = await res.json()
-        setData((prev) => [{ 
-          ...payroll, 
+        const { payroll, attendance } = await res.json()
+        setData((prev) => [{
+          ...payroll,
           employee_name: employeeName,
           employee_code: employeeCode,
           designation: designation,
-          department: department
+          department: department,
+          attendance,
         }, ...prev])
         toast.success(`Payroll generated for ${format(new Date(year, month - 1), 'MMM yyyy')}`)
         setShowGenerate(false)
@@ -237,9 +239,10 @@ export default function PayrollTable({
               <th className="px-3 py-2 text-right">Allow.</th>
               <th className="px-3 py-2 text-right">Incentive</th>
               <th className="px-3 py-2 text-right font-semibold">Gross</th>
+              <th className="px-3 py-2 text-center">Attendance</th>
               <th className="px-3 py-2 text-right">PF</th>
               <th className="px-3 py-2 text-right">TDS</th>
-              <th className="px-3 py-2 text-right">Leave Ded.</th>
+              <th className="px-3 py-2 text-right">LOP Ded.</th>
               <th className="px-3 py-2 text-right font-semibold">Net</th>
               <th className="px-3 py-2 text-center">Status</th>
               <th className="px-3 py-2 text-center">Slip</th>
@@ -296,6 +299,18 @@ export default function PayrollTable({
                   )}
                 </td>
                 <td className="px-3 py-2 text-right font-semibold text-xs">{fmt(row.gross)}</td>
+                <td className="px-3 py-2">
+                  {row.attendance ? (
+                    <div className="flex flex-wrap justify-center gap-1">
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-800" title="Present (incl. late)">P {row.attendance.present + row.attendance.late}</span>
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-800" title="Absent">A {row.attendance.absent}</span>
+                      <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800" title="Half day">H {row.attendance.half_day}</span>
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800" title="Leave (deducted)">LV {row.attendance.leave}</span>
+                    </div>
+                  ) : (
+                    <span className="block text-center text-xs text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.pf)}</td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.tds)}</td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.leave_deduction)}</td>

@@ -36,7 +36,7 @@ export default async function TargetsPage() {
     { auth: { persistSession: false } }
   )
 
-  const [counselorRes, targetRes, paymentRes, leadRes] = await Promise.all([
+  const [counselorRes, targetRes, paymentRes, leadRes, mentorshipRes] = await Promise.all([
     dataClient
       .from('profiles')
       .select('id, full_name, role')
@@ -64,6 +64,14 @@ export default async function TargetsPage() {
       .select('id, full_name, assigned_to, status, created_at, assigned_at, converted_at')
       .gte('created_at', fetchStart)
       .lte('created_at', fetchEnd),
+    dataClient
+      .from('mentorship_payments')
+      .select(`
+        id, amount, paid_on, created_at,
+        mentorship:student_mentorships!mentorship_payments_mentorship_id_fkey(telecaller_id, student:students(full_name))
+      `)
+      .eq('status', 'approved')
+      .order('paid_on', { ascending: false }),
   ])
 
   const counselors = profile.role === 'admin'
@@ -78,6 +86,19 @@ export default async function TargetsPage() {
     return (student?.assigned_counsellor || lead?.assigned_to) === profile.id
   })
   const leadRows = ((leadRes.data ?? []) as any[]).filter(lead => profile.role === 'admin' || lead.assigned_to === profile.id)
+  const mentorshipRows = ((mentorshipRes.data ?? []) as any[])
+    .map(row => {
+      const mentorship = one<{ telecaller_id: string | null; student: any }>(row.mentorship)
+      const student = one<{ full_name: string | null }>(mentorship?.student)
+      return {
+        id: row.id as string,
+        amount: Number(row.amount ?? 0),
+        payment_date: (row.paid_on || row.created_at) as string,
+        counselor_id: mentorship?.telecaller_id ?? null,
+        student_name: student?.full_name ?? null,
+      }
+    })
+    .filter(row => row.counselor_id && (profile.role === 'admin' || row.counselor_id === profile.id))
 
   return (
     <TargetsClient
@@ -87,6 +108,7 @@ export default async function TargetsPage() {
       initialTargets={targets as any[]}
       targetSetupError={targetRes.error?.message ?? null}
       payments={paymentRows}
+      mentorshipPayments={mentorshipRows}
       leads={leadRows}
       defaultStart={defaultStart}
       defaultEnd={defaultEnd}

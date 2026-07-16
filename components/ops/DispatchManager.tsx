@@ -10,7 +10,7 @@ import {
 import { toast } from 'sonner'
 import {
   Truck, Search, RefreshCw, ChevronDown, Pencil, Trash2,
-  Package, X, ArrowDownToLine, Send, ChevronRight, Plus, Printer,
+  Package, X, ArrowDownToLine, Send, ChevronRight, Plus, Printer, MessageCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -38,7 +38,9 @@ const LEGACY_DOC_LABELS: Record<string, string> = {
 const docLabelOf = (v: string) =>
   DOCUMENT_TYPES.find(t => t.value === v)?.label ?? LEGACY_DOC_LABELS[v] ?? v
 
-const newDocRow = () => ({ document_type: 'migration', status: 'pending', remarks: '' })
+const newDocRow = (): DocRow => ({ document_type: 'migration', status: 'pending', remarks: '' })
+
+const RECEIVER_RELATIONS = ['Father', 'Mother', 'Brother', 'Sister', 'Uncle', 'Aunt', 'Guardian', 'Friend', 'Other']
 
 const COURIERS = ['Speed Post', 'DTDC', 'Blue Dart', 'Delhivery', 'India Post', 'Ekart', 'Xpressbees', 'Other']
 
@@ -95,7 +97,33 @@ interface Dispatch {
   expected_delivery: string | null
   status: string
   remarks: string | null
+  received_by: string | null
+  receiver_name: string | null
+  receiver_relation: string | null
+  receiver_phone: string | null
   created_at: string
+}
+
+interface DocRow { id?: string; document_type: string; status: string; remarks: string }
+
+// One dispatch entry can span several rows (one per document); group them so a
+// student's marksheet + migration etc. show as a single record.
+const groupKeyOf = (d: Dispatch) => [
+  d.dispatch_type, d.student_name.trim().toLowerCase(), d.enrollment_number ?? '',
+  d.dispatch_date ?? '', d.tracking_number ?? '', d.courier ?? '',
+].join('|')
+
+interface DispatchGroup { key: string; head: Dispatch; rows: Dispatch[] }
+
+function groupDispatches(list: Dispatch[]): DispatchGroup[] {
+  const map = new Map<string, DispatchGroup>()
+  for (const d of list) {
+    const key = groupKeyOf(d)
+    const g = map.get(key)
+    if (g) g.rows.push(d)
+    else map.set(key, { key, head: d, rows: [d] })
+  }
+  return Array.from(map.values())
 }
 
 const EMPTY_FORM = {
@@ -110,7 +138,11 @@ const EMPTY_FORM = {
   tracking_number: '',
   dispatch_date: '',
   expected_delivery: '',
-  documents: [newDocRow()] as { document_type: string; status: string; remarks: string }[],
+  received_by: '',       // '' (courier) | 'self' | 'guardian'
+  receiver_name: '',
+  receiver_relation: '',
+  receiver_phone: '',
+  documents: [newDocRow()] as DocRow[],
 }
 
 // ── Student Search Combobox ───────────────────────────────────────────────────
@@ -225,6 +257,7 @@ export function DispatchManager() {
   const [filterAssociate, setFilterAssociate] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editItem, setEditItem] = useState<Dispatch | null>(null)
+  const [editRows, setEditRows] = useState<Dispatch[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [manualEntry, setManualEntry] = useState(false)
   const [showOptional, setShowOptional] = useState(false)
@@ -268,14 +301,17 @@ export function DispatchManager() {
 
   function openAdd(type: 'inbound' | 'outbound') {
     setEditItem(null)
+    setEditRows([])
     setForm({ ...EMPTY_FORM, dispatch_type: type })
     setManualEntry(false)
     setShowOptional(false)
     setFormOpen(true)
   }
 
-  function openEdit(d: Dispatch) {
+  function openEdit(g: DispatchGroup) {
+    const d = g.head
     setEditItem(d)
+    setEditRows(g.rows)
     setForm({
       dispatch_type: d.dispatch_type,
       student_id: '',
@@ -288,9 +324,13 @@ export function DispatchManager() {
       tracking_number: d.tracking_number ?? '',
       dispatch_date: d.dispatch_date ?? '',
       expected_delivery: d.expected_delivery ?? '',
-      documents: [{ document_type: d.document_type, status: d.status, remarks: d.remarks ?? '' }],
+      received_by: d.received_by ?? '',
+      receiver_name: d.receiver_name ?? '',
+      receiver_relation: d.receiver_relation ?? '',
+      receiver_phone: d.receiver_phone ?? '',
+      documents: g.rows.map(r => ({ id: r.id, document_type: r.document_type, status: r.status, remarks: r.remarks ?? '' })),
     })
-    setShowOptional(!!(d.courier || d.tracking_number || d.expected_delivery || d.remarks))
+    setShowOptional(!!(d.courier || d.tracking_number || d.expected_delivery))
     setFormOpen(true)
   }
 
@@ -316,9 +356,14 @@ export function DispatchManager() {
     if (!form.father_name.trim()) { toast.error("Father's name is required"); return }
     const docs = form.documents.filter(d => d.document_type)
     if (docs.length === 0) { toast.error('Add at least one document'); return }
+    if (form.received_by === 'guardian' && (!form.receiver_name.trim() || !form.receiver_relation)) {
+      toast.error('Receiver name and relation are required for guardian/relative')
+      return
+    }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     // Fields shared across every document row in this entry
+    const isPickup = form.received_by === 'self' || form.received_by === 'guardian'
     const base = {
       dispatch_type: form.dispatch_type,
       student_name: form.student_name.trim(),
@@ -330,62 +375,110 @@ export function DispatchManager() {
       tracking_number: form.tracking_number.trim() || null,
       dispatch_date: form.dispatch_date || null,
       expected_delivery: form.expected_delivery || null,
+      received_by: form.received_by || null,
+      receiver_name: isPickup ? form.receiver_name.trim() || null : null,
+      receiver_relation: form.received_by === 'guardian' ? form.receiver_relation || null : null,
+      receiver_phone: isPickup ? form.receiver_phone.trim() || null : null,
       dispatched_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     }
-    // If the DB hasn't got the father_name column yet, drop it and retry once
-    // so saving still works before migration 086 is applied.
-    const stripFather = (obj: any) => { const { father_name, ...rest } = obj; return rest }
-    const isFatherColErr = (e: any) => /father_name/.test(e?.message ?? '') && /column|schema/.test(e?.message ?? '')
+    // If the DB hasn't got the newer columns yet, drop them and retry once so
+    // saving still works before the migration is applied.
+    const stripNewCols = (obj: any) => {
+      const { father_name, received_by, receiver_name, receiver_relation, receiver_phone, ...rest } = obj
+      return rest
+    }
+    const isMissingColErr = (e: any) => /father_name|received_by|receiver_/.test(e?.message ?? '') && /column|schema/.test(e?.message ?? '')
     try {
       if (editItem) {
-        const d0 = docs[0]
-        const row = { ...base, document_type: d0.document_type, status: d0.status, remarks: d0.remarks.trim() || null }
-        let { error } = await db.from('student_dispatches').update(row).eq('id', editItem.id)
-        if (error && isFatherColErr(error)) ({ error } = await db.from('student_dispatches').update(stripFather(row)).eq('id', editItem.id))
-        if (error) { toast.error(error.message); return }
+        // Grouped edit: update kept docs, insert new ones, delete removed ones.
+        const keptIds = docs.filter(d => d.id).map(d => d.id as string)
+        const removedIds = editRows.map(r => r.id).filter(id => !keptIds.includes(id))
+        for (const d of docs) {
+          const row = { ...base, document_type: d.document_type, status: d.status, remarks: d.remarks.trim() || null }
+          let { error } = d.id
+            ? await db.from('student_dispatches').update(row).eq('id', d.id)
+            : await db.from('student_dispatches').insert(row)
+          if (error && isMissingColErr(error)) {
+            ({ error } = d.id
+              ? await db.from('student_dispatches').update(stripNewCols(row)).eq('id', d.id)
+              : await db.from('student_dispatches').insert(stripNewCols(row)))
+          }
+          if (error) { toast.error(error.message); return }
+        }
+        if (removedIds.length) {
+          const { error } = await db.from('student_dispatches').delete().in('id', removedIds)
+          if (error) { toast.error(error.message); return }
+        }
         toast.success('Updated')
       } else {
         // one row per document, all sharing the same student / courier / date
         const rows = docs.map(d => ({ ...base, document_type: d.document_type, status: d.status, remarks: d.remarks.trim() || null }))
         let { error } = await db.from('student_dispatches').insert(rows)
-        if (error && isFatherColErr(error)) ({ error } = await db.from('student_dispatches').insert(rows.map(stripFather)))
+        if (error && isMissingColErr(error)) ({ error } = await db.from('student_dispatches').insert(rows.map(stripNewCols)))
         if (error) { toast.error(error.message); return }
-        toast.success(`${rows.length} ${form.dispatch_type === 'inbound' ? 'receive' : 'dispatch'} ${rows.length > 1 ? 'entries' : 'entry'} added`)
+        toast.success(`${form.dispatch_type === 'inbound' ? 'Receive' : 'Dispatch'} entry added (${rows.length} document${rows.length > 1 ? 's' : ''})`)
       }
       setFormOpen(false)
       load()
     } finally { setSaving(false) }
   }
 
-  async function handleStatusChange(id: string, newStatus: string, dtype: string) {
-    const { error } = await db.from('student_dispatches').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id)
+  async function handleStatusChange(ids: string[], newStatus: string) {
+    const { error } = await db.from('student_dispatches').update({ status: newStatus, updated_at: new Date().toISOString() }).in('id', ids)
     if (error) { toast.error('Failed to update'); return }
     toast.success('Status updated')
-    setDispatches(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d))
+    setDispatches(prev => prev.map(d => ids.includes(d.id) ? { ...d, status: newStatus } : d))
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Delete this entry?')) return
-    const { error } = await db.from('student_dispatches').delete().eq('id', id)
+  async function handleDelete(g: DispatchGroup) {
+    const ids = g.rows.map(r => r.id)
+    if (!confirm(`Delete this entry (${ids.length} document${ids.length > 1 ? 's' : ''})?`)) return
+    const { error } = await db.from('student_dispatches').delete().in('id', ids)
     if (error) { toast.error('Failed to delete'); return }
     toast.success('Deleted')
-    setDispatches(prev => prev.filter(d => d.id !== id))
+    setDispatches(prev => prev.filter(d => !ids.includes(d.id)))
   }
 
-  // Build a printable receipt for the student. Groups all documents that belong
-  // to the same dispatch (same student / type / date / courier / tracking).
-  function downloadReceipt(d: Dispatch) {
+  // WhatsApp the student the dispatch/receive details right away
+  function sendDetails(g: DispatchGroup) {
+    const d = g.head
+    let digits = (d.student_phone ?? '').replace(/\D/g, '')
+    if (digits.length === 10) digits = '91' + digits
+    else if (digits.length === 11 && digits.startsWith('0')) digits = '91' + digits.slice(1)
+    if (digits.length < 11) { toast.error('Student ka valid phone number nahi hai'); return }
+
     const isInbound = d.dispatch_type === 'inbound'
-    const siblings = dispatches.filter(x =>
-      x.dispatch_type === d.dispatch_type &&
-      x.student_name === d.student_name &&
-      (x.enrollment_number ?? '') === (d.enrollment_number ?? '') &&
-      (x.dispatch_date ?? '') === (d.dispatch_date ?? '') &&
-      (x.tracking_number ?? '') === (d.tracking_number ?? '') &&
-      (x.courier ?? '') === (d.courier ?? '')
-    )
-    const docs = siblings.length ? siblings : [d]
+    const fmtDate = (v: string | null) => v ? format(new Date(v + 'T00:00:00'), 'dd MMM yyyy') : null
+    const docList = g.rows.map(r => `- ${docLabelOf(r.document_type)}`).join('\n')
+    const lines: string[] = []
+    lines.push(`Dear ${d.student_name},`)
+    lines.push('')
+    lines.push(isInbound
+      ? 'We have received your following document(s) at Distance Courses Wala:'
+      : 'Your following document(s) have been dispatched from Distance Courses Wala:')
+    lines.push(docList)
+    lines.push('')
+    if (d.received_by === 'self') lines.push('Handed over to: Self (collected from office)')
+    if (d.received_by === 'guardian') lines.push(`Handed over to: ${d.receiver_name ?? 'Guardian'}${d.receiver_relation ? ` (${d.receiver_relation})` : ''}${d.receiver_phone ? `, ${d.receiver_phone}` : ''}`)
+    if (d.courier) lines.push(`Courier: ${d.courier}`)
+    if (d.tracking_number) lines.push(`Tracking No: ${d.tracking_number}`)
+    const dd = fmtDate(d.dispatch_date)
+    if (dd) lines.push(`${isInbound ? 'Received' : 'Dispatch'} Date: ${dd}`)
+    const ed = fmtDate(d.expected_delivery)
+    if (ed) lines.push(`Expected Delivery: ${ed}`)
+    lines.push('')
+    lines.push('- Team Distance Courses Wala')
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(lines.join('\n'))}`
+    window.open(waUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  // Build a printable receipt for the student covering every document in the group.
+  function downloadReceipt(g: DispatchGroup) {
+    const d = g.head
+    const isInbound = d.dispatch_type === 'inbound'
+    const docs = g.rows
     const fmtDate = (v: string | null) => v ? format(new Date(v + 'T00:00:00'), 'dd MMM yyyy') : '—'
     const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
     const receiptNo = `DCW-${(isInbound ? 'R' : 'D')}${(d.created_at ? new Date(d.created_at).getTime() : Date.now()).toString().slice(-8)}`
@@ -396,14 +489,20 @@ export function DispatchManager() {
         <td>${esc(statusMeta(x.status, x.dispatch_type).label)}</td>
         <td>${esc(x.remarks ?? '—')}</td>
       </tr>`).join('')
+    const receiverMeta = d.received_by === 'self'
+      ? `<div><label>Handed Over To</label>Self (student)</div>`
+      : d.received_by === 'guardian'
+        ? `<div><label>Handed Over To</label>${esc(d.receiver_name ?? 'Guardian')}${d.receiver_relation ? ` (${esc(d.receiver_relation)})` : ''}</div>` +
+          (d.receiver_phone ? `<div><label>Receiver Phone</label>${esc(d.receiver_phone)}</div>` : '')
+        : ''
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${receiptNo}</title>
     <style>
-      *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+      *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       body{margin:0;padding:32px;color:#1e293b}
       .wrap{max-width:720px;margin:0 auto;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}
-      .head{background:linear-gradient(135deg,#2563eb,#4338ca);color:#fff;padding:22px 26px}
-      .head h1{margin:0;font-size:22px;letter-spacing:.3px}
-      .head p{margin:4px 0 0;font-size:12px;opacity:.85}
+      .head{padding:22px 26px;border-bottom:3px solid #2563eb}
+      .head h1{margin:0;font-size:24px;letter-spacing:.3px;color:#2563eb}
+      .head p{margin:4px 0 0;font-size:12px;color:#64748b}
       .body{padding:24px 26px}
       .title{font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#2563eb;margin:0 0 14px}
       .meta{display:flex;flex-wrap:wrap;gap:14px 28px;margin-bottom:18px}
@@ -411,7 +510,7 @@ export function DispatchManager() {
       .meta label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:2px}
       table{width:100%;border-collapse:collapse;margin-top:6px}
       th,td{border:1px solid #e2e8f0;padding:8px 10px;font-size:13px;text-align:left}
-      th{background:#f8fafc;text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:#64748b}
+      th{background:#eff6ff;text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:#2563eb}
       .sign{display:flex;justify-content:space-between;margin-top:42px;font-size:12px;color:#64748b}
       .foot{text-align:center;font-size:11px;color:#94a3b8;padding:14px;border-top:1px dashed #e2e8f0}
     </style></head><body>
@@ -426,6 +525,7 @@ export function DispatchManager() {
             ${d.father_name ? `<div><label>Father's Name</label>${esc(d.father_name)}</div>` : ''}
             ${d.enrollment_number ? `<div><label>Enrollment No.</label>${esc(d.enrollment_number)}</div>` : ''}
             ${d.student_phone ? `<div><label>Phone</label>${esc(d.student_phone)}</div>` : ''}
+            ${receiverMeta}
             ${d.courier ? `<div><label>Courier</label>${esc(d.courier)}</div>` : ''}
             ${d.tracking_number ? `<div><label>Tracking No.</label>${esc(d.tracking_number)}</div>` : ''}
           </div>
@@ -445,23 +545,26 @@ export function DispatchManager() {
     w.document.close()
   }
 
-  const tabFiltered = dispatches.filter(d => activeTab === 'all' || d.dispatch_type === activeTab)
-  const filtered = tabFiltered.filter(d => {
+  // One entry (group) per student dispatch — a group can hold several documents
+  const allGroups = groupDispatches(dispatches)
+  const tabGroups = allGroups.filter(g => activeTab === 'all' || g.head.dispatch_type === activeTab)
+  const groups = tabGroups.filter(g => {
+    const d = g.head
     const q = search.toLowerCase()
     const matchSearch = !q || d.student_name.toLowerCase().includes(q) || (d.enrollment_number ?? '').toLowerCase().includes(q) || (d.tracking_number ?? '').toLowerCase().includes(q) || (d.associate?.name ?? '').toLowerCase().includes(q)
-    const matchStatus = !filterStatus || d.status === filterStatus
+    const matchStatus = !filterStatus || g.rows.some(r => r.status === filterStatus)
     const matchAssoc = !filterAssociate || d.associate_id === filterAssociate
     return matchSearch && matchStatus && matchAssoc
   })
 
-  const inboundCount  = dispatches.filter(d => d.dispatch_type === 'inbound').length
-  const outboundCount = dispatches.filter(d => d.dispatch_type === 'outbound').length
+  const inboundCount  = allGroups.filter(g => g.head.dispatch_type === 'inbound').length
+  const outboundCount = allGroups.filter(g => g.head.dispatch_type === 'outbound').length
   const currentStatuses = activeTab === 'inbound' ? INBOUND_STATUSES : activeTab === 'outbound' ? OUTBOUND_STATUSES : [...new Map([...INBOUND_STATUSES, ...OUTBOUND_STATUSES].map(s => [s.value, s])).values()]
 
   // Student selected in form
   const formStudentObj = students.find(s => s.id === form.student_id) ?? null
 
-  const pendingCount = dispatches.filter(d => d.status === 'pending').length
+  const pendingCount = allGroups.filter(g => g.rows.some(r => r.status === 'pending')).length
 
   return (
     <div className="space-y-4">
@@ -489,7 +592,7 @@ export function DispatchManager() {
         </div>
         <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           {[
-            { icon: Package, label: 'Total Entries', value: dispatches.length },
+            { icon: Package, label: 'Total Entries', value: allGroups.length },
             { icon: ArrowDownToLine, label: 'Received', value: inboundCount },
             { icon: Send, label: 'Dispatched', value: outboundCount },
             { icon: RefreshCw, label: 'Pending', value: pendingCount },
@@ -507,7 +610,7 @@ export function DispatchManager() {
       {/* ── Type Tabs ── */}
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl w-fit">
         {([
-          { key: 'all',      label: `All (${dispatches.length})` },
+          { key: 'all',      label: `All (${allGroups.length})` },
           { key: 'inbound',  label: `Received (${inboundCount})` },
           { key: 'outbound', label: `Dispatched (${outboundCount})` },
         ] as const).map(t => (
@@ -524,7 +627,7 @@ export function DispatchManager() {
       {/* ── Summary cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {currentStatuses.slice(0, 4).map(s => {
-          const count = tabFiltered.filter(d => d.status === s.value).length
+          const count = tabGroups.filter(g => g.rows.some(r => r.status === s.value)).length
           return (
             <button
               key={s.value}
@@ -570,7 +673,7 @@ export function DispatchManager() {
 
       {(search || filterStatus || filterAssociate) && (
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+          <span>{groups.length} result{groups.length !== 1 ? 's' : ''}</span>
           <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterAssociate('') }} className="text-red-500 hover:text-red-700 flex items-center gap-0.5">
             <X className="w-3 h-3" /> Clear
           </button>
@@ -582,7 +685,7 @@ export function DispatchManager() {
         <div className="flex items-center justify-center py-16">
           <div className="w-7 h-7 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : groups.length === 0 ? (
         <div className="text-center py-16 border rounded-xl bg-white">
           <Truck className="w-10 h-10 mx-auto mb-3 text-gray-300" />
           <p className="font-medium text-gray-500">{dispatches.length === 0 ? 'No entries yet' : 'No results found'}</p>
@@ -592,13 +695,14 @@ export function DispatchManager() {
         <>
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {filtered.map(d => {
+            {groups.map(g => {
+              const d = g.head
+              const ids = g.rows.map(r => r.id)
               const sm = statusMeta(d.status, d.dispatch_type)
-              const docLabel = docLabelOf(d.document_type)
               const isInbound = d.dispatch_type === 'inbound'
               const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
               return (
-                <div key={d.id} className={`bg-white border rounded-xl p-4 space-y-3 ${isInbound ? 'border-teal-200' : 'border-blue-200'}`}>
+                <div key={g.key} className={`bg-white border rounded-xl p-4 space-y-3 ${isInbound ? 'border-teal-200' : 'border-blue-200'}`}>
                   <div className="flex items-start gap-2">
                     <div className={`mt-0.5 p-1.5 rounded-lg flex-shrink-0 ${isInbound ? 'bg-teal-50 text-teal-600' : 'bg-blue-50 text-blue-600'}`}>
                       {isInbound ? <ArrowDownToLine className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
@@ -619,7 +723,7 @@ export function DispatchManager() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
                           {statuses.map(s => (
-                            <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)}>
+                            <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(ids, s.value)}>
                               <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]} mr-2`} />
                               <span className={d.status === s.value ? 'font-semibold' : ''}>{s.label}</span>
                               {d.status === s.value && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
@@ -627,20 +731,30 @@ export function DispatchManager() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <button onClick={() => downloadReceipt(d)} title="Download receipt" className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
+                      <button onClick={() => sendDetails(g)} title="Send details on WhatsApp" className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => downloadReceipt(g)} title="Download receipt" className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
                         <Printer className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => openEdit(d)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50">
+                      <button onClick={() => openEdit(g)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => handleDelete(d.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
+                      <button onClick={() => handleDelete(g)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabel}</span>
+                    {g.rows.map(r => (
+                      <span key={r.id} className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabelOf(r.document_type)}</span>
+                    ))}
+                    {d.received_by && (
+                      <span className="text-[11px] bg-violet-50 text-violet-700 border border-violet-100 rounded-md px-2 py-0.5">
+                        {d.received_by === 'self' ? 'Self pickup' : `${d.receiver_name ?? 'Guardian'}${d.receiver_relation ? ` (${d.receiver_relation})` : ''}`}
+                      </span>
+                    )}
                     {d.courier && <span className="text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md px-2 py-0.5">{d.courier}</span>}
                     {d.associate && (
                       <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{d.associate.name}</span>
@@ -692,13 +806,14 @@ export function DispatchManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filtered.map(d => {
+                  {groups.map(g => {
+                    const d = g.head
+                    const ids = g.rows.map(r => r.id)
                     const sm = statusMeta(d.status, d.dispatch_type)
-                    const docLabel = docLabelOf(d.document_type)
                     const isInbound = d.dispatch_type === 'inbound'
                     const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
                     return (
-                      <tr key={d.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={g.key} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold ${isInbound ? 'bg-teal-50 text-teal-700' : 'bg-blue-50 text-blue-700'}`}>
                             {isInbound ? <ArrowDownToLine className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -710,7 +825,16 @@ export function DispatchManager() {
                           {d.enrollment_number && <p className="text-[11px] text-gray-400 font-mono">{d.enrollment_number}</p>}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabel}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {g.rows.map(r => (
+                              <span key={r.id} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded-md px-2 py-0.5">{docLabelOf(r.document_type)}</span>
+                            ))}
+                          </div>
+                          {d.received_by && (
+                            <p className="text-[11px] text-violet-600 mt-1">
+                              {d.received_by === 'self' ? 'Self pickup' : `${d.receiver_name ?? 'Guardian'}${d.receiver_relation ? ` (${d.receiver_relation})` : ''}`}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {d.associate
@@ -734,7 +858,7 @@ export function DispatchManager() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="center" className="w-40">
                               {statuses.map(s => (
-                                <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(d.id, s.value, d.dispatch_type)}>
+                                <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(ids, s.value)}>
                                   <div className={`w-2 h-2 rounded-full ${s.color.split(' ')[0]} mr-2`} />
                                   <span className={d.status === s.value ? 'font-semibold' : ''}>{s.label}</span>
                                   {d.status === s.value && <span className="ml-auto text-[10px] text-gray-400">✓</span>}
@@ -745,9 +869,10 @@ export function DispatchManager() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50" title="Download receipt" onClick={() => downloadReceipt(d)}><Printer className="w-3.5 h-3.5" /></Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(d)}><Pencil className="w-3.5 h-3.5" /></Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(d.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Send details on WhatsApp" onClick={() => sendDetails(g)}><MessageCircle className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50" title="Download receipt" onClick={() => downloadReceipt(g)}><Printer className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(g)}><Pencil className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(g)}><Trash2 className="w-3.5 h-3.5" /></Button>
                           </div>
                         </td>
                       </tr>
@@ -756,7 +881,7 @@ export function DispatchManager() {
                 </tbody>
               </table>
             </div>
-            <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">{filtered.length} entr{filtered.length !== 1 ? 'ies' : 'y'}</div>
+            <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">{groups.length} entr{groups.length !== 1 ? 'ies' : 'y'}</div>
           </div>
         </>
       )}
@@ -891,15 +1016,13 @@ export function DispatchManager() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold text-slate-700">Documents *</Label>
-                {!editItem && (
-                  <button
-                    type="button"
-                    onClick={() => setForm(p => ({ ...p, documents: [...p.documents, { ...newDocRow(), status: p.documents[0]?.status ?? 'pending' }] }))}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add document
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setForm(p => ({ ...p, documents: [...p.documents, { ...newDocRow(), status: p.documents[0]?.status ?? 'pending' }] }))}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add document
+                </button>
               </div>
               {form.documents.map((doc, idx) => (
                 <div key={idx} className="rounded-lg border border-gray-200 bg-slate-50/60 p-2.5 space-y-2">
@@ -937,7 +1060,7 @@ export function DispatchManager() {
                         onChange={e => setForm(p => ({ ...p, documents: p.documents.map((d, i) => i === idx ? { ...d, remarks: e.target.value } : d) }))}
                         className="flex-1 border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      {!editItem && form.documents.length > 1 && (
+                      {form.documents.length > 1 && (
                         <button
                           type="button"
                           onClick={() => setForm(p => ({ ...p, documents: p.documents.filter((_, i) => i !== idx) }))}
@@ -951,6 +1074,70 @@ export function DispatchManager() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Handover — courier, or collected from office by self / guardian */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                {form.dispatch_type === 'inbound' ? 'Submitted By' : 'Handover To'}
+              </Label>
+              <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
+                {([
+                  { value: '',         label: 'Courier / Post' },
+                  { value: 'self',     label: 'Self' },
+                  { value: 'guardian', label: 'Guardian / Relative' },
+                ] as const).map(o => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setForm(p => ({
+                      ...p,
+                      received_by: o.value,
+                      receiver_name: o.value === 'self' ? p.student_name : o.value === 'guardian' ? p.receiver_name : '',
+                      receiver_relation: o.value === 'guardian' ? p.receiver_relation : '',
+                      receiver_phone: o.value === 'self' ? p.student_phone : o.value === 'guardian' ? p.receiver_phone : '',
+                    }))}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${form.received_by === o.value ? 'bg-white shadow-sm text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {(form.received_by === 'self' || form.received_by === 'guardian') && (
+                <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-2.5 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">
+                        {form.received_by === 'self' ? 'Student Name' : 'Receiver Name *'}
+                      </Label>
+                      <input type="text" value={form.receiver_name}
+                        onChange={e => setForm(p => ({ ...p, receiver_name: e.target.value }))}
+                        placeholder="Full name"
+                        className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">Phone</Label>
+                      <input type="tel" value={form.receiver_phone}
+                        onChange={e => setForm(p => ({ ...p, receiver_phone: e.target.value }))}
+                        placeholder="Phone number"
+                        className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  {form.received_by === 'guardian' && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">Relation *</Label>
+                      <select
+                        value={form.receiver_relation}
+                        onChange={e => setForm(p => ({ ...p, receiver_relation: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select relation…</option>
+                        {RECEIVER_RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Date */}

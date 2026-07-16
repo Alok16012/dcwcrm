@@ -38,9 +38,11 @@ export async function proxy(request: NextRequest) {
   const isAdminLogin     = pathname === '/login'
   const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
-  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin
+  // Public short links (invoice PDFs shared on WhatsApp) — no auth
+  const isPublicLink     = pathname.startsWith('/i/')
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink
 
-  if (isApiRoute) return response
+  if (isApiRoute || isPublicLink) return response
 
   if (user) {
     const { data: profile } = await supabase

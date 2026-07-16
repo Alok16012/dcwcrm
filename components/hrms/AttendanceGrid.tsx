@@ -5,9 +5,8 @@ import { format, addDays, parseISO, isAfter } from 'date-fns'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
+import { Eraser, Loader2 } from 'lucide-react'
 import type { AttendanceStatus } from '@/types/app.types'
 
 interface EmployeeAttendance {
@@ -26,35 +25,17 @@ interface AttendanceGridProps {
   rangeEnd: string
 }
 
-const STATUS_COLORS: Record<AttendanceStatus, string> = {
-  present:  'bg-green-100 text-green-800',
-  absent:   'bg-red-100 text-red-800',
-  half_day: 'bg-yellow-100 text-yellow-800',
-  late:     'bg-orange-100 text-orange-800',
-  leave:    'bg-blue-100 text-blue-800',
-  holiday:  'bg-gray-100 text-gray-600',
-}
-
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present:  'P',
-  absent:   'A',
-  half_day: 'H',
-  late:     'L',
-  leave:    'LV',
-  holiday:  'HD',
-}
-
-const STATUS_FULL: Record<AttendanceStatus, string> = {
-  present:  'Present',
-  absent:   'Absent',
-  half_day: 'Half Day',
-  late:     'Late',
-  leave:    'Leave',
-  holiday:  'Holiday',
+const STATUS_META: Record<AttendanceStatus, { label: string; full: string; cell: string; chip: string }> = {
+  present:  { label: 'P',  full: 'Present',  cell: 'bg-green-100 text-green-800',   chip: 'bg-green-600 text-white' },
+  absent:   { label: 'A',  full: 'Absent',   cell: 'bg-red-100 text-red-700',       chip: 'bg-red-600 text-white' },
+  half_day: { label: 'H',  full: 'Half Day', cell: 'bg-yellow-100 text-yellow-800', chip: 'bg-yellow-500 text-white' },
+  late:     { label: 'L',  full: 'Late',     cell: 'bg-orange-100 text-orange-800', chip: 'bg-orange-500 text-white' },
+  leave:    { label: 'LV', full: 'Leave',    cell: 'bg-blue-100 text-blue-800',     chip: 'bg-blue-600 text-white' },
+  holiday:  { label: 'HD', full: 'Holiday',  cell: 'bg-gray-200 text-gray-600',     chip: 'bg-gray-500 text-white' },
 }
 
 const ALL_STATUSES: AttendanceStatus[] = ['present', 'absent', 'half_day', 'late', 'leave', 'holiday']
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function getDatesInRange(start: string, end: string): string[] {
   const dates: string[] = []
@@ -69,15 +50,8 @@ function getDatesInRange(start: string, end: string): string[] {
 
 export default function AttendanceGrid({ data: initialData, year, month, rangeStart, rangeEnd }: AttendanceGridProps) {
   const [data, setData] = useState(initialData)
-  const [editCell, setEditCell] = useState<{ empId: string; date: string } | null>(null)
-
-  // Bulk state
-  const [bulkMode, setBulkMode] = useState<'single' | 'range'>('single')
-  const [bulkDate, setBulkDate] = useState('')
-  const [bulkFromDate, setBulkFromDate] = useState('')
-  const [bulkToDate, setBulkToDate] = useState('')
-  const [bulkStatus, setBulkStatus] = useState<AttendanceStatus>('present')
-  const [preview, setPreview] = useState<{ count: number; dates: string[] } | null>(null)
+  // The "brush": pick a status once, then click cells to paint it (Excel-style)
+  const [brush, setBrush] = useState<AttendanceStatus | 'clear'>('present')
   const [isPending, startTransition] = useTransition()
 
   const supabase = createClient()
@@ -93,265 +67,217 @@ export default function AttendanceGrid({ data: initialData, year, month, rangeSt
     router.push(`/hrms/attendance?month=${m}&year=${y}`)
   }
 
-  function isInCycle(emp: EmployeeAttendance, dateStr: string) {
-    return dateStr >= emp.cycle_start && dateStr <= emp.cycle_end
+  const isInCycle = (emp: EmployeeAttendance, dateStr: string) =>
+    dateStr >= emp.cycle_start && dateStr <= emp.cycle_end
+
+  function applyLocal(changes: { empId: string; date: string; status: AttendanceStatus | null }[]) {
+    setData(prev => prev.map(e => {
+      const mine = changes.filter(c => c.empId === e.employee_id)
+      if (!mine.length) return e
+      const att = { ...e.attendance }
+      for (const c of mine) {
+        if (c.status === null) delete att[c.date]
+        else att[c.date] = c.status
+      }
+      return { ...e, attendance: att }
+    }))
   }
 
-  // Only return actual DB-recorded status — no pre-filling
-  function getStatus(emp: EmployeeAttendance, dateStr: string): AttendanceStatus | null {
-    return emp.attendance[dateStr] ?? null
-  }
-
-  // ── Single cell update ────────────────────────────────────────────────────────
-  function updateAttendance(empId: string, dateStr: string, status: AttendanceStatus) {
+  // Paint one or many cells with the current brush
+  function paint(cells: { empId: string; date: string }[]) {
+    const valid = cells.filter(c => {
+      const emp = data.find(e => e.employee_id === c.empId)
+      return emp && isInCycle(emp, c.date) && c.date <= today
+    })
+    if (!valid.length) return
     startTransition(async () => {
       try {
-        const { error } = await supabase.from('attendance').upsert(
-          { employee_id: empId, date: dateStr, status } as never,
-          { onConflict: 'employee_id,date' }
-        )
-        if (error) throw error
-        setData(prev => prev.map(e =>
-          e.employee_id === empId
-            ? { ...e, attendance: { ...e.attendance, [dateStr]: status } }
-            : e
-        ))
-      } catch (e: any) {
-        toast.error('Failed to update: ' + (e?.message ?? 'unknown error'))
-      } finally {
-        setEditCell(null)
+        if (brush === 'clear') {
+          for (const c of valid) {
+            const { error } = await supabase.from('attendance').delete()
+              .eq('employee_id', c.empId).eq('date', c.date)
+            if (error) throw error
+          }
+          applyLocal(valid.map(c => ({ ...c, status: null })))
+        } else {
+          const rows = valid.map(c => ({ employee_id: c.empId, date: c.date, status: brush }))
+          const BATCH = 100
+          for (let i = 0; i < rows.length; i += BATCH) {
+            const { error } = await supabase.from('attendance')
+              .upsert(rows.slice(i, i + BATCH) as never[], { onConflict: 'employee_id,date' })
+            if (error) throw error
+          }
+          applyLocal(valid.map(c => ({ ...c, status: brush })))
+        }
+        if (valid.length > 1) {
+          toast.success(brush === 'clear'
+            ? `${valid.length} cells cleared`
+            : `${valid.length} marked ${STATUS_META[brush].full}`)
+        }
+      } catch (e) {
+        const msg = (e as { message?: string })?.message ?? 'unknown error'
+        toast.error('Save failed: ' + msg)
       }
     })
   }
 
-  // ── Build bulk preview ────────────────────────────────────────────────────────
-  function buildPreview() {
-    const dates = bulkMode === 'single'
-      ? (bulkDate ? [bulkDate] : [])
-      : (bulkFromDate && bulkToDate ? getDatesInRange(bulkFromDate, bulkToDate) : [])
-
-    if (!dates.length) { toast.error('Select a date first'); return }
-
-    let count = 0
-    for (const emp of data) {
-      for (const d of dates) {
-        if (isInCycle(emp, d) && d <= today) count++
-      }
-    }
-    if (count === 0) {
-      toast.error('No employees have these dates in their active cycle')
-      return
-    }
-    setPreview({ count, dates })
+  // Column header click: paint the whole day for every employee
+  function paintDay(dateStr: string) {
+    paint(data.map(e => ({ empId: e.employee_id, date: dateStr })))
   }
 
-  // ── Apply bulk mark ───────────────────────────────────────────────────────────
-  function applyBulk() {
-    if (!preview) return
-    startTransition(async () => {
-      try {
-        const upserts: { employee_id: string; date: string; status: AttendanceStatus }[] = []
-        for (const emp of data) {
-          for (const d of preview.dates) {
-            if (isInCycle(emp, d) && d <= today) {
-              upserts.push({ employee_id: emp.employee_id, date: d, status: bulkStatus })
-            }
-          }
-        }
-        if (!upserts.length) { toast.error('Nothing to mark'); return }
-
-        // Upsert in batches of 100 to avoid request size limits
-        const BATCH = 100
-        for (let i = 0; i < upserts.length; i += BATCH) {
-          const { error } = await supabase
-            .from('attendance')
-            .upsert(upserts.slice(i, i + BATCH) as never, { onConflict: 'employee_id,date' })
-          if (error) throw error
-        }
-
-        // Update local state
-        setData(prev => prev.map(emp => {
-          const newAtt = { ...emp.attendance }
-          for (const d of preview.dates) {
-            if (isInCycle(emp, d) && d <= today) newAtt[d] = bulkStatus
-          }
-          return { ...emp, attendance: newAtt }
-        }))
-
-        toast.success(`✓ Marked ${upserts.length} records as ${STATUS_FULL[bulkStatus]}`)
-        setPreview(null)
-        setBulkDate('')
-        setBulkFromDate('')
-        setBulkToDate('')
-      } catch (e: any) {
-        toast.error('Bulk mark failed: ' + (e?.message ?? 'Check permissions'))
-      }
-    })
+  // "Fill row" — paint every unmarked past day in the employee's cycle
+  function fillRow(emp: EmployeeAttendance) {
+    if (brush === 'clear') { toast.error('Select a status first (not eraser)'); return }
+    const cells = getDatesInRange(emp.cycle_start, emp.cycle_end)
+      .filter(d => d <= today && !emp.attendance[d])
+      .map(d => ({ empId: emp.employee_id, date: d }))
+    if (!cells.length) { toast.info('No unmarked days left'); return }
+    paint(cells)
   }
 
   return (
     <div className="space-y-4">
 
-      {/* ── Header ── */}
+      {/* ── Month nav + brush palette ── */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 font-bold">‹</button>
-          <span className="text-sm font-semibold text-gray-800 min-w-[110px] text-center">{MONTHS[month - 1]} {year} Cycle</span>
-          <button onClick={() => navigate(1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 font-bold">›</button>
+          <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 font-bold text-lg">‹</button>
+          <span className="text-base font-bold text-gray-800 min-w-[150px] text-center">{MONTHS[month - 1]} {year}</span>
+          <button onClick={() => navigate(1)} className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 font-bold text-lg">›</button>
         </div>
+        {isPending && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
 
-        {/* ── Bulk controls ── */}
-        <div className="flex items-center gap-2 ml-auto flex-wrap">
-          <span className="text-sm text-muted-foreground font-medium">Bulk:</span>
-
-          <Select value={bulkMode} onValueChange={v => { setBulkMode(v as 'single' | 'range'); setPreview(null) }}>
-            <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="single">Single Date</SelectItem>
-              <SelectItem value="range">Date Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {bulkMode === 'single' ? (
-            <input type="date" value={bulkDate} min={rangeStart} max={today}
-              onChange={e => { setBulkDate(e.target.value); setPreview(null) }}
-              className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
-          ) : (
-            <>
-              <input type="date" value={bulkFromDate} min={rangeStart} max={today}
-                onChange={e => { setBulkFromDate(e.target.value); setPreview(null) }}
-                className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
-              <span className="text-xs text-gray-400">to</span>
-              <input type="date" value={bulkToDate} min={bulkFromDate || rangeStart} max={today}
-                onChange={e => { setBulkToDate(e.target.value); setPreview(null) }}
-                className="h-9 px-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
-            </>
-          )}
-
-          <Select value={bulkStatus} onValueChange={v => { setBulkStatus(v as AttendanceStatus); setPreview(null) }}>
-            <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ALL_STATUSES.map(s => (
-                <SelectItem key={s} value={s}>{STATUS_FULL[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {!preview ? (
-            <Button size="sm" onClick={buildPreview}
-              disabled={bulkMode === 'single' ? !bulkDate : (!bulkFromDate || !bulkToDate)}
-              className="h-9">
-              Preview
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-                {preview.count} records → {STATUS_FULL[bulkStatus]}
-              </span>
-              <Button size="sm" onClick={applyBulk} disabled={isPending}
-                className="h-9 bg-green-600 hover:bg-green-700">
-                {isPending ? 'Saving…' : 'Confirm'}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setPreview(null)} disabled={isPending} className="h-9">
-                Cancel
-              </Button>
-            </div>
-          )}
+        <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+          {ALL_STATUSES.map(s => (
+            <button
+              key={s}
+              onClick={() => setBrush(s)}
+              title={STATUS_META[s].full}
+              className={`px-3 h-9 rounded-lg text-xs font-bold transition-all border ${
+                brush === s
+                  ? `${STATUS_META[s].chip} border-transparent ring-2 ring-offset-1 ring-gray-400`
+                  : `${STATUS_META[s].cell} border-transparent opacity-70 hover:opacity-100`
+              }`}
+            >
+              {STATUS_META[s].label} · {STATUS_META[s].full}
+            </button>
+          ))}
+          <button
+            onClick={() => setBrush('clear')}
+            title="Eraser — click a cell to clear it"
+            className={`px-3 h-9 rounded-lg text-xs font-bold transition-all border flex items-center gap-1 ${
+              brush === 'clear'
+                ? 'bg-gray-800 text-white border-transparent ring-2 ring-offset-1 ring-gray-400'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Eraser className="w-3.5 h-3.5" /> Clear
+          </button>
         </div>
       </div>
 
+      <p className="text-xs text-gray-500 -mt-2">
+        Upar status chuno, phir table me cell pe click karo — wahi status lag jayega.
+        Din ke number pe click = us din sab employees mark. Naam ke aage <b>Fill</b> = us employee ke bache hue din mark.
+      </p>
+
       {/* ── Grid ── */}
-      <div className="overflow-x-auto rounded-md border">
-        <table className="min-w-max text-xs">
+      <div className="overflow-x-auto rounded-xl border bg-white">
+        <table className="min-w-max text-xs border-collapse">
           <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="sticky left-0 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] z-10">Employee</th>
-              <th className="sticky left-[160px] bg-muted/50 px-2 py-2 text-center font-semibold min-w-[100px] z-10 border-r border-gray-200 text-[10px]">Cycle</th>
+            <tr className="bg-slate-100">
+              <th className="sticky left-0 bg-slate-100 px-3 py-2 text-left font-bold min-w-[170px] z-10 border-b border-r border-slate-200">Employee</th>
               {allDates.map(d => {
                 const parsed = parseISO(d)
                 const isWeekend = [0, 6].includes(parsed.getDay())
+                const isFuture = d > today
                 return (
-                  <th key={d} className={`px-1 py-1 text-center font-medium w-9 ${d === today ? 'bg-blue-100' : isWeekend ? 'bg-gray-50' : ''}`}>
-                    <div className="text-[9px] text-gray-400">{format(parsed, 'EEE')}</div>
-                    <div>{format(parsed, 'd')}</div>
+                  <th key={d} className={`p-0 text-center border-b border-l border-slate-200 ${d === today ? 'bg-blue-100' : isWeekend ? 'bg-slate-200/60' : ''}`}>
+                    <button
+                      onClick={() => !isFuture && paintDay(d)}
+                      disabled={isFuture}
+                      title={isFuture ? 'Future date' : `Mark all employees on ${format(parsed, 'd MMM')}`}
+                      className={`w-9 py-1.5 ${isFuture ? 'cursor-default opacity-40' : 'hover:bg-blue-200 cursor-pointer'}`}
+                    >
+                      <div className="text-[9px] text-gray-500 leading-none">{format(parsed, 'EEEEE')}</div>
+                      <div className="font-bold">{format(parsed, 'd')}</div>
+                    </button>
                   </th>
                 )
               })}
-              <th className="px-2 py-2 text-center font-semibold min-w-[40px] text-green-700">P</th>
-              <th className="px-2 py-2 text-center font-semibold min-w-[40px] text-red-600">A</th>
-              <th className="px-2 py-2 text-center font-semibold min-w-[40px] text-gray-400">—</th>
+              <th className="px-2 py-2 text-center font-bold text-green-700 border-b border-l border-slate-200" title="Present + Late">P</th>
+              <th className="px-2 py-2 text-center font-bold text-red-600 border-b border-l border-slate-200" title="Absent">A</th>
+              <th className="px-2 py-2 text-center font-bold text-yellow-600 border-b border-l border-slate-200" title="Half Day">H</th>
+              <th className="px-2 py-2 text-center font-bold text-blue-600 border-b border-l border-slate-200" title="Leave">LV</th>
+              <th className="px-2 py-2 text-center font-bold text-gray-400 border-b border-l border-slate-200" title="Unmarked past days">?</th>
             </tr>
           </thead>
           <tbody>
             {data.map(emp => {
               const cycleDates = getDatesInRange(emp.cycle_start, emp.cycle_end)
               const pastCycleDates = cycleDates.filter(d => d <= today)
-
-              // Only count actual DB records
-              let presentCount = 0, absentCount = 0, unmarkedCount = 0
+              let p = 0, a = 0, h = 0, lv = 0, un = 0
               for (const d of pastCycleDates) {
                 const s = emp.attendance[d]
-                if (!s) { unmarkedCount++; continue }
-                if (s === 'present' || s === 'late' || s === 'half_day') presentCount++
-                else if (s === 'absent') absentCount++
+                if (!s) un++
+                else if (s === 'present' || s === 'late') p++
+                else if (s === 'absent') a++
+                else if (s === 'half_day') h++
+                else if (s === 'leave') lv++
               }
 
               return (
-                <tr key={emp.employee_id} className="border-b hover:bg-muted/30">
-                  <td className="sticky left-0 bg-background px-3 py-1.5 font-medium z-10">{emp.employee_name}</td>
-                  <td className="sticky left-[160px] bg-background px-2 py-1.5 text-[10px] text-gray-500 border-r border-gray-100 z-10 whitespace-nowrap">
-                    {format(parseISO(emp.cycle_start), 'd MMM')} – {format(parseISO(emp.cycle_end), 'd MMM')}
+                <tr key={emp.employee_id} className="hover:bg-slate-50">
+                  <td className="sticky left-0 bg-white px-3 py-1 font-semibold z-10 border-b border-r border-slate-200 whitespace-nowrap">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{emp.employee_name}</span>
+                      <button
+                        onClick={() => fillRow(emp)}
+                        title="Fill all unmarked past days with the selected status"
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50"
+                      >
+                        Fill
+                      </button>
+                    </div>
+                    <div className="text-[9px] font-normal text-gray-400">
+                      {format(parseISO(emp.cycle_start), 'd MMM')} – {format(parseISO(emp.cycle_end), 'd MMM')}
+                    </div>
                   </td>
                   {allDates.map(d => {
                     const inCycle = isInCycle(emp, d)
-                    const status = inCycle ? getStatus(emp, d) : null
-                    const isEditing = editCell?.empId === emp.employee_id && editCell?.date === d
                     const isFuture = d > today
+                    const status = inCycle ? emp.attendance[d] : undefined
                     const isToday = d === today
-                    const parsed = parseISO(d)
-                    const isWeekend = [0, 6].includes(parsed.getDay())
+                    const isWeekend = [0, 6].includes(parseISO(d).getDay())
 
                     if (!inCycle) {
-                      return <td key={d} className="px-1 py-1 text-center"><span className="text-gray-200">–</span></td>
+                      return <td key={d} className="border-b border-l border-slate-100 bg-slate-50 text-center text-slate-200">–</td>
                     }
-
                     return (
-                      <td key={d} className={`px-1 py-1 text-center ${isToday ? 'bg-blue-50' : isWeekend ? 'bg-gray-50/50' : ''}`}>
-                        {isEditing ? (
-                          <Select
-                            defaultValue={status ?? 'present'}
-                            onValueChange={v => updateAttendance(emp.employee_id, d, v as AttendanceStatus)}
-                            open
-                            onOpenChange={open => !open && setEditCell(null)}
-                          >
-                            <SelectTrigger className="h-6 w-14 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {ALL_STATUSES.map(s => (
-                                <SelectItem key={s} value={s}>{STATUS_FULL[s]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <button
-                            onClick={() => !isFuture && setEditCell({ empId: emp.employee_id, date: d })}
-                            title={status ? STATUS_FULL[status] : isFuture ? 'Future' : 'Click to mark'}
-                            className={`rounded px-1 py-0.5 font-medium transition-all w-8 ${
-                              isFuture
-                                ? 'text-gray-200 cursor-default'
-                                : status
-                                ? `${STATUS_COLORS[status]} hover:opacity-80 cursor-pointer`
-                                : 'text-gray-300 hover:bg-gray-100 cursor-pointer'
-                            }`}
-                          >
-                            {isFuture ? '·' : status ? STATUS_LABELS[status] : '—'}
-                          </button>
-                        )}
+                      <td key={d} className={`p-0 text-center border-b border-l border-slate-100 ${isToday ? 'bg-blue-50' : isWeekend ? 'bg-slate-50' : ''}`}>
+                        <button
+                          onClick={() => !isFuture && paint([{ empId: emp.employee_id, date: d }])}
+                          disabled={isFuture}
+                          title={status ? `${STATUS_META[status].full} — click to mark ${brush === 'clear' ? 'clear' : STATUS_META[brush].full}` : isFuture ? 'Future' : 'Click to mark'}
+                          className={`w-9 h-8 font-bold transition-colors ${
+                            isFuture
+                              ? 'text-gray-200 cursor-default'
+                              : status
+                              ? `${STATUS_META[status].cell} hover:opacity-75`
+                              : 'text-gray-300 hover:bg-blue-100'
+                          }`}
+                        >
+                          {isFuture ? '·' : status ? STATUS_META[status].label : ''}
+                        </button>
                       </td>
                     )
                   })}
-                  <td className="px-2 py-1.5 text-center font-bold text-green-700">{presentCount}</td>
-                  <td className="px-2 py-1.5 text-center font-bold text-red-600">{absentCount}</td>
-                  <td className="px-2 py-1.5 text-center text-gray-400 text-[11px]">{unmarkedCount > 0 ? unmarkedCount : ''}</td>
+                  <td className="px-2 text-center font-bold text-green-700 border-b border-l border-slate-200">{p}</td>
+                  <td className="px-2 text-center font-bold text-red-600 border-b border-l border-slate-200">{a}</td>
+                  <td className="px-2 text-center font-bold text-yellow-600 border-b border-l border-slate-200">{h}</td>
+                  <td className="px-2 text-center font-bold text-blue-600 border-b border-l border-slate-200">{lv}</td>
+                  <td className="px-2 text-center font-semibold text-gray-400 border-b border-l border-slate-200">{un || ''}</td>
                 </tr>
               )
             })}
@@ -362,12 +288,12 @@ export default function AttendanceGrid({ data: initialData, year, month, rangeSt
       {/* ── Legend ── */}
       <div className="flex flex-wrap gap-2 text-xs">
         {ALL_STATUSES.map(s => (
-          <Badge key={s} variant="outline" className={`${STATUS_COLORS[s]} border-0`}>
-            {STATUS_LABELS[s]} = {STATUS_FULL[s]}
-          </Badge>
+          <span key={s} className={`${STATUS_META[s].cell} rounded px-2 py-0.5 font-medium`}>
+            {STATUS_META[s].label} = {STATUS_META[s].full}
+          </span>
         ))}
-        <Badge variant="outline" className="bg-gray-50 text-gray-400 border-0">– = Out of cycle</Badge>
-        <Badge variant="outline" className="bg-gray-50 text-gray-400 border-0">— = Unmarked</Badge>
+        <span className="bg-slate-50 text-gray-400 rounded px-2 py-0.5">– = cycle ke bahar</span>
+        <span className="bg-slate-50 text-gray-400 rounded px-2 py-0.5">? = unmarked</span>
       </div>
     </div>
   )

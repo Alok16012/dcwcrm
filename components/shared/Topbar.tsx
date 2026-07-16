@@ -1,5 +1,5 @@
 'use client'
-import { LogOut, Menu } from 'lucide-react'
+import { LogOut, Menu, MessageCircle, Instagram, Facebook, Youtube } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +48,49 @@ export function Topbar({ user }: TopbarProps) {
       <div className="hidden md:block" />
 
       <div className="flex items-center gap-1.5">
+        <a
+          href="https://wa.me/919149406965"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 transition-colors"
+          aria-label="WhatsApp 9149406965"
+          title="WhatsApp: 9149406965"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="hidden md:block">9149406965</span>
+        </a>
+        <div className="hidden sm:flex items-center gap-0.5">
+          <a
+            href="https://www.instagram.com/sheraatravels"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-xl text-pink-600 hover:bg-pink-50 transition-colors"
+            aria-label="Instagram"
+            title="Instagram"
+          >
+            <Instagram className="w-5 h-5" />
+          </a>
+          <a
+            href="https://www.facebook.com/sheratravelssxr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 transition-colors"
+            aria-label="Facebook"
+            title="Facebook"
+          >
+            <Facebook className="w-5 h-5" />
+          </a>
+          <a
+            href="https://www.youtube.com/@Sheratravels"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+            aria-label="YouTube"
+            title="YouTube"
+          >
+            <Youtube className="w-5 h-5" />
+          </a>
+        </div>
         <NotificationBell userId={user.id} role={user.role} />
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl px-1.5 md:px-2 py-1 text-sm hover:bg-gray-100 transition-colors">

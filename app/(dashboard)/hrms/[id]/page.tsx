@@ -137,11 +137,17 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
     cycleEnd = new Date(currentYear, currentMonth - 1, startDay - 1)
   }
 
+  // Compare as local calendar-date strings so boundary days don't slip
+  // between cycles due to UTC/IST offsets.
+  const toDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const cycleStartStr = toDateStr(cycleStart)
+  const cycleEndStr = toDateStr(cycleEnd)
   const currentCycleIncentives = assignedStudents
     .filter(s => {
       if (!s.enrollment_date) return false
-      const d = new Date(s.enrollment_date)
-      return d >= cycleStart && d <= cycleEnd
+      const ds = String(s.enrollment_date).slice(0, 10)
+      return ds >= cycleStartStr && ds <= cycleEndStr
     })
     .reduce((acc, s) => acc + (s.incentive_amount || 0), 0)
 

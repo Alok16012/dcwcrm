@@ -84,13 +84,22 @@ export async function POST(req: NextRequest) {
             endDate = new Date(year, month - 1, startDay - 1)
         }
 
+        // Format as local calendar dates. toISOString() converts to UTC and, on
+        // an IST machine, shifts local midnight to the previous day — which slid
+        // the whole cycle window one day early and put boundary-day incentives
+        // in the wrong month's payroll.
+        const fmtDate = (d: Date) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const startStr = fmtDate(startDate)
+        const endStr = fmtDate(endDate)
+
         // Fetch attendance for this range
         const { data: attendance } = await supabase
             .from('attendance')
             .select('status')
             .eq('employee_id', employee_id)
-            .gte('date', startDate.toISOString().split('T')[0])
-            .lte('date', endDate.toISOString().split('T')[0])
+            .gte('date', startStr)
+            .lte('date', endStr)
 
         const attendanceRows = (attendance ?? []) as AttendanceRow[]
         const attCounts = attendanceRows.reduce(
@@ -118,8 +127,8 @@ export async function POST(req: NextRequest) {
             .from('students')
             .select('incentive_amount')
             .eq('assigned_counsellor', emp.profile_id)
-            .gte('enrollment_date', startDate.toISOString().split('T')[0])
-            .lte('enrollment_date', endDate.toISOString().split('T')[0])
+            .gte('enrollment_date', startStr)
+            .lte('enrollment_date', endStr)
 
         const studentIncentiveRows = (studentIncentives ?? []) as StudentIncentiveRow[]
         const calculatedIncentive = studentIncentiveRows.reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
@@ -143,10 +152,10 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'Payroll already paid for this month' }, { status: 400 })
             }
 
-            const existingIncentive = Number(existing.incentive ?? 0)
-            const mergedIncentive = existingIncentive >= cycleStudentIncentive
-                ? existingIncentive
-                : existingIncentive + cycleStudentIncentive
+            // Regenerating recalculates the incentive fresh from this cycle's
+            // enrollments. The old "merge" (keep-or-add) rule stacked stale
+            // values across regenerations and never corrected downwards.
+            const mergedIncentive = cycleStudentIncentive
             const mergedGross = basic + hra + allow + mergedIncentive
             const mergedNet = mergedGross - pf - tds - od - leaveDeduction
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { format } from 'date-fns'
-import { Edit, Plus, Search } from 'lucide-react'
+import { Edit, Plus, Search, UserCheck, UserX, Building2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -41,6 +41,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
   const [data, setData] = useState(initialData)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
   const [showForm, setShowForm] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<EmployeeRow | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -71,8 +72,42 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
       e.full_name.toLowerCase().includes(search.toLowerCase()) ||
       e.employee_code.toLowerCase().includes(search.toLowerCase())
     const matchRole = roleFilter === 'all' || e.role === roleFilter
-    return matchSearch && matchRole
+    const matchStatus = statusFilter === 'all' || e.status === statusFilter
+    return matchSearch && matchRole && matchStatus
   })
+
+  // Department-wise grouping
+  const grouped = filtered.reduce((acc, e) => {
+    const dept = e.department && e.department !== '—' ? e.department : 'No Department'
+    if (!acc[dept]) acc[dept] = []
+    acc[dept].push(e)
+    return acc
+  }, {} as Record<string, EmployeeRow[]>)
+  const departments = Object.keys(grouped).sort((a, b) =>
+    a === 'No Department' ? 1 : b === 'No Department' ? -1 : a.localeCompare(b))
+
+  const toggleActive = (emp: EmployeeRow) => {
+    const makeActive = emp.status === 'inactive'
+    if (!confirm(`${emp.full_name} ko ${makeActive ? 'ACTIVE' : 'INACTIVE'} karein?${makeActive ? '' : ' Wo attendance, payroll aur dropdowns se hat jayenge.'}`)) return
+    startTransition(async () => {
+      try {
+        const res = await fetch('/api/hrms/employees', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: emp.id, is_active: makeActive }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Failed to update status')
+        }
+        setData(prev => prev.map(e => e.id === emp.id ? { ...e, status: makeActive ? 'active' : 'inactive' } : e))
+        toast.success(`${emp.full_name} ${makeActive ? 'activated' : 'deactivated'}`)
+        router.refresh()
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : 'Failed to update status')
+      }
+    })
+  }
 
   const onSubmit = (values: EmployeeFormData) => {
     startTransition(async () => {
@@ -185,18 +220,33 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleEdit(row.original.id)
-          }}
-          disabled={isPending}
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleEdit(row.original.id)
+            }}
+            disabled={isPending}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title={row.original.status === 'active' ? 'Deactivate (employee left)' : 'Activate'}
+            className={`h-8 w-8 ${row.original.status === 'active' ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleActive(row.original)
+            }}
+            disabled={isPending}
+          >
+            {row.original.status === 'active' ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -222,16 +272,44 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
             ))}
           </SelectContent>
         </Select>
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
+                statusFilter === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         <Button onClick={() => { setEditingEmployee(null); reset({ role: 'lead', hra: 0, allowances: 0, pf_deduction: 0, tds_deduction: 0, salary_cycle_start_day: 1 }); setShowForm(true) }}>
           <Plus className="mr-2 h-4 w-4" /> Add Employee
         </Button>
       </div>
 
-      <DataTable
-        data={filtered}
-        columns={columns}
-        onRowClick={(row) => router.push(`/hrms/${row.id}`)}
-      />
+      {departments.length === 0 ? (
+        <div className="text-center py-16 border rounded-xl bg-white">
+          <p className="font-medium text-gray-500">No employees found</p>
+        </div>
+      ) : (
+        departments.map(dept => (
+          <div key={dept} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <h2 className="text-sm font-bold text-gray-800">{dept}</h2>
+              <span className="text-xs text-gray-400 font-medium">({grouped[dept].length})</span>
+            </div>
+            <DataTable
+              data={grouped[dept]}
+              columns={columns}
+              onRowClick={(row) => router.push(`/hrms/${row.id}`)}
+            />
+          </div>
+        ))
+      )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

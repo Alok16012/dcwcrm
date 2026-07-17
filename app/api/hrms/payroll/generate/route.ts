@@ -30,6 +30,19 @@ type StudentIncentiveRow = {
     incentive_amount: number | null
 }
 
+type MentorPayRow = {
+    incentive_amount: number | null
+    salary_percentage: number | null
+    paid_on: string | null
+    approved_at: string | null
+    created_at: string | null
+}
+
+type AdvanceRow = {
+    id: string
+    amount: number | null
+}
+
 type GeneratePayrollBody = {
     employee_id?: string
     month?: number
@@ -131,13 +144,23 @@ export async function POST(req: NextRequest) {
             .lte('enrollment_date', endStr)
 
         const studentIncentiveRows = (studentIncentives ?? []) as StudentIncentiveRow[]
-        const calculatedIncentive = studentIncentiveRows.reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
-        const cycleStudentIncentive = calculatedIncentive || Number(incentive) || 0
+        const admissionIncentive = studentIncentiveRows.reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
 
-        const inc = cycleStudentIncentive
+        // Mentorship incentive: approved mentorship payments credited to this
+        // employee (as telecaller/mentor) whose payment date falls in the cycle.
+        const { data: mentorPays } = await supabase
+            .from('mentorship_payments')
+            .select('incentive_amount, salary_percentage, paid_on, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id)')
+            .eq('status', 'approved')
+            .eq('mentorship.telecaller_id', emp.profile_id)
+        const mentorshipIncentive = ((mentorPays ?? []) as unknown as MentorPayRow[]).reduce((acc, p) => {
+            const when = (p.paid_on ?? p.approved_at ?? p.created_at ?? '').slice(0, 10)
+            if (!when || when < startStr || when > endStr) return acc
+            return acc + (Number(p.incentive_amount ?? p.salary_percentage) || 0)
+        }, 0)
 
-        const gross = basic + hra + allow + inc
-        const net = gross - pf - tds - od - leaveDeduction
+        const cycleIncentive = admissionIncentive + mentorshipIncentive
+        const inc = cycleIncentive || Number(incentive) || 0
 
         const { data: existing } = await supabase
             .from('payroll')
@@ -147,33 +170,49 @@ export async function POST(req: NextRequest) {
             .eq('year', year)
             .maybeSingle() as { data: ExistingPayroll | null }
 
+        // Salary advances recovered in this payroll: all pending ones, plus (on
+        // regenerate) those already settled against this same payroll row.
+        const advFilter = existing
+            ? `status.eq.pending,settled_in.eq.${existing.id}`
+            : 'status.eq.pending'
+        const { data: advRaw } = await supabase
+            .from('advance_salaries')
+            .select('id, amount')
+            .eq('employee_id', employee_id)
+            .or(advFilter)
+        const advances = (advRaw ?? []) as AdvanceRow[]
+        const advanceDeduction = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+
+        const gross = basic + hra + allow + inc
+        const net = gross - pf - tds - od - leaveDeduction - advanceDeduction
+
+        const payload = {
+            basic,
+            hra,
+            allowances: allow,
+            incentive: inc,
+            gross,
+            pf,
+            tds,
+            other_deductions: od,
+            leave_deduction: leaveDeduction,
+            advance_deduction: advanceDeduction,
+            net,
+        }
+
+        let payroll: Record<string, unknown> | null = null
+
         if (existing) {
             if (existing.status === 'paid') {
                 return NextResponse.json({ error: 'Payroll already paid for this month' }, { status: 400 })
             }
 
-            // Regenerating recalculates the incentive fresh from this cycle's
-            // enrollments. The old "merge" (keep-or-add) rule stacked stale
-            // values across regenerations and never corrected downwards.
-            const mergedIncentive = cycleStudentIncentive
-            const mergedGross = basic + hra + allow + mergedIncentive
-            const mergedNet = mergedGross - pf - tds - od - leaveDeduction
-
+            // Regenerating recalculates everything fresh for this cycle. The old
+            // "merge" (keep-or-add) rule stacked stale incentives across
+            // regenerations and never corrected downwards.
             const { data: updated, error: updateErr } = await supabase
                 .from('payroll')
-                .update({
-                    basic,
-                    hra,
-                    allowances: allow,
-                    incentive: mergedIncentive,
-                    gross: mergedGross,
-                    pf,
-                    tds,
-                    other_deductions: od,
-                    leave_deduction: leaveDeduction,
-                    net: mergedNet,
-                    status: existing.status || 'draft'
-                } as never)
+                .update({ ...payload, status: existing.status || 'draft' } as never)
                 .eq('id', existing.id)
                 .select('*')
                 .single()
@@ -181,39 +220,36 @@ export async function POST(req: NextRequest) {
             if (updateErr) {
                 return NextResponse.json({ error: updateErr.message }, { status: 400 })
             }
+            payroll = updated as Record<string, unknown>
+        } else {
+            const { data: inserted, error: insertErr } = await supabase
+                .from('payroll')
+                .insert({ employee_id, month, year, ...payload, status: 'draft' } as never)
+                .select('*')
+                .single()
 
-            return NextResponse.json({ payroll: updated, attendance: attCounts })
-        }
-
-        const { data: inserted, error: insertErr } = await supabase
-            .from('payroll')
-            .insert({
-                employee_id,
-                month,
-                year,
-                basic,
-                hra,
-                allowances: allow,
-                incentive: inc,
-                gross,
-                pf,
-                tds,
-                other_deductions: od,
-                leave_deduction: leaveDeduction,
-                net,
-                status: 'draft'
-            } as never)
-            .select('*')
-            .single()
-
-        if (insertErr) {
-            if (insertErr.code === '23505') {
-                return NextResponse.json({ error: 'Payroll already generated for this month' }, { status: 400 })
+            if (insertErr) {
+                if (insertErr.code === '23505') {
+                    return NextResponse.json({ error: 'Payroll already generated for this month' }, { status: 400 })
+                }
+                return NextResponse.json({ error: insertErr.message }, { status: 400 })
             }
-            return NextResponse.json({ error: insertErr.message }, { status: 400 })
+            payroll = inserted as Record<string, unknown>
         }
 
-        return NextResponse.json({ payroll: inserted, attendance: attCounts })
+        // Link recovered advances to this payroll so deleting it releases them
+        if (advances.length && payroll) {
+            await supabase
+                .from('advance_salaries')
+                .update({ status: 'settled', settled_in: payroll.id } as never)
+                .in('id', advances.map(a => a.id))
+        }
+
+        return NextResponse.json({
+            payroll,
+            attendance: attCounts,
+            incentive_breakup: { admission: admissionIncentive, mentorship: mentorshipIncentive },
+        })
     } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }

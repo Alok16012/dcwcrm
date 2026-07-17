@@ -234,6 +234,9 @@ export async function PATCH(req: NextRequest) {
     if (updateData.email) profileUpdate.email = updateData.email
     if (updateData.phone) profileUpdate.phone = updateData.phone
     if (updateData.role) profileUpdate.role = updateData.role
+    // Active/inactive applies to the login profile too, so ex-employees stop
+    // appearing in counsellor/assignee dropdowns across the CRM.
+    if (typeof updateData.is_active === 'boolean') profileUpdate.is_active = updateData.is_active
 
     if (Object.keys(profileUpdate).length > 0) {
       const { error: pError } = await (adminClient.from('profiles') as any)
@@ -257,6 +260,7 @@ export async function PATCH(req: NextRequest) {
     if (updateData.bank_account_masked !== undefined) empUpdate.bank_account = updateData.bank_account_masked
     if (updateData.bank_ifsc !== undefined) empUpdate.bank_ifsc = updateData.bank_ifsc
     if (updateData.salary_cycle_start_day !== undefined) empUpdate.salary_cycle_start_day = updateData.salary_cycle_start_day
+    if (typeof updateData.is_active === 'boolean') empUpdate.is_active = updateData.is_active
 
     if (Object.keys(empUpdate).length > 0) {
       const { error: eError } = await (adminClient.from('employees') as any)

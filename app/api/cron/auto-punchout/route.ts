@@ -14,8 +14,13 @@ function todayIST(): string {
 }
 
 export async function GET(req: Request) {
+  // Vercel cron sends Authorization: Bearer CRON_SECRET when the env var is
+  // set. If it isn't configured, fall back to trusting Vercel's cron
+  // user-agent so auto punch-out still runs (it only closes open punches).
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isVercelCron = (req.headers.get('user-agent') ?? '').startsWith('vercel-cron')
+  const secretOk = !!process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`
+  if (!secretOk && !isVercelCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -114,8 +114,9 @@ export function SelfPunchClient({ employeeId, employeeName }: Props) {
       if (error) throw error
       toast.success(`Punched In at ${format(new Date(), 'hh:mm a')}`)
       await loadData()
-    } catch {
-      toast.error('Failed to punch in')
+    } catch (e) {
+      const msg = (e as { message?: string })?.message
+      toast.error('Failed to punch in' + (msg ? `: ${msg}` : ''))
     } finally {
       setPunching(false)
     }
@@ -140,8 +141,9 @@ export function SelfPunchClient({ employeeId, employeeName }: Props) {
       if (error) throw error
       toast.success(`Punched Out at ${format(new Date(), 'hh:mm a')}`)
       await loadData()
-    } catch {
-      toast.error('Failed to punch out')
+    } catch (e) {
+      const msg = (e as { message?: string })?.message
+      toast.error('Failed to punch out' + (msg ? `: ${msg}` : ''))
     } finally {
       setPunching(false)
     }

@@ -547,6 +547,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dept</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Board</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Course</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Standard</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned To</th>
@@ -617,10 +618,13 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                       <Badge variant="outline" className="capitalize text-[10px] font-normal border-gray-200 text-gray-500">{lead.mode}</Badge>
                     ) : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-3 text-gray-600 text-[10px]">
-                    {lead.department?.name
-                      ? `${lead.department.name}${lead.sub_section?.name ? ` - ${lead.sub_section.name}` : ''}`
-                      : <span className="text-gray-300">—</span>}
+                  <td className="px-3 py-3 text-gray-600 text-[10px]">{lead.department?.name ?? <span className="text-gray-300">—</span>}</td>
+                  <td className="px-3 py-3">
+                    {lead.sub_section?.name ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
+                        {lead.sub_section.name}
+                      </span>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.course?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.sub_course?.name ?? <span className="text-gray-300">—</span>}</td>

@@ -16,6 +16,7 @@ const LEAD_FIELDS = [
   { key: 'source', label: 'Source', required: false },
   { key: 'status', label: 'Status', required: false },
   { key: 'department', label: 'Department', required: false },
+  { key: 'sub_department', label: 'Sub Department (University/Board)', required: false },
   { key: 'course', label: 'Course', required: false },
   { key: 'standard', label: 'Standard', required: false },
 ]
@@ -53,13 +54,21 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
       setHeaders(hdrs)
       setRows(json)
       const autoMap: Record<string, string> = {}
+      const usedHeaders = new Set<string>()
+      // First pass: exact matches, so "Department" doesn't get claimed by "Sub Department"
       LEAD_FIELDS.forEach(({ key }) => {
+        const match = hdrs.find((h) => h.toLowerCase().replace(/[\s-]/g, '_') === key)
+        if (match) { autoMap[key] = match; usedHeaders.add(match) }
+      })
+      LEAD_FIELDS.forEach(({ key }) => {
+        if (autoMap[key]) return
         const match = hdrs.find((h) =>
-          h.toLowerCase().replace(/\s/g, '_') === key ||
-          h.toLowerCase().includes(key.replace('_', ' ')) ||
-          h.toLowerCase().includes(key)
+          !usedHeaders.has(h) && (
+            h.toLowerCase().includes(key.replace(/_/g, ' ')) ||
+            h.toLowerCase().includes(key)
+          )
         )
-        if (match) autoMap[key] = match
+        if (match) { autoMap[key] = match; usedHeaders.add(match) }
       })
       setMapping(autoMap)
     }
@@ -77,8 +86,8 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
 
   function downloadSample() {
     const sampleData = [
-      { 'Full Name': 'Rahul Kumar', 'Phone': '9876543210', 'Email': 'rahul@example.com', 'City': 'Delhi', 'State': 'Delhi', 'Source': 'phone', 'Status': 'new', 'Course': 'MBA', 'Standard': 'Full Time', 'Department': 'Management' },
-      { 'Full Name': 'Priya Singh', 'Phone': '8765432109', 'Email': 'priya@example.com', 'City': 'Mumbai', 'State': 'Maharashtra', 'Source': 'website', 'Status': 'interested', 'Course': 'Class 10', 'Standard': '10th', 'Department': 'Schooling' },
+      { 'Full Name': 'Rahul Kumar', 'Phone': '9876543210', 'Email': 'rahul@example.com', 'City': 'Delhi', 'State': 'Delhi', 'Source': 'phone', 'Status': 'new', 'Course': 'MBA', 'Standard': 'Full Time', 'Department': 'Management', 'Sub Department': '' },
+      { 'Full Name': 'Priya Singh', 'Phone': '8765432109', 'Email': 'priya@example.com', 'City': 'Mumbai', 'State': 'Maharashtra', 'Source': 'website', 'Status': 'interested', 'Course': 'Class 10', 'Standard': '10th', 'Department': 'Open Schooling', 'Sub Department': 'NIOS' },
     ]
     const ws = XLSX.utils.json_to_sheet(sampleData)
     const wb = XLSX.utils.book_new()
@@ -94,9 +103,10 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
     setImporting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      interface LookupItem { id: string; name: string; course_id?: string }
-      const [deptRes, courseRes, subCourseRes] = await Promise.all([
+      interface LookupItem { id: string; name: string; course_id?: string; department_id?: string }
+      const [deptRes, subSectionRes, courseRes, subCourseRes] = await Promise.all([
         supabase.from('departments').select('id, name').returns<LookupItem[]>(),
+        supabase.from('department_sub_sections').select('id, name, department_id').returns<LookupItem[]>(),
         supabase.from('courses').select('id, name').returns<LookupItem[]>(),
         supabase.from('sub_courses').select('id, name, course_id').returns<LookupItem[]>(),
       ])
@@ -107,12 +117,22 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
         const source = row[mapping.source ?? '']?.toLowerCase().trim()
         const status = row[mapping.status ?? '']?.toLowerCase().trim()
         const deptName = mapping.department ? row[mapping.department]?.trim() : null
+        const subDeptName = mapping.sub_department ? row[mapping.sub_department]?.trim() : null
         const courseName = mapping.course ? row[mapping.course]?.trim() : null
         const standardName = mapping.standard ? row[mapping.standard]?.trim() : null
         let department_id: string | null = null
+        let sub_section_id: string | null = null
         let course_id: string | null = null
         let sub_course_id: string | null = null
         if (deptName) { const id = deptMap.get(deptName.toLowerCase()); if (id) department_id = id }
+        if (subDeptName) {
+          const candidates = (subSectionRes.data ?? []).filter(s => s.name.toLowerCase() === subDeptName.toLowerCase())
+          const match = (department_id ? candidates.find(s => s.department_id === department_id) : null) ?? candidates[0] ?? null
+          if (match) {
+            sub_section_id = match.id
+            if (!department_id && match.department_id) department_id = match.department_id
+          }
+        }
         if (courseName) { const id = courseMap.get(courseName.toLowerCase()); if (id) course_id = id }
         if (standardName && course_id) {
           const sc = (subCourseRes.data ?? []).find(s => s.name.toLowerCase() === standardName.toLowerCase() && s.course_id === course_id)
@@ -126,7 +146,7 @@ export function BulkImportLeads({ onSuccess, onCancel }: BulkImportLeadsProps) {
           state: mapping.state ? row[mapping.state]?.trim() || null : null,
           source: SOURCE_VALUES.includes(source) ? source : 'other',
           status: STATUS_VALUES.includes(status) ? status : 'new',
-          department_id, course_id, sub_course_id,
+          department_id, sub_section_id, course_id, sub_course_id,
           created_by: user?.id,
         }
       }).filter((l) => l.full_name && l.phone)

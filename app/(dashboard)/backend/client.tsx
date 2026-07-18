@@ -67,6 +67,9 @@ function counsellorColor(name: string) {
 interface FilterOption { id: string; name: string }
 interface BoardOption { id: string; name: string; department_id: string }
 
+// Filters survive navigating into a student and coming back (sessionStorage)
+const FILTER_STORAGE_KEY = 'backend-students-filters'
+
 export function BackendListClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -84,6 +87,8 @@ export function BackendListClient() {
   const [modeFilter, setModeFilter] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState(deptParam || '')
   const [boardFilter, setBoardFilter] = useState('')
+  const [sortBy, setSortBy] = useState<'' | 'dues_desc' | 'dues_asc'>('')
+  const [filtersRestored, setFiltersRestored] = useState(false)
   const [courses, setCourses] = useState<FilterOption[]>([])
   const [sessions, setSessions] = useState<FilterOption[]>([])
   const [counsellors, setCounsellors] = useState<FilterOption[]>([])
@@ -110,6 +115,41 @@ export function BackendListClient() {
   const [assigningMentor, setAssigningMentor] = useState(false)
   const [tableKey, setTableKey] = useState(0)
   const supabase = createClient()
+
+  // Restore saved filters on mount (after SSR, so no hydration mismatch).
+  // A ?dept= URL param wins over the saved department.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(FILTER_STORAGE_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw)
+        setSearch(saved.search ?? '')
+        setStatusFilter(saved.status ?? '')
+        setPaymentFilter(saved.payment ?? '')
+        setCourseFilter(saved.course ?? '')
+        setSessionFilter(saved.session ?? '')
+        setCounsellorFilter(saved.counsellor ?? '')
+        setModeFilter(saved.mode ?? '')
+        if (!deptParam) setDepartmentFilter(saved.department ?? '')
+        setBoardFilter(saved.board ?? '')
+        setSortBy(saved.sortBy ?? '')
+      }
+    } catch { /* corrupted storage — start fresh */ }
+    setFiltersRestored(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save filters whenever they change (after initial restore)
+  useEffect(() => {
+    if (!filtersRestored) return
+    try {
+      sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+        search, status: statusFilter, payment: paymentFilter, course: courseFilter,
+        session: sessionFilter, counsellor: counsellorFilter, mode: modeFilter,
+        department: departmentFilter, board: boardFilter, sortBy,
+      }))
+    } catch { /* storage unavailable */ }
+  }, [filtersRestored, search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter, sortBy])
 
   function scrollTabs(dir: 'left' | 'right') {
     if (tabScrollRef.current) {
@@ -159,8 +199,9 @@ export function BackendListClient() {
     } else {
       const filtered = allBoards.filter(b => b.department_id === departmentFilter)
       setBoards(filtered)
-      // If current boardFilter doesn't belong to this department, reset it
-      if (boardFilter && !filtered.find(b => b.id === boardFilter)) {
+      // If current boardFilter doesn't belong to this department, reset it.
+      // Skip while allBoards hasn't loaded yet, or a restored filter gets wiped.
+      if (allBoards.length > 0 && boardFilter && !filtered.find(b => b.id === boardFilter)) {
         setBoardFilter('')
       }
     }
@@ -208,6 +249,13 @@ export function BackendListClient() {
       setLoading(false)
     }
   }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
+
+  // Payment-wise ordering: highest dues first (or lowest), else keep server order
+  const displayStudents = useMemo(() => {
+    if (!sortBy) return students
+    const dues = (s: Student) => (s.total_fee ?? 0) - (s.amount_paid ?? 0)
+    return [...students].sort((a, b) => sortBy === 'dues_desc' ? dues(b) - dues(a) : dues(a) - dues(b))
+  }, [students, sortBy])
 
   // Tabs: filter by dept if selected, then deduplicate by name to avoid same-name boards from multiple depts
   const tabBoards = useMemo(() => {
@@ -313,7 +361,7 @@ export function BackendListClient() {
     setExporting(true)
     try {
       const xlsx = await import('xlsx')
-      const rows = students.map((s) => ({
+      const rows = displayStudents.map((s) => ({
         Name: s.full_name,
         "Father's Name": s.guardian_name || '-',
         Phone: s.phone,
@@ -579,7 +627,7 @@ export function BackendListClient() {
             <div className="text-center py-16 text-muted-foreground">
               <UserPlus className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-medium">No pending students</p>
-              <p className="text-xs mt-1">Converted leads will appear here for approval</p>
+              <p className="text-xs mt-1">Converted leads aur direct add kiye gaye new admissions yahan approval ke liye aayenge</p>
             </div>
           ) : (
             <div className="rounded-xl border overflow-hidden bg-white">
@@ -617,6 +665,30 @@ export function BackendListClient() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5"
+                            onClick={() => setEditStudent(s)}
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </Button>
+                          {/* Invoice bhejna pending state me bhi possible hai — approval ki zaroorat nahi */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <PrintInvoiceButton student={s} />
+                              </div>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SendInvoiceWhatsAppButton student={s} />
+                              </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           <Button
                             size="sm"
                             className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
@@ -798,6 +870,18 @@ export function BackendListClient() {
             <SelectItem value="unpaid">Unpaid</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={(v) => setSortBy((v ?? '') as '' | 'dues_desc' | 'dues_asc')}>
+          <SelectTrigger className="w-44 h-9">
+            <span className="text-sm truncate">
+              {sortBy === 'dues_desc' ? 'Dues: High → Low' : sortBy === 'dues_asc' ? 'Dues: Low → High' : 'Sort by Dues'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Default Order</SelectItem>
+            <SelectItem value="dues_desc">Dues: High → Low</SelectItem>
+            <SelectItem value="dues_asc">Dues: Low → High</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Bulk action bar */}
@@ -825,30 +909,12 @@ export function BackendListClient() {
 
       <DataTable
         key={tableKey}
-        data={students}
+        data={displayStudents}
         columns={columns}
         isLoading={loading}
         onRowClick={(s) => router.push(`/backend/${s.id}`)}
         onSelectionChange={(rows) => setSelectedStudents(rows)}
       />
-
-      <Dialog open={!!editStudent} onOpenChange={(open) => !open && setEditStudent(null)}>
-        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Update Student Details</DialogTitle>
-          </DialogHeader>
-          {editStudent && (
-            <StudentForm
-              student={editStudent}
-              onSuccess={() => {
-                setEditStudent(null)
-                fetchStudents()
-              }}
-              onCancel={() => setEditStudent(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
@@ -859,6 +925,9 @@ export function BackendListClient() {
             onSuccess={() => {
               setShowAdd(false)
               fetchStudents()
+              loadPending()
+              // New admissions land in the pending tab — show the user where it went
+              setActiveTab('pending')
             }}
             onCancel={() => setShowAdd(false)}
           />
@@ -917,6 +986,26 @@ export function BackendListClient() {
       </Dialog>
 
       </> /* end students tab */}
+
+      {/* Edit dialog — shared by All Students table and the pending (New Students) tab */}
+      <Dialog open={!!editStudent} onOpenChange={(open) => !open && setEditStudent(null)}>
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Update Student Details</DialogTitle>
+          </DialogHeader>
+          {editStudent && (
+            <StudentForm
+              student={editStudent}
+              onSuccess={() => {
+                setEditStudent(null)
+                fetchStudents()
+                loadPending()
+              }}
+              onCancel={() => setEditStudent(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Reject Student Dialog */}
       <Dialog open={!!rejectTarget} onOpenChange={open => !open && setRejectTarget(null)}>

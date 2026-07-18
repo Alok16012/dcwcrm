@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
-import { Download, Mail, Trash2, Loader2 } from 'lucide-react'
+import { Download, Mail, Trash2, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { pdf } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/client'
@@ -67,6 +67,7 @@ export default function PayrollTable({
   const [showGenerate, setShowGenerate] = useState(false)
   const [deleteRow, setDeleteRow] = useState<PayrollRow | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [recalcId, setRecalcId] = useState<string | null>(null)
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
 
@@ -239,18 +240,49 @@ export default function PayrollTable({
           throw new Error(err.error || 'Failed to generate payroll')
         }
         const { payroll, attendance } = await res.json()
-        setData((prev) => [{
+        const newRow = {
           ...payroll,
           employee_name: employeeName,
           employee_code: employeeCode,
           designation: designation,
           department: department,
           attendance,
-        }, ...prev])
+        }
+        // Regenerating an existing month updates that row — replace, don't duplicate
+        setData((prev) => prev.some((r) => r.id === payroll.id)
+          ? prev.map((r) => r.id === payroll.id ? { ...r, ...newRow } : r)
+          : [newRow, ...prev])
         toast.success(`Payroll generated for ${format(new Date(year, month - 1), 'MMM yyyy')}`)
         setShowGenerate(false)
       } catch (err: any) {
         toast.error(err.message || 'Failed to generate payroll')
+      }
+    })
+  }
+
+  // Re-run the incentive/attendance calculation for an existing row. Incentives
+  // approved after the draft was generated (mentorship approvals, new
+  // enrollments) don't update the stored row on their own — this refreshes it.
+  const recalcRow = (row: PayrollRow) => {
+    setRecalcId(row.id)
+    startTransition(async () => {
+      try {
+        const res = await fetch('/api/hrms/payroll/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: row.employee_id, month: row.month, year: row.year }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Failed to recalculate')
+        }
+        const { payroll, attendance } = await res.json()
+        setData((prev) => prev.map((r) => r.id === row.id ? { ...r, ...payroll, attendance } : r))
+        toast.success(`Recalculated — incentive ${fmt(Number(payroll.incentive) || 0)}`)
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to recalculate')
+      } finally {
+        setRecalcId(null)
       }
     })
   }
@@ -390,6 +422,16 @@ export default function PayrollTable({
                         onClick={() => emailSlip(row)}
                       >
                         {sendingId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                      </Button>
+                    )}
+                    {isAdmin && row.status !== 'paid' && (
+                      <Button
+                        size="sm" variant="ghost" title="Recalculate incentive & attendance"
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                        disabled={recalcId === row.id}
+                        onClick={() => recalcRow(row)}
+                      >
+                        {recalcId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                       </Button>
                     )}
                     {isAdmin && row.status !== 'paid' && (

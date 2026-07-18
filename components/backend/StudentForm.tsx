@@ -223,6 +223,11 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             })
     }, [selectedDeptId, student?.id, setValue])
 
+    // New admissions (direct add — even by Accounts) always enter as 'pending'
+    // and stay in the New Students tab until explicitly approved there. Edits
+    // to a pending student (fees, details) must not move it out of pending.
+    const isPendingApproval = student?.status === 'pending'
+
     async function onSubmit(data: StudentFormData) {
         setLoading(true)
         try {
@@ -246,6 +251,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 const payload = {
                     ...rest,
                     ...base,
+                    // Pending students can only be activated via the New Students
+                    // approval flow, not through the edit form.
+                    ...(isPendingApproval ? { status: 'pending' as const } : {}),
                     incentive_amount: Math.round((data.incentive_amount ?? 0) * 100) / 100,
                 }
                 const { error } = await supabase.from('students').update({
@@ -278,13 +286,14 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                 const newPayload = {
                     ...data,
                     ...base,
+                    status: 'pending' as const,
                     incentive_amount: Math.round((data.incentive_amount ?? 0) * 100) / 100,
                 }
                 const { data: newStudent, error } = await supabase.from('students').insert({
                     ...newPayload,
                 } as never).select().single()
                 if (error) throw error
-                toast.success('Student successfully added')
+                toast.success('New admission added — approval ke liye New Students tab me bhej diya')
             }
 
             onSuccess()
@@ -499,21 +508,30 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                             </FieldWrapper>
 
                             <FieldWrapper label="Status">
-                                <Select value={watch('status')} onValueChange={(v) => setValue('status', v as any)}>
-                                    <SelectTrigger className="bg-white border-blue-200">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                                            <SelectItem key={k} value={k}>
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full ${STATUS_DOT[k]}`} />
-                                                    {v}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                {(!student?.id || isPendingApproval) ? (
+                                    <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-amber-200 bg-amber-50">
+                                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                                        <span className="text-sm font-medium text-amber-700">
+                                            New Admission — Pending Approval
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <Select value={watch('status')} onValueChange={(v) => setValue('status', v as any)}>
+                                        <SelectTrigger className="bg-white border-blue-200">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                                                <SelectItem key={k} value={k}>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full ${STATUS_DOT[k]}`} />
+                                                        {v}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </FieldWrapper>
 
                             {watch('status') === 'dropped' && (

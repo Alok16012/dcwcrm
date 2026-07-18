@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
 
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 400 })
 
-    // Create or update student with status='pending' (bypasses RLS via service role)
+    // Create or update student with status='pending' (bypasses RLS via service role).
+    // Both lead conversions and directly-added admissions wait in the
+    // New Students tab until approved there.
     const { error: studentErr } = await adminClient
       .from('students')
       .upsert({

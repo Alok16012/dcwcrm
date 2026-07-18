@@ -202,7 +202,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
 
     const headers = [
       'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source', 
-      'Mode', 'Department', 'Course', 'Sub-Course', 'Assigned To', 'Date Added'
+      'Mode', 'Department', 'University/Board', 'Course', 'Sub-Course', 'Assigned To', 'Date Added'
     ]
 
     const csvRows = sorted.map(l => [
@@ -214,6 +214,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
       LEAD_SOURCE_LABELS[l.source] ?? l.source,
       l.mode ?? '',
       l.department?.name ?? '',
+      l.sub_section?.name ?? '',
       l.course?.name ?? '',
       l.sub_course?.name ?? '',
       l.assigned_user?.full_name ?? 'Unassigned',
@@ -616,7 +617,11 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                       <Badge variant="outline" className="capitalize text-[10px] font-normal border-gray-200 text-gray-500">{lead.mode}</Badge>
                     ) : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-3 text-gray-600 text-[10px]">{lead.department?.name ?? <span className="text-gray-300">—</span>}</td>
+                  <td className="px-3 py-3 text-gray-600 text-[10px]">
+                    {lead.department?.name
+                      ? `${lead.department.name}${lead.sub_section?.name ? ` - ${lead.sub_section.name}` : ''}`
+                      : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.course?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{lead.sub_course?.name ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-3">

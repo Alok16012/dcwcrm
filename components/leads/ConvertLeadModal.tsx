@@ -115,7 +115,9 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
               <Label className="text-xs font-semibold text-gray-600">Department</Label>
               <Select value={departmentId} onValueChange={(v) => { setDepartmentId(v ?? ''); setSubSectionId('') }}>
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select dept" />
+                  <SelectValue placeholder="Select dept">
+                    {departmentId ? departments.find((d) => d.id === departmentId)?.name ?? null : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
@@ -130,7 +132,9 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
             <Label className="text-xs font-semibold text-gray-600">University/Board</Label>
             <Select value={subSectionId} onValueChange={(v) => setSubSectionId(v ?? '')} disabled={!departmentId}>
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select university/board" />
+                <SelectValue placeholder="Select university/board">
+                  {subSectionId ? subSections.find((s) => s.id === subSectionId)?.name ?? null : null}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {subSections.map((s) => (

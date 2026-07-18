@@ -72,7 +72,11 @@ export function LeadTransferModal({ open, onClose, leadIds, currentAssignee, onS
           <div>
             <Label>Transfer to</Label>
             <Select value={selectedId} onValueChange={(v) => setSelectedId(v || '')}>
-              <SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select agent">
+                  {selectedId ? telecallers.find((t) => t.id === selectedId)?.full_name ?? 'Select agent' : null}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {telecallers.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
               </SelectContent>

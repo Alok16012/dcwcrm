@@ -991,7 +991,9 @@ export function BackendListClient() {
               <label className="text-xs font-semibold text-gray-600">Select Counselor / Mentor</label>
               <Select value={selectedCounselor} onValueChange={setSelectedCounselor}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose counselor..." />
+                  <SelectValue placeholder="Choose counselor...">
+                    {selectedCounselor ? counselors.find((c) => c.id === selectedCounselor)?.name ?? null : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {counselors.map(c => (

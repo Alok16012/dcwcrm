@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useTransition, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
-import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock, XCircle, GraduationCap, Award } from 'lucide-react'
+import { MoreVertical, Pencil, FileText, Search, Trash2, Download, ChevronLeft, ChevronRight, UserPlus, CheckCircle2, Clock, XCircle, GraduationCap, Award, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -87,7 +87,7 @@ export function BackendListClient() {
   const [modeFilter, setModeFilter] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState(deptParam || '')
   const [boardFilter, setBoardFilter] = useState('')
-  const [sortBy, setSortBy] = useState<'' | 'dues_desc' | 'dues_asc'>('')
+  const [sortBy, setSortBy] = useState<'' | 'dues_desc' | 'dues_asc' | 'paid_desc' | 'paid_asc'>('')
   const [filtersRestored, setFiltersRestored] = useState(false)
   const [courses, setCourses] = useState<FilterOption[]>([])
   const [sessions, setSessions] = useState<FilterOption[]>([])
@@ -250,12 +250,38 @@ export function BackendListClient() {
     }
   }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
 
-  // Payment-wise ordering: highest dues first (or lowest), else keep server order
+  // Payment-wise ordering (paid amount or pending dues), else keep server order
   const displayStudents = useMemo(() => {
     if (!sortBy) return students
     const dues = (s: Student) => (s.total_fee ?? 0) - (s.amount_paid ?? 0)
-    return [...students].sort((a, b) => sortBy === 'dues_desc' ? dues(b) - dues(a) : dues(a) - dues(b))
+    const paid = (s: Student) => s.amount_paid ?? 0
+    const get = sortBy.startsWith('paid') ? paid : dues
+    const desc = sortBy.endsWith('desc')
+    return [...students].sort((a, b) => desc ? get(b) - get(a) : get(a) - get(b))
   }, [students, sortBy])
+
+  // Header click cycles: descending → ascending → off
+  function toggleSort(field: 'paid' | 'dues') {
+    setSortBy((prev) =>
+      prev === `${field}_desc` ? `${field}_asc`
+      : prev === `${field}_asc` ? ''
+      : `${field}_desc`)
+  }
+
+  function SortHeader({ label, field }: { label: string; field: 'paid' | 'dues' }) {
+    const active = sortBy.startsWith(field)
+    const Icon = !active ? ArrowUpDown : sortBy.endsWith('desc') ? ArrowDown : ArrowUp
+    return (
+      <button
+        onClick={() => toggleSort(field)}
+        className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-blue-600 font-semibold' : ''}`}
+        title={`Sort by ${label} (click to toggle)`}
+      >
+        {label}
+        <Icon className="w-3.5 h-3.5" />
+      </button>
+    )
+  }
 
   // Tabs: filter by dept if selected, then deduplicate by name to avoid same-name boards from multiple depts
   const tabBoards = useMemo(() => {
@@ -523,9 +549,9 @@ export function BackendListClient() {
       }
     },
     { accessorKey: 'total_fee', header: 'Total Fee', cell: ({ row }) => row.original.total_fee ? formatCurrency(row.original.total_fee) : '-' },
-    { accessorKey: 'amount_paid', header: 'Paid', cell: ({ row }) => <span className="text-green-700">{formatCurrency(row.original.amount_paid ?? 0)}</span> },
+    { accessorKey: 'amount_paid', header: () => <SortHeader label="Paid" field="paid" />, cell: ({ row }) => <span className="text-green-700">{formatCurrency(row.original.amount_paid ?? 0)}</span> },
     {
-      id: 'pending', header: 'Pending', cell: ({ row }) => {
+      id: 'pending', header: () => <SortHeader label="Pending" field="dues" />, cell: ({ row }) => {
         const p = (row.original.total_fee ?? 0) - (row.original.amount_paid ?? 0)
         return p > 0 ? <span className="text-red-600">{formatCurrency(p)}</span> : <span className="text-gray-400">-</span>
       }
@@ -870,16 +896,22 @@ export function BackendListClient() {
             <SelectItem value="unpaid">Unpaid</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={(v) => setSortBy((v ?? '') as '' | 'dues_desc' | 'dues_asc')}>
+        <Select value={sortBy} onValueChange={(v) => setSortBy((v ?? '') as typeof sortBy)}>
           <SelectTrigger className="w-44 h-9">
             <span className="text-sm truncate">
-              {sortBy === 'dues_desc' ? 'Dues: High → Low' : sortBy === 'dues_asc' ? 'Dues: Low → High' : 'Sort by Dues'}
+              {sortBy === 'dues_desc' ? 'Dues: High → Low'
+                : sortBy === 'dues_asc' ? 'Dues: Low → High'
+                : sortBy === 'paid_desc' ? 'Paid: High → Low'
+                : sortBy === 'paid_asc' ? 'Paid: Low → High'
+                : 'Sort by Payment'}
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Default Order</SelectItem>
             <SelectItem value="dues_desc">Dues: High → Low</SelectItem>
             <SelectItem value="dues_asc">Dues: Low → High</SelectItem>
+            <SelectItem value="paid_desc">Paid: High → Low</SelectItem>
+            <SelectItem value="paid_asc">Paid: Low → High</SelectItem>
           </SelectContent>
         </Select>
       </div>

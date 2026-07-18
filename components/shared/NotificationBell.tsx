@@ -91,11 +91,11 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
 
     setFollowups(followupData ?? [])
 
-    // General notifications — broadcast or targeted to my role
+    // General notifications — broadcast, targeted to my role, or targeted to me
     const { data: notifData } = await db
       .from('notifications')
       .select('id, title, message, type, created_at')
-      .or(`target_role.is.null,target_role.eq.${role}`)
+      .or(`and(target_user_id.is.null,or(target_role.is.null,target_role.eq.${role})),target_user_id.eq.${userId}`)
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -118,8 +118,26 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
     const channel = supabase
       .channel(`notif-tasks-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `assigned_to=eq.${userId}` }, () => load())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads', filter: `assigned_to=eq.${userId}` }, (payload: any) => {
+        // Live alert when a new lead lands assigned to me (e.g. Meta auto-assign)
+        const l = payload?.new
+        if (l?.full_name) {
+          toast.info('Naya lead assign hua!', {
+            description: `${l.full_name}${l.phone && l.phone !== '—' ? ` · ${l.phone}` : ''}`,
+            duration: 8000,
+          })
+        }
+        load()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads', filter: `assigned_to=eq.${userId}` }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload: any) => {
+        const n = payload?.new
+        // Toast targeted notifications instantly (works in browser + mobile app webview)
+        if (n?.target_user_id === userId) {
+          toast.info(n.title ?? 'Notification', { description: n.message ?? '', duration: 8000 })
+        }
+        load()
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [userId, load])

@@ -96,14 +96,23 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
       setConfirmConvert(true)
       return
     }
+    if (newStatus === 'custom') {
+      const entered = window.prompt('Enter custom status', lead.custom_status ?? '')
+      if (entered === null) return
+      const label = entered.trim()
+      if (!label) { toast.error('Custom status cannot be empty'); return }
+      applyStatusChange(newStatus, label)
+      return
+    }
     applyStatusChange(newStatus)
   }
 
-  function applyStatusChange(newStatus: LeadStatus) {
+  function applyStatusChange(newStatus: LeadStatus, customLabel?: string) {
     startTransition(async () => {
-      const { error } = await supabase.from('leads').update({ status: newStatus } as never).eq('id', lead.id)
+      const custom = newStatus === 'custom' ? (customLabel ?? null) : null
+      const { error } = await supabase.from('leads').update({ status: newStatus, custom_status: custom } as never).eq('id', lead.id)
       if (error) { toast.error('Failed to update status'); return }
-      setLead((prev) => ({ ...prev, status: newStatus }))
+      setLead((prev) => ({ ...prev, status: newStatus, custom_status: custom }))
       toast.success('Status updated')
       // Reload activities
       const { data } = await supabase
@@ -150,7 +159,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                 <CardTitle className="text-base">Lead Information</CardTitle>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge className={`${LEAD_STATUS_COLORS[lead.status]} border-0`}>
-                    {LEAD_STATUS_LABELS[lead.status]}
+                    {lead.status === 'custom' ? (lead.custom_status?.trim() || 'Custom') : LEAD_STATUS_LABELS[lead.status]}
                   </Badge>
                   {lead.status === 'converted' && (
                     <Button

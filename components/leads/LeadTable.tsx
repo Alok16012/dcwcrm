@@ -57,6 +57,7 @@ const STATUS_COLORS: Record<string, string> = {
   switch_off: 'bg-zinc-50 text-zinc-600 border-zinc-200',
   not_reachable: 'bg-gray-50 text-gray-600 border-gray-200',
   not_interested: 'bg-rose-50 text-rose-600 border-rose-200',
+  custom: 'bg-violet-50 text-violet-700 border-violet-200',
   // Legacy values (still in DB)
   application_sent: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   cold: 'bg-gray-50 text-gray-600 border-gray-200',
@@ -67,7 +68,14 @@ const STATUS_DOT: Record<string, string> = {
   counselled: 'bg-orange-500', document_received: 'bg-cyan-500', converted: 'bg-green-500',
   lost: 'bg-red-500', dnp: 'bg-slate-400', switch_off: 'bg-zinc-400',
   not_reachable: 'bg-gray-400', not_interested: 'bg-rose-500',
+  custom: 'bg-violet-500',
   application_sent: 'bg-cyan-500', cold: 'bg-gray-400',
+}
+
+// Label to show for a lead's status — custom leads display their free-text label
+function statusLabel(lead: Lead) {
+  if (lead.status === 'custom') return lead.custom_status?.trim() || 'Custom'
+  return LEAD_STATUS_LABELS[lead.status] ?? lead.status
 }
 
 interface LeadTableProps {
@@ -154,23 +162,36 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
 
   async function handleStatusChange(lead: Lead, newStatus: LeadStatus) {
     if (newStatus === 'converted') { setStatusLead(lead); return }
-    if (lead.status === newStatus) return
+
+    // Custom status — ask for the free-text label
+    let customLabel: string | null = null
+    if (newStatus === 'custom') {
+      const entered = window.prompt('Enter custom status', lead.custom_status ?? '')
+      if (entered === null) return // cancelled
+      customLabel = entered.trim()
+      if (!customLabel) { toast.error('Custom status cannot be empty'); return }
+    } else if (lead.status === newStatus) {
+      return
+    }
+
     startTransition(async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase.from('leads').update({ status: newStatus, updated_at: new Date().toISOString() } as never).eq('id', lead.id)
+      const update: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() }
+      update.custom_status = newStatus === 'custom' ? customLabel : null
+      const { error } = await supabase.from('leads').update(update as never).eq('id', lead.id)
       if (error) { toast.error('Failed to update status'); return }
 
       await supabase.from('lead_activities').insert({
         lead_id: lead.id,
         activity_type: 'status_changed',
-        old_value: lead.status,
-        new_value: newStatus,
+        old_value: lead.status === 'custom' ? (lead.custom_status ?? 'custom') : lead.status,
+        new_value: newStatus === 'custom' ? customLabel : newStatus,
         performed_by: user?.id
       } as never)
 
       toast.success('Status updated')
       // Update locally to preserve current page position
-      if (onLeadUpdate) onLeadUpdate(lead.id, { status: newStatus })
+      if (onLeadUpdate) onLeadUpdate(lead.id, { status: newStatus, custom_status: customLabel })
       else onRefresh()
     })
   }
@@ -210,7 +231,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
       l.phone,
       l.email ?? '',
       l.city ?? '',
-      LEAD_STATUS_LABELS[l.status] ?? l.status,
+      statusLabel(l),
       LEAD_SOURCE_LABELS[l.source] ?? l.source,
       l.mode ?? '',
       l.department?.name ?? '',
@@ -284,7 +305,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               <DropdownMenuContent align="start" className="w-48">
                 {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
                   <DropdownMenuItem key={k} onClick={() => toggleStatus(k)} className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.status?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.status?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
                       {filters.status?.includes(k) && <span className="text-white text-[10px]">✓</span>}
                     </div>
                     {v}
@@ -304,7 +325,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               <DropdownMenuContent align="start" className="w-44">
                 {(Object.entries(LEAD_SOURCE_LABELS) as [LeadSource, string][]).map(([k, v]) => (
                   <DropdownMenuItem key={k} onClick={() => toggleSource(k)} className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.source?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.source?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
                       {filters.source?.includes(k) && <span className="text-white text-[10px]">✓</span>}
                     </div>
                     {v}
@@ -433,7 +454,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               {/* Row 1: checkbox + avatar + name + date + menu */}
               <div className="flex items-start gap-3">
                 <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
-                  <Checkbox checked={selected.has(lead.id)} onCheckedChange={() => toggleOne(lead.id)} />
+                  <Checkbox className="border-gray-500" checked={selected.has(lead.id)} onCheckedChange={() => toggleOne(lead.id)} />
                 </div>
                 <div
                   className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold ${getAvatarColor(lead.full_name)}`}
@@ -492,7 +513,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80 ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {LEAD_STATUS_LABELS[lead.status]}
+                      {statusLabel(lead)}
                       <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
@@ -539,7 +560,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
                 <th className="pl-4 pr-2 py-3 w-10">
-                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                  <Checkbox className="border-gray-500" checked={allSelected} onCheckedChange={toggleAll} />
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
@@ -563,7 +584,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                   className="hover:bg-blue-50/30 cursor-pointer transition-colors group"
                 >
                   <td className="pl-4 pr-2 py-3" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox checked={selected.has(lead.id)} onCheckedChange={() => toggleOne(lead.id)} />
+                    <Checkbox className="border-gray-500" checked={selected.has(lead.id)} onCheckedChange={() => toggleOne(lead.id)} />
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-3">
@@ -598,7 +619,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors hover:opacity-80 ${STATUS_COLORS[lead.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                          {LEAD_STATUS_LABELS[lead.status]}
+                          {statusLabel(lead)}
                           <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" />
                         </button>
                       </DropdownMenuTrigger>

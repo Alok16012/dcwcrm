@@ -15,6 +15,9 @@ import { SalarySlipPDF } from './SalarySlipPDF'
 interface PayrollRow {
   id: string
   employee_id: string
+  // false = salary shown from the employee's structure but payroll not yet
+  // generated for this month. Absent/true = a real payroll row.
+  generated?: boolean
   employee_name: string
   employee_code?: string
   designation?: string
@@ -68,6 +71,7 @@ export default function PayrollTable({
   const [deleteRow, setDeleteRow] = useState<PayrollRow | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [recalcId, setRecalcId] = useState<string | null>(null)
+  const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
 
@@ -287,8 +291,49 @@ export default function PayrollTable({
     })
   }
 
-  const hasDraft = data.some((r) => r.status === 'draft')
-  const hasProcessed = data.some((r) => r.status === 'processed')
+  // Generate payroll for a single not-yet-generated row (replaces the synthetic
+  // salary-structure row with the real payroll returned by the API).
+  const generateRow = (row: PayrollRow) => {
+    setGeneratingId(row.id)
+    return new Promise<boolean>((resolve) => {
+      startTransition(async () => {
+        try {
+          const res = await fetch('/api/hrms/payroll/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: row.employee_id, month: row.month, year: row.year }),
+          })
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(err.error || 'Failed to generate')
+          }
+          const { payroll, attendance } = await res.json()
+          setData((prev) => prev.map((r) => r.id === row.id
+            ? { ...r, ...payroll, generated: true, attendance }
+            : r))
+          resolve(true)
+        } catch (err: any) {
+          toast.error(`${row.employee_name}: ${err.message || 'Failed to generate'}`)
+          resolve(false)
+        } finally {
+          setGeneratingId(null)
+        }
+      })
+    })
+  }
+
+  const generateAll = async () => {
+    const pending = data.filter((r) => r.generated === false)
+    let ok = 0
+    for (const row of pending) {
+      if (await generateRow(row)) ok++
+    }
+    if (ok > 0) toast.success(`Generated payroll for ${ok} employee${ok !== 1 ? 's' : ''}`)
+  }
+
+  const hasUngenerated = data.some((r) => r.generated === false)
+  const hasDraft = data.some((r) => r.generated !== false && r.status === 'draft')
+  const hasProcessed = data.some((r) => r.generated !== false && r.status === 'processed')
 
   return (
     <div className="space-y-4">
@@ -297,6 +342,12 @@ export default function PayrollTable({
           {employeeId && (
             <Button variant="outline" size="sm" onClick={() => setShowGenerate(true)}>
               + Generate Month
+            </Button>
+          )}
+          {hasUngenerated && (
+            <Button variant="outline" size="sm" disabled={isPending} onClick={generateAll}>
+              {isPending && generatingId ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              Generate All
             </Button>
           )}
           {hasDraft && (
@@ -342,7 +393,7 @@ export default function PayrollTable({
                 </td>
                 <td className="px-3 py-2 text-right text-xs">{fmt(row.basic)}</td>
                 <td className="px-3 py-2 text-right">
-                  {isAdmin && row.status === 'draft' ? (
+                  {isAdmin && row.generated !== false && row.status === 'draft' ? (
                     <Input
                       type="number"
                       min="0"
@@ -356,7 +407,7 @@ export default function PayrollTable({
                   )}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {isAdmin && row.status === 'draft' ? (
+                  {isAdmin && row.generated !== false && row.status === 'draft' ? (
                     <Input
                       type="number"
                       min="0"
@@ -370,7 +421,7 @@ export default function PayrollTable({
                   )}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {isAdmin && row.status === 'draft' ? (
+                  {isAdmin && row.generated !== false && row.status === 'draft' ? (
                     <Input
                       type="number"
                       min="0"
@@ -402,14 +453,37 @@ export default function PayrollTable({
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.advance_deduction ?? 0)}</td>
                 <td className="px-3 py-2 text-right font-bold text-green-700">{fmt(row.net)}</td>
                 <td className="px-3 py-2 text-center">
-                  <Badge
-                    variant={row.status === 'paid' ? 'default' : row.status === 'processed' ? 'secondary' : 'outline'}
-                    className="capitalize text-xs"
-                  >
-                    {row.status}
-                  </Badge>
+                  {row.generated === false ? (
+                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 whitespace-nowrap">
+                      Not generated
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant={row.status === 'paid' ? 'default' : row.status === 'processed' ? 'secondary' : 'outline'}
+                      className="capitalize text-xs"
+                    >
+                      {row.status}
+                    </Badge>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-center">
+                  {row.generated === false ? (
+                    <div className="flex items-center justify-center">
+                      {isAdmin ? (
+                        <Button
+                          size="sm" variant="outline"
+                          className="h-7 text-xs"
+                          disabled={generatingId === row.id || isPending}
+                          onClick={() => generateRow(row)}
+                        >
+                          {generatingId === row.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                          Generate
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  ) : (
                   <div className="flex items-center justify-center gap-0.5">
                     <Button size="sm" variant="ghost" title="Download slip" onClick={() => downloadSlip(row)}>
                       <Download className="h-3.5 w-3.5" />
@@ -444,6 +518,7 @@ export default function PayrollTable({
                       </Button>
                     )}
                   </div>
+                  )}
                 </td>
               </tr>
             ))}

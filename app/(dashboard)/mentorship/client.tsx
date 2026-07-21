@@ -273,26 +273,43 @@ export default function MentorshipClient() {
         for (const st of built) {
           for (const sub of st.subjects as any[]) {
             for (const p of sub.payments as any[]) {
-              if (!p.payment_id && p.amount > 0) {
-                const note = `${STAGE_LBL[p.stage] ?? p.stage} · ${sub.name}`
-                const key = paymentKey(Number(p.amount), p.date, note, p.proof_url)
-                const existing = existingByKey[key]?.shift()
-                if (existing) {
-                  p.payment_id = existing.id
-                  shouldResaveStages = true
-                  continue
-                }
-                const { data: pay, error: payErr } = await (supabase as any).from('mentorship_payments').insert({
-                  mentorship_id: savedCaseId,
-                  amount: p.amount,
-                  paid_on: p.date,
-                  screenshot_url: p.proof_url,
-                  note,
-                  status: 'pending',
-                  created_by: user.id,
-                }).select('id').single()
-                if (!payErr && pay) { p.payment_id = pay.id; shouldResaveStages = true }
+              if (!(p.amount > 0)) continue
+              const note = `${STAGE_LBL[p.stage] ?? p.stage} · ${sub.name}`
+              const linkedStatus = p.payment_id ? payStatus[p.payment_id] : null
+
+              // Already-approved installments are locked — never touch them.
+              if (linkedStatus === 'approved') continue
+
+              // A still-pending installment that was edited (amount/date/proof
+              // changed): update its verification request in place instead of
+              // spawning a duplicate that the admin has to approve again.
+              if (p.payment_id && linkedStatus === 'pending') {
+                await (supabase as any).from('mentorship_payments').update({
+                  amount: p.amount, paid_on: p.date, screenshot_url: p.proof_url, note,
+                }).eq('id', p.payment_id).eq('status', 'pending')
+                continue
               }
+
+              // New installment, or a previously-rejected one being re-entered:
+              // (re)submit it for verification. Rejected rows keep their history;
+              // the stage now points at the fresh pending request.
+              const key = paymentKey(Number(p.amount), p.date, note, p.proof_url)
+              const existing = existingByKey[key]?.shift()
+              if (existing) {
+                p.payment_id = existing.id
+                shouldResaveStages = true
+                continue
+              }
+              const { data: pay, error: payErr } = await (supabase as any).from('mentorship_payments').insert({
+                mentorship_id: savedCaseId,
+                amount: p.amount,
+                paid_on: p.date,
+                screenshot_url: p.proof_url,
+                note,
+                status: 'pending',
+                created_by: user.id,
+              }).select('id').single()
+              if (!payErr && pay) { p.payment_id = pay.id; shouldResaveStages = true }
             }
           }
         }
@@ -331,6 +348,24 @@ export default function MentorshipClient() {
     return { c, total: total || (c.total_amount ?? 0), collected }
   }
   const grandCollectedAll = Object.keys(cases).reduce((s, sid) => s + (caseSummary(sid)?.collected ?? 0), 0)
+
+  // Installment verification state for a student's existing case — used to warn
+  // the counselor before they add another entry for a student who already has
+  // one, so the same student doesn't keep coming up for approval.
+  function caseInstallmentStatus(studentId: string) {
+    const c = cases[studentId]
+    if (!c || !Array.isArray(c.stages)) return null
+    let pending = 0, approved = 0, total = 0
+    c.stages.forEach((st: any) => (st.subjects ?? []).forEach((sub: any) => (sub.payments ?? []).forEach((p: any) => {
+      if (!p.payment_id) return
+      total++
+      const s = payStatus[p.payment_id]
+      if (s === 'approved') approved++
+      else if (s === 'pending') pending++
+    })))
+    return { pending, approved, total }
+  }
+  const manageDupInfo = manageStudent ? caseInstallmentStatus(manageStudent.id) : null
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
@@ -497,6 +532,18 @@ export default function MentorshipClient() {
           </DialogHeader>
 
           <div className="space-y-4 mt-1">
+            {/* Duplicate-entry warning — this student already has a saved case */}
+            {caseId && manageDupInfo && manageDupInfo.total > 0 && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                <span className="text-amber-500 font-bold mt-0.5 flex-shrink-0">⚠</span>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  This student already has a mentorship case
+                  {manageDupInfo.pending > 0 && <> with <b>{manageDupInfo.pending} installment{manageDupInfo.pending !== 1 ? 's' : ''} still awaiting approval</b></>}
+                  {manageDupInfo.approved > 0 && <> ({manageDupInfo.approved} already approved)</>}.
+                  You are editing the existing case — only add genuinely new subjects/payments so the same student doesn&apos;t go for approval again.
+                </p>
+              </div>
+            )}
             {/* Mode */}
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setCaseMode('dcw')} className={`py-2.5 rounded-xl text-sm font-bold border-2 ${caseMode === 'dcw' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>Managed by DCW</button>

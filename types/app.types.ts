@@ -13,7 +13,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export type LeadStatus =
   | 'new' | 'contacted' | 'interested' | 'counselled'
   | 'document_received' | 'converted' | 'lost'
-  | 'dnp' | 'switch_off' | 'not_reachable' | 'not_interested'
+  | 'dnp' | 'switch_off' | 'not_reachable' | 'not_interested' | 'custom'
 
 export type LeadSource =
   | 'website' | 'walk_in' | 'referral' | 'whatsapp'
@@ -145,6 +145,7 @@ export interface Lead {
   sub_section_id?: string
   session_id?: string
   status: LeadStatus
+  custom_status?: string | null
   source: LeadSource
   assigned_to?: string
   assigned_at?: string
@@ -296,6 +297,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   switch_off: 'Switch Off',
   not_reachable: 'Not Reachable',
   not_interested: 'Not Interested',
+  custom: 'Custom',
 }
 
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
@@ -310,6 +312,7 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   switch_off: 'bg-zinc-100 text-zinc-700',
   not_reachable: 'bg-gray-100 text-gray-700',
   not_interested: 'bg-rose-100 text-rose-700',
+  custom: 'bg-violet-100 text-violet-800',
 }
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {

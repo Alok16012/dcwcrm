@@ -204,30 +204,49 @@ export default function MentorshipDashboardPage() {
           created_by: userId ?? null,
         })
       } catch {}
-      // credit the mentor's payroll incentive for the current month → reflects in HRMS + Incentive page
-      try { await creditPayrollIncentive(mentorId, amt) } catch {}
+      // credit the mentor's payroll incentive for the cycle the payment was
+      // received in (paid_on) → matches the payroll generate/recalculate logic
+      try { await creditPayrollIncentive(mentorId, amt, m?.paid_on ?? null) } catch {}
     }
   }
 
-  // Add the incentive to the mentor's payroll (current month) so it shows in HRMS + their Incentive page
-  async function creditPayrollIncentive(mentorProfileId: string, amount: number) {
-    const { data: emp } = await (supabase as any).from('employees')
-      .select('id, basic_salary, hra, allowances, pf_deduction, tds_deduction, salary_cycle_start_day').eq('profile_id', mentorProfileId).maybeSingle()
-    if (!emp) return
-    // Map today's date to the employee's billing cycle. e.g. cycle start 22 →
-    // June payroll covers 22 May–21 June, so a date on/after the 22nd belongs to
-    // the next month's payroll period.
-    const now = new Date()
-    const cycleStartDay = Number(emp.salary_cycle_start_day ?? 1)
-    let m = now.getMonth() // 0-based
-    let year = now.getFullYear()
-    if (cycleStartDay > 1 && now.getDate() >= cycleStartDay) {
+  // Map a date to the employee's billing cycle. e.g. cycle start 22 → June
+  // payroll covers 22 May–21 June, so a date on/after the 22nd belongs to the
+  // next month's payroll period.
+  function cycleMonthYear(d: Date, cycleStartDay: number) {
+    let m = d.getMonth() // 0-based
+    let year = d.getFullYear()
+    if (cycleStartDay > 1 && d.getDate() >= cycleStartDay) {
       m += 1
       if (m > 11) { m = 0; year += 1 }
     }
-    const month = m + 1
-    const { data: existing } = await (supabase as any).from('payroll')
-      .select('id, incentive, gross, net').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
+    return { month: m + 1, year }
+  }
+
+  // Add the incentive to the mentor's payroll so it shows in HRMS + their
+  // Incentive page. The cycle is picked from the payment date (paid_on) so it
+  // matches what payroll generate/recalculate computes — approval delays must
+  // not push the incentive into a later month.
+  async function creditPayrollIncentive(mentorProfileId: string, amount: number, paidOn?: string | null) {
+    const { data: emp } = await (supabase as any).from('employees')
+      .select('id, basic_salary, hra, allowances, pf_deduction, tds_deduction, salary_cycle_start_day').eq('profile_id', mentorProfileId).maybeSingle()
+    if (!emp) return
+    const cycleStartDay = Number(emp.salary_cycle_start_day ?? 1)
+    const refDate = paidOn ? new Date(paidOn) : new Date()
+    let { month, year } = cycleMonthYear(Number.isNaN(refDate.getTime()) ? new Date() : refDate, cycleStartDay)
+    let { data: existing } = await (supabase as any).from('payroll')
+      .select('id, incentive, gross, net, status').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
+    if (existing?.status === 'paid') {
+      // That month's salary is already paid out — credit the current open cycle instead
+      const cur = cycleMonthYear(new Date(), cycleStartDay)
+      if (cur.month !== month || cur.year !== year) {
+        month = cur.month
+        year = cur.year
+        const res = await (supabase as any).from('payroll')
+          .select('id, incentive, gross, net, status').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
+        existing = res.data
+      }
+    }
     if (existing) {
       await (supabase as any).from('payroll').update({
         incentive: (existing.incentive ?? 0) + amount,
@@ -261,13 +280,7 @@ export default function MentorshipDashboardPage() {
     if (!emp) return
     const d = refDate ? new Date(refDate) : new Date()
     const cycleStartDay = Number(emp.salary_cycle_start_day ?? 1)
-    let m = d.getMonth()
-    let year = d.getFullYear()
-    if (cycleStartDay > 1 && d.getDate() >= cycleStartDay) {
-      m += 1
-      if (m > 11) { m = 0; year += 1 }
-    }
-    const month = m + 1
+    const { month, year } = cycleMonthYear(Number.isNaN(d.getTime()) ? new Date() : d, cycleStartDay)
     const { data: existing } = await (supabase as any).from('payroll')
       .select('id, incentive, gross, net').eq('employee_id', emp.id).eq('month', month).eq('year', year).maybeSingle()
     if (!existing) return
@@ -287,7 +300,7 @@ export default function MentorshipDashboardPage() {
     try {
       const inc = Number(m.incentive_amount ?? m.salary_percentage ?? 0)
       const mentorId = m.mentorship?.telecaller?.id
-      if (mentorId && inc > 0) { try { await reversePayrollIncentive(mentorId, inc, m.approved_at) } catch {} }
+      if (mentorId && inc > 0) { try { await reversePayrollIncentive(mentorId, inc, m.paid_on ?? m.approved_at) } catch {} }
       try { await (supabase as any).from('mentor_incentives').delete().eq('payment_id', m.id) } catch {}
       const { error } = await (supabase as any).from('mentorship_payments').delete().eq('id', m.id)
       if (error) throw error

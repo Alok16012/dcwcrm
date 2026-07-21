@@ -39,7 +39,7 @@ const SYSTEM_FIELD_KEYS = ['full_name', 'phone', 'email', 'city', 'state', 'sour
 
 // Map old/legacy status values to new ones
 function sanitizeStatus(status: string): LeadFormData['status'] {
-  const valid = ['new', 'contacted', 'interested', 'counselled', 'document_received', 'converted', 'lost', 'dnp', 'switch_off', 'not_reachable', 'not_interested']
+  const valid = ['new', 'contacted', 'interested', 'counselled', 'document_received', 'converted', 'lost', 'dnp', 'switch_off', 'not_reachable', 'not_interested', 'custom']
   if (valid.includes(status)) return status as LeadFormData['status']
   if (status === 'application_sent') return 'document_received'
   if (status === 'cold') return 'dnp'
@@ -59,6 +59,7 @@ const STATUS_DOT: Record<string, string> = {
   switch_off: 'bg-zinc-400',
   not_reachable: 'bg-gray-400',
   not_interested: 'bg-rose-500',
+  custom: 'bg-violet-500',
 }
 
 // Source icons as emoji/text
@@ -124,6 +125,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       sub_section_id: lead.sub_section_id ?? '',
       session_id: lead.session_id ?? '',
       status: sanitizeStatus(lead.status),
+      custom_status: (lead as any).custom_status ?? '',
       source: lead.source,
       assigned_to: lead.assigned_to ?? '',
       next_followup_date: lead.next_followup_date ?? '',
@@ -252,6 +254,8 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
       }
       const payload = {
         ...rest,
+        // Only keep the free-text label when the status is actually "Custom"
+        custom_status: rest.status === 'custom' ? (rest.custom_status?.trim() || null) : null,
         email: rest.email || null,
         city: rest.city || null,
         state: rest.state || null,
@@ -467,6 +471,13 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                   ))}
                 </SelectContent>
               </Select>
+              {watch('status') === 'custom' && (
+                <Input
+                  {...register('custom_status')}
+                  placeholder="Type custom status label"
+                  className="mt-2 bg-white border-violet-200 focus:border-violet-400"
+                />
+              )}
             </FieldWrapper>
           )}
 

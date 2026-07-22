@@ -262,6 +262,29 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
     setFields((prev) => [...prev, { key: `custom_field_${prev.length + 1}`, label: '', type: 'text', required: false }])
   }
   function removeField(i: number) { setFields((prev) => prev.filter((_, idx) => idx !== i)) }
+
+  // Dropdown options — edited as an explicit list (no comma parsing), so
+  // multiple options add reliably and spaces/commas inside an option are safe.
+  function setFieldType(i: number, type: FormField['type']) {
+    setFields((prev) => prev.map((f, idx) => {
+      if (idx !== i) return f
+      // Seed one empty option when a field first becomes a dropdown
+      const options = type === 'select' ? (f.options && f.options.length ? f.options : ['']) : f.options
+      return { ...f, type, options }
+    }))
+  }
+  function updateOption(fi: number, oi: number, val: string) {
+    setFields((prev) => prev.map((f, idx) => idx === fi
+      ? { ...f, options: (f.options ?? []).map((o, j) => j === oi ? val : o) } : f))
+  }
+  function addOption(fi: number) {
+    setFields((prev) => prev.map((f, idx) => idx === fi
+      ? { ...f, options: [...(f.options ?? []), ''] } : f))
+  }
+  function removeOption(fi: number, oi: number) {
+    setFields((prev) => prev.map((f, idx) => idx === fi
+      ? { ...f, options: (f.options ?? []).filter((_, j) => j !== oi) } : f))
+  }
   function move(i: number, dir: -1 | 1) {
     setFields((prev) => {
       const j = i + dir
@@ -413,7 +436,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
                     <div className="grid grid-cols-2 gap-2 pl-7">
                       <div>
                         <label className="text-[11px] text-gray-500">Input type</label>
-                        <Select value={f.type} onValueChange={(v) => updateField(i, { type: (v || 'text') as FormField['type'] })}>
+                        <Select value={f.type} onValueChange={(v) => setFieldType(i, (v || 'text') as FormField['type'])}>
                           <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {INPUT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -431,14 +454,34 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
                       </div>
                     </div>
                     {f.type === 'select' && (
-                      <div className="pl-7">
-                        <label className="text-[11px] text-gray-500">Options (comma separated)</label>
-                        <Input
-                          value={(f.options ?? []).join(', ')}
-                          onChange={(e) => updateField(i, { options: e.target.value.split(',').map((o) => o.trim()) })}
-                          placeholder="NIOS 10th, NIOS 12th, BA, MBA"
-                          className="h-8 text-xs bg-white"
-                        />
+                      <div className="pl-7 space-y-1.5">
+                        <label className="text-[11px] text-gray-500">Dropdown options</label>
+                        {(f.options ?? []).map((opt, oi) => (
+                          <div key={oi} className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-gray-400 w-4 text-right flex-shrink-0">{oi + 1}.</span>
+                            <Input
+                              value={opt}
+                              onChange={(e) => updateOption(i, oi, e.target.value)}
+                              placeholder={`Option ${oi + 1}`}
+                              className="h-8 text-xs bg-white flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeOption(i, oi)}
+                              className="text-gray-300 hover:text-red-500 flex-shrink-0"
+                              title="Remove option"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addOption(i)}
+                          className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 ml-5"
+                        >
+                          <Plus className="w-3 h-3" /> Add option
+                        </button>
                       </div>
                     )}
                     <div className="flex items-center gap-2 pl-7">

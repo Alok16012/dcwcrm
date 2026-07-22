@@ -38,8 +38,9 @@ export async function proxy(request: NextRequest) {
   const isAdminLogin     = pathname === '/login'
   const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
-  // Public short links (invoice PDFs shared on WhatsApp) — no auth
-  const isPublicLink     = pathname.startsWith('/i/')
+  // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
+  // forms (Meta ads landing pages at /f/{slug}) — no auth
+  const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/')
   const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink
 
   if (isApiRoute || isPublicLink) return response

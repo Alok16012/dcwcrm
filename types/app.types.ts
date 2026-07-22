@@ -17,7 +17,7 @@ export type LeadStatus =
 
 export type LeadSource =
   | 'website' | 'walk_in' | 'referral' | 'whatsapp'
-  | 'phone' | 'excel_import' | 'social_media' | 'other'
+  | 'phone' | 'excel_import' | 'social_media' | 'meta_ads' | 'other'
 
 export type ActivityType =
   | 'created' | 'status_changed' | 'assigned' | 'transferred'
@@ -323,6 +323,7 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   phone: 'Phone',
   excel_import: 'Excel Import',
   social_media: 'Social Media',
+  meta_ads: 'Meta Ads',
   other: 'Other',
 }
 

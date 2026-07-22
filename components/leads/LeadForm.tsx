@@ -71,6 +71,7 @@ const SOURCE_ICONS: Record<string, string> = {
   phone: '📞',
   excel_import: '📊',
   social_media: '📱',
+  meta_ads: '📣',
   other: '✨',
 }
 

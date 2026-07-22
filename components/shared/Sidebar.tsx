@@ -7,7 +7,7 @@ import {
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
   Wallet, Package, Bell, User, IndianRupee, HeartHandshake, ClipboardList, School,
-  Award, Truck,
+  Award, Truck, FileInput,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -43,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
   { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
   { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
+  { label: 'Lead Forms', href: '/settings/lead-forms', icon: FileInput, roles: ['admin', 'backend'] },
   { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
   { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },

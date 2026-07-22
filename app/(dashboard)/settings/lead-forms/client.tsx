@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PublicLeadForm, type PublicForm } from '@/components/public/PublicLeadForm'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -65,12 +66,14 @@ function slugify(s: string) {
 
 function defaultFields(): FormField[] {
   return [
-    { key: 'full_name', label: 'Poora Naam', type: 'text', required: true, placeholder: 'Aapka naam' },
+    { key: 'full_name', label: 'Full Name', type: 'text', required: true, placeholder: 'Your name' },
     { key: 'phone', label: 'Mobile Number', type: 'phone', required: true, placeholder: '10-digit mobile number' },
-    { key: 'course', label: 'Kaunsa Course chahiye?', type: 'select', required: false, options: ['NIOS 10th', 'NIOS 12th', 'BA', 'B.Com', 'BBA', 'MBA', 'Other'] },
-    { key: 'city', label: 'City', type: 'text', required: false, placeholder: 'Aapka sheher' },
+    { key: 'course', label: 'Which course are you interested in?', type: 'select', required: false, options: ['NIOS 10th', 'NIOS 12th', 'BA', 'B.Com', 'BBA', 'MBA', 'Other'] },
+    { key: 'city', label: 'City', type: 'text', required: false, placeholder: 'Your city' },
   ]
 }
+
+const DEFAULT_SUCCESS = 'Thank you! Our team will contact you shortly.'
 
 export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
   const [forms, setForms] = useState<LeadForm[]>(initial)
@@ -85,7 +88,7 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
 
   function copyLink(slug: string) {
     navigator.clipboard.writeText(publicUrl(slug))
-    toast.success('Link copy ho gaya! Meta ad me daaliye')
+    toast.success('Link copied! Paste it in your Meta ad')
   }
 
   async function toggleActive(f: LeadForm) {
@@ -93,7 +96,7 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
       .update({ is_active: !f.is_active } as never).eq('id', f.id)
     if (error) { toast.error('Failed'); return }
     setForms((p) => p.map((x) => x.id === f.id ? { ...x, is_active: !x.is_active } : x))
-    toast.success(f.is_active ? 'Form band kar diya' : 'Form live kar diya')
+    toast.success(f.is_active ? 'Form turned off' : 'Form is live now')
   }
 
   async function handleDelete(f: LeadForm) {
@@ -107,7 +110,7 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
   function startNew() {
     setEditing({
       id: '', slug: '', title: '', subtitle: '', fields: defaultFields(),
-      success_message: 'Dhanyavaad! Hamari team jaldi aapse contact karegi.',
+      success_message: DEFAULT_SUCCESS,
       source: 'meta_ads', is_active: true, submissions_count: 0, created_at: '',
     })
   }
@@ -124,15 +127,15 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
     <div>
       <PageHeader
         title="Lead Capture Forms"
-        description="Public forms banaiye Meta ads ke liye — bina login ke koi bhi bhar sakta hai"
+        description="Create public forms for Meta ads — anyone can fill without login"
         action={<Button size="sm" onClick={startNew}><Plus className="w-4 h-4 mr-1" /> New Form</Button>}
       />
 
       {forms.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-dashed">
           <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">Abhi koi form nahi hai</p>
-          <p className="text-sm text-gray-400 mt-1">Pehla form banaiye aur uska link Meta ad me daaliye</p>
+          <p className="text-gray-500 font-medium">No forms yet</p>
+          <p className="text-sm text-gray-400 mt-1">Create your first form and use its link in your Meta ad</p>
           <Button className="mt-4" onClick={startNew}><Plus className="w-4 h-4 mr-1" /> New Form</Button>
         </div>
       ) : (
@@ -197,7 +200,7 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
         <ConfirmDialog
           open
           title="Delete Form"
-          description={`"${deleteTarget.title}" delete karein? Ye link band ho jayega. (Aaye hue leads safe rahenge.)`}
+          description={`Delete "${deleteTarget.title}"? This link will stop working. (Leads already received stay safe.)`}
           confirmLabel="Delete"
           destructive
           onConfirm={() => handleDelete(deleteTarget)}
@@ -222,6 +225,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
   const [successMsg, setSuccessMsg] = useState(form.success_message ?? '')
   const [fields, setFields] = useState<FormField[]>(form.fields ?? [])
   const [saving, setSaving] = useState(false)
+  const [view, setView] = useState<'edit' | 'preview'>('edit') // small-screen toggle
   const supabase = createClient()
 
   // Auto-slug from title until the user edits slug manually
@@ -269,10 +273,10 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
   }
 
   async function save() {
-    if (!title.trim()) { toast.error('Form ka title daaliye'); return }
+    if (!title.trim()) { toast.error('Enter a form title'); return }
     const finalSlug = slugify(slug || title)
-    if (!finalSlug) { toast.error('Valid slug daaliye'); return }
-    if (existingSlugs.includes(finalSlug)) { toast.error('Ye link (slug) already use ho raha hai'); return }
+    if (!finalSlug) { toast.error('Enter a valid link (slug)'); return }
+    if (existingSlugs.includes(finalSlug)) { toast.error('This link (slug) is already in use'); return }
     const cleanFields = fields
       .filter((f) => f.label.trim())
       .map((f) => ({
@@ -283,11 +287,11 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
           : undefined,
       }))
     if (!cleanFields.some((f) => f.key === 'phone')) {
-      toast.error('Kam se kam ek Phone field zaroori hai (leads phone se aati hai)')
+      toast.error('At least one Phone field is required (leads come in by phone)')
       return
     }
     if (!cleanFields.some((f) => f.key === 'full_name')) {
-      toast.error('Ek Name field zaroori hai')
+      toast.error('A Name field is required')
       return
     }
 
@@ -297,7 +301,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
       title: title.trim(),
       subtitle: subtitle.trim() || null,
       fields: cleanFields,
-      success_message: successMsg.trim() || 'Dhanyavaad! Hamari team jaldi aapse contact karegi.',
+      success_message: successMsg.trim() || DEFAULT_SUCCESS,
       source: 'meta_ads',
       is_active: form.is_active,
     }
@@ -308,13 +312,13 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
         const { data, error } = await supabase.from('lead_capture_forms')
           .insert({ ...payload, created_by: user?.id } as never).select().single()
         if (error) throw error
-        toast.success('Form ban gaya! Link copy karke Meta ad me daaliye')
+        toast.success('Form created! Copy the link into your Meta ad')
         onSaved(data as unknown as LeadForm)
       } else {
         const { data, error } = await supabase.from('lead_capture_forms')
           .update(payload as never).eq('id', form.id).select().single()
         if (error) throw error
-        toast.success('Form update ho gaya')
+        toast.success('Form updated')
         onSaved(data as unknown as LeadForm)
       }
     } catch (e: any) {
@@ -324,114 +328,154 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
     }
   }
 
+  // Live preview mirrors exactly what the public page will show
+  const previewForm: PublicForm = {
+    slug: slug || 'preview',
+    title: title || 'Your form title',
+    subtitle: subtitle || null,
+    fields: fields
+      .filter((f) => f.label.trim())
+      .map((f) => ({
+        ...f,
+        options: f.type === 'select' ? (f.options ?? []).map((o) => o.trim()).filter(Boolean) : undefined,
+      })) as PublicForm['fields'],
+    success_message: successMsg || DEFAULT_SUCCESS,
+  }
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
-        <DialogHeader>
-          <DialogTitle>{isNew ? 'Naya Lead Form' : 'Edit Form'}</DialogTitle>
+      <DialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl h-[92vh] p-0 gap-0 overflow-hidden rounded-2xl flex flex-col">
+        <DialogHeader className="px-5 py-3 border-b flex-row items-center justify-between space-y-0">
+          <DialogTitle>{isNew ? 'New Lead Form' : 'Edit Form'}</DialogTitle>
+          {/* Small-screen Edit/Preview toggle */}
+          <div className="lg:hidden inline-flex rounded-lg border bg-slate-100 p-0.5 mr-8">
+            <button
+              onClick={() => setView('edit')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${view === 'edit' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
+            >Edit</button>
+            <button
+              onClick={() => setView('preview')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${view === 'preview' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
+            ><Eye className="w-3 h-3" /> Preview</button>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Basic details */}
-          <div className="space-y-3">
-            <div>
-              <Label>Form Title *</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. NIOS Admission 2026 — Abhi Apply Karein" />
-            </div>
-            <div>
-              <Label>Subtitle (optional)</Label>
-              <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Fill karein, hum aapko call karenge" />
-            </div>
-            <div>
-              <Label>Public Link (slug)</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400 font-mono flex-shrink-0">/f/</span>
-                <Input
-                  value={slug}
-                  onChange={(e) => { setSlug(e.target.value); setSlugTouched(true) }}
-                  placeholder="nios-admission"
-                  className="font-mono"
-                />
+        <div className="flex-1 min-h-0 grid lg:grid-cols-[1fr_380px]">
+          {/* ── Builder column ── */}
+          <div className={`overflow-y-auto px-5 py-4 space-y-5 ${view === 'preview' ? 'hidden lg:block' : ''}`}>
+            {/* Basic details */}
+            <div className="space-y-3">
+              <div>
+                <Label>Form Title *</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. NIOS Admission 2026 — Apply Now" />
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">Ye link Meta ad me use hoga. Chhota aur simple rakhein.</p>
-            </div>
-          </div>
-
-          {/* Fields builder */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-semibold">Form Fields</Label>
-              <Button size="sm" variant="outline" onClick={addField}><Plus className="w-3.5 h-3.5 mr-1" /> Add Field</Button>
-            </div>
-            <div className="space-y-2">
-              {fields.map((f, i) => (
-                <div key={i} className="border rounded-xl p-3 bg-slate-50/60 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col">
-                      <button onClick={() => move(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-600 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => move(i, 1)} disabled={i === fields.length - 1} className="text-gray-300 hover:text-gray-600 disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
-                    </div>
-                    <Input
-                      value={f.label}
-                      onChange={(e) => setFieldLabel(i, e.target.value)}
-                      placeholder="Field label (e.g. WhatsApp Number)"
-                      className="flex-1 h-9 bg-white"
-                    />
-                    <button onClick={() => removeField(i)} className="text-red-400 hover:text-red-600 flex-shrink-0"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pl-7">
-                    <div>
-                      <label className="text-[11px] text-gray-500">Input type</label>
-                      <Select value={f.type} onValueChange={(v) => updateField(i, { type: (v || 'text') as FormField['type'] })}>
-                        <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {INPUT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-gray-500">Saves as</label>
-                      <Select value={saveTargetOf(f)} onValueChange={(v) => setFieldTarget(i, v || 'extra')}>
-                        <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {SAVE_TARGETS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {f.type === 'select' && (
-                    <div className="pl-7">
-                      <label className="text-[11px] text-gray-500">Options (comma separated)</label>
-                      <Input
-                        value={(f.options ?? []).join(', ')}
-                        onChange={(e) => updateField(i, { options: e.target.value.split(',').map((o) => o.trim()) })}
-                        placeholder="NIOS 10th, NIOS 12th, BA, MBA"
-                        className="h-8 text-xs bg-white"
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 pl-7">
-                    <Switch checked={!!f.required} onCheckedChange={(v) => updateField(i, { required: v })} />
-                    <span className="text-xs text-gray-600">Required</span>
-                    {RESERVED.has(f.key) && <Badge variant="outline" className="text-[10px] ml-auto text-blue-600 border-blue-200">→ {f.key}</Badge>}
-                  </div>
+              <div>
+                <Label>Subtitle (optional)</Label>
+                <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Fill this and we'll call you back" />
+              </div>
+              <div>
+                <Label>Public Link (slug)</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400 font-mono flex-shrink-0">/f/</span>
+                  <Input
+                    value={slug}
+                    onChange={(e) => { setSlug(e.target.value); setSlugTouched(true) }}
+                    placeholder="nios-admission"
+                    className="font-mono"
+                  />
                 </div>
-              ))}
+                <p className="text-[11px] text-gray-400 mt-1">This link will be used in your Meta ad. Keep it short and simple.</p>
+              </div>
+            </div>
+
+            {/* Fields builder */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold">Form Fields</Label>
+                <Button size="sm" variant="outline" onClick={addField}><Plus className="w-3.5 h-3.5 mr-1" /> Add Field</Button>
+              </div>
+              <div className="space-y-2">
+                {fields.map((f, i) => (
+                  <div key={i} className="border rounded-xl p-3 bg-slate-50/60 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col">
+                        <button onClick={() => move(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-600 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => move(i, 1)} disabled={i === fields.length - 1} className="text-gray-300 hover:text-gray-600 disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                      </div>
+                      <Input
+                        value={f.label}
+                        onChange={(e) => setFieldLabel(i, e.target.value)}
+                        placeholder="Field label (e.g. WhatsApp Number)"
+                        className="flex-1 h-9 bg-white"
+                      />
+                      <button onClick={() => removeField(i)} className="text-red-400 hover:text-red-600 flex-shrink-0"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pl-7">
+                      <div>
+                        <label className="text-[11px] text-gray-500">Input type</label>
+                        <Select value={f.type} onValueChange={(v) => updateField(i, { type: (v || 'text') as FormField['type'] })}>
+                          <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {INPUT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-gray-500">Saves as</label>
+                        <Select value={saveTargetOf(f)} onValueChange={(v) => setFieldTarget(i, v || 'extra')}>
+                          <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {SAVE_TARGETS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {f.type === 'select' && (
+                      <div className="pl-7">
+                        <label className="text-[11px] text-gray-500">Options (comma separated)</label>
+                        <Input
+                          value={(f.options ?? []).join(', ')}
+                          onChange={(e) => updateField(i, { options: e.target.value.split(',').map((o) => o.trim()) })}
+                          placeholder="NIOS 10th, NIOS 12th, BA, MBA"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pl-7">
+                      <Switch checked={!!f.required} onCheckedChange={(v) => updateField(i, { required: v })} />
+                      <span className="text-xs text-gray-600">Required</span>
+                      {RESERVED.has(f.key) && <Badge variant="outline" className="text-[10px] ml-auto text-blue-600 border-blue-200">→ {f.key}</Badge>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Success message */}
+            <div>
+              <Label>Thank-you Message (shown after submit)</Label>
+              <Textarea value={successMsg} onChange={(e) => setSuccessMsg(e.target.value)} rows={2} placeholder={DEFAULT_SUCCESS} />
             </div>
           </div>
 
-          {/* Success message */}
-          <div>
-            <Label>Thank-you Message (form bhar ne ke baad)</Label>
-            <Textarea value={successMsg} onChange={(e) => setSuccessMsg(e.target.value)} rows={2} placeholder="Dhanyavaad! Hamari team jaldi aapse contact karegi." />
+          {/* ── Live preview column ── */}
+          <div className={`bg-slate-200/50 border-l overflow-y-auto ${view === 'edit' ? 'hidden lg:block' : ''}`}>
+            <div className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur border-b px-4 py-2 flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Live Preview — how it will look</span>
+            </div>
+            <div className="scale-[0.92] origin-top">
+              <PublicLeadForm form={previewForm} preview />
+            </div>
           </div>
+        </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" onClick={onClose}><X className="w-4 h-4 mr-1" /> Cancel</Button>
-            <Button onClick={save} disabled={saving}>
-              <Check className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : isNew ? 'Create Form' : 'Save Changes'}
-            </Button>
-          </div>
+        {/* Footer actions */}
+        <div className="border-t px-5 py-3 flex justify-end gap-2 bg-white">
+          <Button variant="outline" onClick={onClose}><X className="w-4 h-4 mr-1" /> Cancel</Button>
+          <Button onClick={save} disabled={saving}>
+            <Check className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : isNew ? 'Create Form' : 'Save Changes'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

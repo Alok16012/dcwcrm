@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // Validate required fields
     for (const f of fields) {
       if (f.required && !String(values[f.key] ?? '').trim()) {
-        return NextResponse.json({ error: `${f.label} zaroori hai` }, { status: 400 })
+        return NextResponse.json({ error: `${f.label} is required` }, { status: 400 })
       }
     }
 
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const fullName = lead.full_name || 'Meta Lead'
     const phone = lead.phone
     if (!phone) {
-      return NextResponse.json({ error: 'Mobile number zaroori hai' }, { status: 400 })
+      return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
     }
 
     await ingestLead(supabase, {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: (form as { success_message: string }).success_message
-        || 'Dhanyavaad! Hamari team jaldi aapse contact karegi.',
+        || 'Thank you! Our team will contact you shortly.',
     })
   } catch (error: any) {
     console.error('Public lead form error:', error)

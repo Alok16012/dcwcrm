@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS lead_capture_forms (
   subtitle          text,
   -- fields: [{ key, label, type, required, options[], placeholder }]
   fields            jsonb NOT NULL DEFAULT '[]'::jsonb,
-  success_message   text DEFAULT 'Dhanyavaad! Hamari team jaldi aapse contact karegi.',
+  success_message   text DEFAULT 'Thank you! Our team will contact you shortly.',
   source            text NOT NULL DEFAULT 'meta_ads',
   is_active         boolean NOT NULL DEFAULT true,
   submissions_count integer NOT NULL DEFAULT 0,

@@ -26,7 +26,7 @@ const COMPANY = {
   email: 'info@distancecourseswala.in',
 }
 
-export function PublicLeadForm({ form }: { form: PublicForm }) {
+export function PublicLeadForm({ form, preview = false }: { form: PublicForm; preview?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [hp, setHp] = useState('') // honeypot
   const [submitting, setSubmitting] = useState(false)
@@ -39,19 +39,21 @@ export function PublicLeadForm({ form }: { form: PublicForm }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // In the admin builder this renders as a live preview — never submit.
+    if (preview) return
     setError('')
 
     // Client-side required check
     for (const f of form.fields) {
       if (f.required && !String(values[f.key] ?? '').trim()) {
-        setError(`${f.label} zaroori hai`)
+        setError(`${f.label} is required`)
         return
       }
     }
     const phoneField = form.fields.find((f) => f.type === 'phone' || f.key === 'phone')
     if (phoneField) {
       const digits = String(values[phoneField.key] ?? '').replace(/\D/g, '')
-      if (digits.length < 10) { setError('Sahi mobile number daaliye (10 digit)'); return }
+      if (digits.length < 10) { setError('Please enter a valid 10-digit mobile number'); return }
     }
 
     setSubmitting(true)
@@ -62,10 +64,10 @@ export function PublicLeadForm({ form }: { form: PublicForm }) {
         body: JSON.stringify({ slug: form.slug, values, hp }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Kuch galat ho gaya, dobara try karein'); return }
-      setDone(data.message ?? form.success_message ?? 'Dhanyavaad! Hamari team jaldi aapse contact karegi.')
+      if (!res.ok) { setError(data.error ?? 'Something went wrong, please try again'); return }
+      setDone(data.message ?? form.success_message ?? 'Thank you! Our team will contact you shortly.')
     } catch {
-      setError('Network error — dobara try karein')
+      setError('Network error — please try again')
     } finally {
       setSubmitting(false)
     }
@@ -87,7 +89,7 @@ export function PublicLeadForm({ form }: { form: PublicForm }) {
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-gradient-to-r from-emerald-500 to-green-600 py-8 flex flex-col items-center text-white">
               <CheckCircle2 className="w-16 h-16 mb-2" />
-              <p className="text-lg font-bold">Ho gaya!</p>
+              <p className="text-lg font-bold">Done!</p>
             </div>
             <div className="p-6 text-center">
               <p className="text-slate-700 leading-relaxed">{done}</p>
@@ -95,7 +97,7 @@ export function PublicLeadForm({ form }: { form: PublicForm }) {
                 href={`tel:${COMPANY.phone.replace(/\s/g, '')}`}
                 className="mt-5 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
               >
-                <Phone className="w-4 h-4" /> Abhi Call Karein
+                <Phone className="w-4 h-4" /> Call Us Now
               </a>
             </div>
           </div>
@@ -163,10 +165,10 @@ export function PublicLeadForm({ form }: { form: PublicForm }) {
                 disabled={submitting}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-[15px]"
               >
-                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Bhej rahe hain...</> : 'Submit Karein'}
+                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Submit'}
               </button>
               <p className="text-[11px] text-center text-slate-400">
-                Aapki jaankari surakshit hai. Hum sirf aapko course ki details ke liye contact karenge.
+                Your information is safe. We&apos;ll only contact you about course details.
               </p>
             </div>
           </form>

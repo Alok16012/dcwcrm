@@ -26,6 +26,11 @@ const COMPANY = {
   email: 'info@distancecourseswala.in',
 }
 
+function readCookie(name: string): string | null {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return m ? decodeURIComponent(m[1]) : null
+}
+
 export function PublicLeadForm({ form, preview = false }: { form: PublicForm; preview?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [hp, setHp] = useState('') // honeypot
@@ -58,13 +63,24 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
 
     setSubmitting(true)
     try {
+      // Same event_id goes to the browser pixel AND the server (Conversions
+      // API) so Meta dedupes the two into one Lead.
+      const eventId = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const res = await fetch('/api/public/lead-form', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: form.slug, values, hp }),
+        body: JSON.stringify({
+          slug: form.slug, values, hp,
+          event_id: eventId,
+          fbp: readCookie('_fbp'),
+          fbc: readCookie('_fbc'),
+          page_url: window.location.href,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Something went wrong, please try again'); return }
+      // Browser-side Meta Pixel Lead event (if the pixel is configured)
+      try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
       setDone(data.message ?? form.success_message ?? 'Thank you! Our team will contact you shortly.')
     } catch {
       setError('Network error — please try again')

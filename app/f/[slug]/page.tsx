@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { PublicLeadForm, type PublicForm } from '@/components/public/PublicLeadForm'
+import { MetaPixel } from '@/components/public/MetaPixel'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,5 +34,10 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
   const { slug } = await params
   const { data: form } = await getForm(slug)
   if (!form) notFound()
-  return <PublicLeadForm form={form as unknown as PublicForm} />
+  return (
+    <>
+      <MetaPixel />
+      <PublicLeadForm form={form as unknown as PublicForm} />
+    </>
+  )
 }

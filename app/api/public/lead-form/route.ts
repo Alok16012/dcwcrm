@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ingestLead } from '@/lib/leads/ingest'
+import { sendLeadToMeta } from '@/lib/meta/capi'
 
 // Keys that map directly onto lead columns; everything else -> metadata.
 const RESERVED = new Set(['full_name', 'phone', 'email', 'city', 'state'])
@@ -19,10 +20,14 @@ export async function POST(req: NextRequest) {
   )
   try {
     const body = await req.json()
-    const { slug, values, hp } = body as {
+    const { slug, values, hp, event_id, fbp, fbc, page_url } = body as {
       slug?: string
       values?: Record<string, string>
       hp?: string
+      event_id?: string
+      fbp?: string | null
+      fbc?: string | null
+      page_url?: string
     }
 
     // Honeypot — bots fill hidden fields; humans never do.
@@ -78,6 +83,20 @@ export async function POST(req: NextRequest) {
       state: lead.state ?? null,
       source: (form as { source: string }).source || 'meta_ads',
       metadata,
+    })
+
+    // Meta Conversions API — server-side Lead event, deduped with the browser
+    // pixel via event_id. Best-effort: a Meta failure never blocks the lead.
+    await sendLeadToMeta({
+      eventId: event_id || crypto.randomUUID(),
+      email: lead.email ?? null,
+      phone,
+      firstName: fullName,
+      sourceUrl: page_url ?? null,
+      clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      userAgent: req.headers.get('user-agent'),
+      fbp: fbp ?? null,
+      fbc: fbc ?? null,
     })
 
     // Best-effort submissions counter

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { InvoicePDF } from './InvoicePDF'
 import { Student, Payment } from '@/types/app.types'
 import { toast } from 'sonner'
+import { APP_URL } from '@/lib/branding'
 
 interface SendInvoiceWhatsAppButtonProps {
     student: Student
@@ -73,7 +74,7 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
                 .upload(`invoices/${slug}.pdf`, blob, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
 
-            const invoiceUrl = `${window.location.origin}/i/${slug}`
+            const invoiceUrl = `${APP_URL}/i/${slug}`
 
             const courseText = [course, standard].filter(Boolean).join(' - ')
             const courseLine = [courseText, board, session].filter(Boolean).join(', ') || 'your course'

@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { PublicLeadForm, type PublicForm } from '@/components/public/PublicLeadForm'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { APP_URL } from '@/lib/branding'
 
 interface FormField {
   key: string
@@ -84,7 +85,12 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
 
   useEffect(() => { setOrigin(window.location.origin) }, [])
 
-  function publicUrl(slug: string) { return `${origin}/f/${slug}` }
+  // Shared links always use the branded DCW domain, whichever URL the admin
+  // is browsing on. Local dev keeps the local origin so testing works.
+  function publicUrl(slug: string) {
+    const base = origin.includes('localhost') ? origin : APP_URL
+    return `${base}/f/${slug}`
+  }
 
   function copyLink(slug: string) {
     navigator.clipboard.writeText(publicUrl(slug))

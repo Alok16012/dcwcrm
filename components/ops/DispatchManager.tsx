@@ -13,6 +13,7 @@ import {
   Package, X, ArrowDownToLine, Send, ChevronRight, Plus, Printer, MessageCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { APP_HOST } from '@/lib/branding'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -535,7 +536,7 @@ export function DispatchManager() {
           </table>
           <div class="sign"><span>Receiver's Signature</span><span>Authorised Signatory</span></div>
         </div>
-        <div class="foot">This is a system-generated receipt from Distance Courses Wala · crmrahul.vercel.app</div>
+        <div class="foot">This is a system-generated receipt from Distance Courses Wala · ${APP_HOST}</div>
       </div>
       <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
     </body></html>`

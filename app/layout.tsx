@@ -6,12 +6,12 @@ import { Toaster } from 'sonner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Distance Courses Wala - Education Consultancy CRM',
+  title: 'DCW',
   description: 'Manage leads, students, finance and HR for Distance Courses Wala consultancy',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    title: 'DCW CRM',
+    title: 'DCW',
     statusBarStyle: 'default',
   },
 }

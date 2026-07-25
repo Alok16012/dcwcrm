@@ -2,12 +2,12 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.dcw.crm',
-  appName: 'DCW CRM',
+  appName: 'DCW',
   // Minimal local fallback dir (real content loaded from server.url below)
   webDir: 'capacitor-www',
   server: {
     // App loads the live site directly — same Vercel backend + Supabase DB
-    url: 'https://crmrahul.vercel.app',
+    url: 'https://dcwcrm.vercel.app',
     cleartext: false,
     androidScheme: 'https',
   },

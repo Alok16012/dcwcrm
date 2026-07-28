@@ -170,16 +170,18 @@ export async function POST(req: NextRequest) {
             .eq('year', year)
             .maybeSingle() as { data: ExistingPayroll | null }
 
-        // Salary advances recovered in this payroll: all pending ones, plus (on
-        // regenerate) those already settled against this same payroll row.
-        const advFilter = existing
-            ? `status.eq.pending,settled_in.eq.${existing.id}`
-            : 'status.eq.pending'
-        const { data: advRaw } = await supabase
+        // Salary advances recovered in this payroll: pending ones GIVEN ON OR
+        // BEFORE this cycle's end date (so an advance taken in a later month is
+        // not swept into an earlier cycle's payroll), plus (on regenerate) those
+        // already settled against this same payroll row.
+        let advQuery = supabase
             .from('advance_salaries')
             .select('id, amount')
             .eq('employee_id', employee_id)
-            .or(advFilter)
+        advQuery = existing
+            ? advQuery.or(`and(status.eq.pending,given_on.lte.${endStr}),settled_in.eq.${existing.id}`)
+            : advQuery.eq('status', 'pending').lte('given_on', endStr)
+        const { data: advRaw } = await advQuery
         const advances = (advRaw ?? []) as AdvanceRow[]
         const advanceDeduction = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
 

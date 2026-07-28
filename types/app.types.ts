@@ -76,6 +76,7 @@ export interface LeadFilters {
   department_id?: string[]
   sub_section_id?: string[]
   city?: string
+  form?: string
   created_from?: string
   created_to?: string
   followup_from?: string

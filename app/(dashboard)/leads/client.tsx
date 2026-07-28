@@ -94,8 +94,13 @@ export function LeadsClient() {
       if (filters.source?.length) query = query.in('source', filters.source)
       if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
       if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
+      if (filters.form) query = query.eq('metadata->>form', filters.form)
       if (filters.city) query = query.ilike('city', `%${filters.city}%`)
       if (filters.mode) query = query.eq('mode', filters.mode)
+      // Created-date range. created_at is a timestamp, so make the "to" bound
+      // inclusive of the whole selected day (up to 23:59:59).
+      if (filters.created_from) query = query.gte('created_at', filters.created_from)
+      if (filters.created_to) query = query.lte('created_at', `${filters.created_to}T23:59:59`)
       if (filters.followup_from) query = query.gte('next_followup_date', filters.followup_from)
       if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
 

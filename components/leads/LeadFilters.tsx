@@ -15,6 +15,7 @@ export function LeadFilters() {
   const { filters, setFilters, clearFilters } = useLeadStore()
   const [courses, setCourses] = useState<Course[]>([])
   const [telecallers, setTelecallers] = useState<Profile[]>([])
+  const [forms, setForms] = useState<string[]>([])
   const [search, setSearch] = useState(filters.search ?? '')
   const supabase = createClient()
 
@@ -22,9 +23,11 @@ export function LeadFilters() {
     Promise.all([
       supabase.from('courses').select('*').eq('is_active', true).order('name'),
       supabase.from('profiles').select('*').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
-    ]).then(([{ data: c }, { data: t }]) => {
+      supabase.from('lead_capture_forms').select('title').order('title'),
+    ]).then(([{ data: c }, { data: t }, { data: f }]) => {
       setCourses(c ?? [])
       setTelecallers(t ?? [])
+      setForms(((f ?? []) as { title: string }[]).map((x) => x.title).filter(Boolean))
     })
   }, [])
 
@@ -110,6 +113,19 @@ export function LeadFilters() {
 
       {/* Selects row */}
       <div className="grid grid-cols-2 gap-2">
+        {forms.length > 0 && (
+          <Select
+            value={filters.form ?? ''}
+            onValueChange={(v) => setFilters({ form: v || undefined })}
+          >
+            <SelectTrigger className="h-8 text-xs col-span-2"><SelectValue placeholder="Form / Campaign" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All forms</SelectItem>
+              {forms.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
         <Select
           value={filters.assigned_to?.[0] ?? ''}
           onValueChange={(v) => setFilters({ assigned_to: v ? [v] : undefined })}

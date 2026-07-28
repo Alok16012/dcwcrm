@@ -80,7 +80,17 @@ function statusLabel(lead: Lead) {
 
 interface LeadTableProps {
   leads: Lead[]
+  totalCount: number
   isLoading?: boolean
+  page: number
+  pageSize: number
+  sortDir: 'desc' | 'asc'
+  searchValue: string
+  onPageChange: (page: number) => void
+  onPageSizeChange: (size: number) => void
+  onSortChange: (dir: 'desc' | 'asc') => void
+  onSearchChange: (term: string) => void
+  onExportAll: () => Promise<Lead[]>
   onRefresh: () => void
   onLeadUpdate?: (id: string, update: Partial<Lead>) => void
   courses?: Course[]
@@ -90,49 +100,40 @@ interface LeadTableProps {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50]
 
-export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses = [], telecallers = [], isTelecaller = false }: LeadTableProps) {
+export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDir, searchValue, onPageChange, onPageSizeChange, onSortChange, onSearchChange, onExportAll, onRefresh, onLeadUpdate, courses = [], telecallers = [], isTelecaller = false }: LeadTableProps) {
   const router = useRouter()
   const { filters, setFilters, clearFilters } = useLeadStore()
-  const [search, setSearch] = useState(filters.search ?? '')
+  const [search, setSearch] = useState(searchValue)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [transferLeadIds, setTransferLeadIds] = useState<string[]>([])
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [statusLead, setStatusLead] = useState<Lead | null>(null)
   const [showBulkDelete, setShowBulkDelete] = useState(false)
   const [deleteLead, setDeleteLead] = useState<Lead | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
   const [showFilters, setShowFilters] = useState(false)
-  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
+  const [exporting, setExporting] = useState(false)
+  const [forms, setForms] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
+    // Public capture-form titles, for the "Form / Campaign" filter
+    supabase.from('lead_capture_forms').select('title').order('title').then(({ data }) => {
+      setForms(((data ?? []) as { title: string }[]).map((x) => x.title).filter(Boolean))
+    })
   }, [])
 
-  // Local search filter
-  const searchLower = search.toLowerCase()
-  const filtered = leads.filter((l) => {
-    if (!searchLower) return true
-    return (
-      l.full_name.toLowerCase().includes(searchLower) ||
-      l.phone.includes(searchLower) ||
-      (l.email ?? '').toLowerCase().includes(searchLower)
-    )
-  })
+  // Debounce the search box -> server-side search handled by the parent
+  useEffect(() => {
+    const t = setTimeout(() => onSearchChange(search.trim()), 350)
+    return () => clearTimeout(t)
+  }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sort by updated_at so recently assigned/updated leads appear first
-  const sorted = [...filtered].sort((a, b) => {
-    const aDate = new Date((a as any).updated_at ?? a.created_at).getTime()
-    const bDate = new Date((b as any).updated_at ?? b.created_at).getTime()
-    return sortDir === 'desc' ? bDate - aDate : aDate - bDate
-  })
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
-  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize)
+  // The server already returns the current page — filtered, sorted, paginated.
+  const paginated = leads
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
   // Selection
   const allSelected = paginated.length > 0 && paginated.every((l) => selected.has(l.id))
@@ -147,17 +148,17 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
-  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length || filters.mode || filters.city || filters.followup_from || filters.followup_to
+  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length || filters.mode || filters.city || filters.followup_from || filters.followup_to || filters.form || filters.created_from || filters.created_to
 
   function toggleStatus(s: LeadStatus) {
     const cur = filters.status ?? []
     setFilters({ status: cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s] })
-    setPage(1)
+    onPageChange(1)
   }
   function toggleSource(s: LeadSource) {
     const cur = filters.source ?? []
     setFilters({ source: cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s] })
-    setPage(1)
+    onPageChange(1)
   }
 
   async function handleStatusChange(lead: Lead, newStatus: LeadStatus) {
@@ -219,14 +220,24 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
   }
 
   async function handleExport() {
-    if (sorted.length === 0) return
+    if (totalCount === 0 || exporting) return
+    setExporting(true)
+    let rows: Lead[] = []
+    try {
+      rows = await onExportAll()
+    } catch {
+      toast.error('Export failed')
+      setExporting(false)
+      return
+    }
+    if (rows.length === 0) { setExporting(false); return }
 
     const headers = [
-      'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source', 
+      'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source',
       'Mode', 'Department', 'University/Board', 'Course', 'Sub-Course', 'Assigned To', 'Date Added'
     ]
 
-    const csvRows = sorted.map(l => [
+    const csvRows = rows.map(l => [
       l.full_name,
       l.phone,
       l.email ?? '',
@@ -252,6 +263,8 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setExporting(false)
   }
 
   if (!mounted) return <div className="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[400px] animate-pulse" />
@@ -268,26 +281,26 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               type="text"
               placeholder="Search name, phone, email..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {search && (
-              <button onClick={() => { setSearch(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-          <span className="text-sm text-gray-500 font-medium whitespace-nowrap hidden sm:block">{filtered.length} Leads</span>
+          <span className="text-sm text-gray-500 font-medium whitespace-nowrap hidden sm:block">{totalCount.toLocaleString()} Leads</span>
           <button
-            onClick={() => setSortDir((d) => d === 'desc' ? 'asc' : 'desc')}
+            onClick={() => onSortChange(sortDir === 'desc' ? 'asc' : 'desc')}
             className="flex items-center gap-1 px-2 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 whitespace-nowrap"
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{sortDir === 'desc' ? 'Newest' : 'Oldest'}</span>
           </button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={sorted.length === 0} className="gap-1 h-9 px-2 sm:px-3">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={totalCount === 0 || exporting} className="gap-1 h-9 px-2 sm:px-3">
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Export</span>
+            <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Export'}</span>
           </Button>
         </div>
 
@@ -334,9 +347,22 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Form / Campaign filter */}
+            {forms.length > 0 && (
+              <Select value={filters.form ?? ''} onValueChange={(v) => { setFilters({ form: v || undefined }); onPageChange(1) }}>
+                <SelectTrigger className={`w-40 h-8 text-xs whitespace-nowrap ${filters.form ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
+                  <SelectValue placeholder="Form / Campaign" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All forms</SelectItem>
+                  {forms.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
             {/* Assigned to filter */}
             {telecallers.length > 0 && (
-              <Select value={filters.assigned_to?.[0] ?? ''} onValueChange={(v) => { setFilters({ assigned_to: v ? [v] : undefined }); setPage(1) }}>
+              <Select value={filters.assigned_to?.[0] ?? ''} onValueChange={(v) => { setFilters({ assigned_to: v ? [v] : undefined }); onPageChange(1) }}>
                 <SelectTrigger className={`w-32 h-8 text-xs whitespace-nowrap ${filters.assigned_to?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
                   <SelectValue placeholder="Assigned to" />
                 </SelectTrigger>
@@ -349,7 +375,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
 
             {/* Course filter */}
             {courses.length > 0 && (
-              <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); setPage(1) }}>
+              <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); onPageChange(1) }}>
                 <SelectTrigger className={`w-28 h-8 text-xs ${filters.course_id?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
                   <SelectValue placeholder="Course" />
                 </SelectTrigger>
@@ -361,7 +387,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
             )}
 
             {/* Mode filter */}
-            <Select value={filters.mode ?? ''} onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); setPage(1) }}>
+            <Select value={filters.mode ?? ''} onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); onPageChange(1) }}>
               <SelectTrigger className={`w-28 h-8 text-xs ${filters.mode ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
                 <SelectValue placeholder="Mode" />
               </SelectTrigger>
@@ -378,14 +404,32 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               <input
                 type="date"
                 value={filters.followup_from ?? ''}
-                onChange={(e) => { setFilters({ followup_from: e.target.value || undefined }); setPage(1) }}
+                onChange={(e) => { setFilters({ followup_from: e.target.value || undefined }); onPageChange(1) }}
                 className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
               />
               <span className="text-xs text-gray-400">–</span>
               <input
                 type="date"
                 value={filters.followup_to ?? ''}
-                onChange={(e) => { setFilters({ followup_to: e.target.value || undefined }); setPage(1) }}
+                onChange={(e) => { setFilters({ followup_to: e.target.value || undefined }); onPageChange(1) }}
+                className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
+              />
+            </div>
+
+            {/* Created date filter */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+              <span className="text-[11px] text-gray-400 whitespace-nowrap">Created:</span>
+              <input
+                type="date"
+                value={filters.created_from ?? ''}
+                onChange={(e) => { setFilters({ created_from: e.target.value || undefined }); onPageChange(1) }}
+                className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
+              />
+              <span className="text-xs text-gray-400">–</span>
+              <input
+                type="date"
+                value={filters.created_to ?? ''}
+                onChange={(e) => { setFilters({ created_to: e.target.value || undefined }); onPageChange(1) }}
                 className="h-6 px-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 w-[110px]"
               />
             </div>
@@ -395,19 +439,19 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
               type="text"
               placeholder="City..."
               value={filters.city ?? ''}
-              onChange={(e) => { setFilters({ city: e.target.value || undefined }); setPage(1) }}
+              onChange={(e) => { setFilters({ city: e.target.value || undefined }); onPageChange(1) }}
               className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-24"
             />
 
             {/* Clear filters */}
             {activeFilters ? (
-              <button onClick={() => { clearFilters(); setPage(1) }} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1.5 whitespace-nowrap">
+              <button onClick={() => { clearFilters(); onPageChange(1) }} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1.5 whitespace-nowrap">
                 <X className="w-3 h-3" /> Clear
               </button>
             ) : null}
 
             {/* Mobile: leads count */}
-            <span className="text-xs text-gray-400 whitespace-nowrap sm:hidden">{filtered.length} leads</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap sm:hidden">{totalCount.toLocaleString()} leads</span>
           </div>
         </div>
       </div>
@@ -688,11 +732,11 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
       )}
 
       {/* Pagination footer */}
-      {!isLoading && sorted.length > 0 && (
+      {!isLoading && totalCount > 0 && (
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>Rows per page:</span>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1) }}>
+            <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>
               <SelectTrigger className="w-16 h-7 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PAGE_SIZE_OPTIONS.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
@@ -702,11 +746,11 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
 
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <span>
-              {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, sorted.length)} of {sorted.length}
+              {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount.toLocaleString()}
             </span>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page === 1}
                 className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -716,7 +760,7 @@ export function LeadTable({ leads, isLoading, onRefresh, onLeadUpdate, courses =
                 Page {page} of {totalPages}
               </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
                 className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >

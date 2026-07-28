@@ -26,12 +26,19 @@ export default async function AdvancesPage() {
 
   const profileIds = emps.map(e => e.profile_id)
   const { data: profs } = profileIds.length > 0
-    ? await supabase.from('profiles').select('id, full_name').in('id', profileIds)
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', profileIds)
     : { data: [] }
-  const nameMap = Object.fromEntries(((profs ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name]))
+  const profMap = Object.fromEntries(
+    ((profs ?? []) as { id: string; full_name: string; role: string }[]).map(p => [p.id, p])
+  )
+
+  // Only real salaried staff — associates and students are not employees
+  const NON_EMPLOYEE_ROLES = new Set(['associate', 'student'])
 
   const employees = emps
-    .map(e => ({ id: e.id, name: nameMap[e.profile_id] ?? '—' }))
+    .map(e => ({ id: e.id, name: profMap[e.profile_id]?.full_name ?? '—', role: profMap[e.profile_id]?.role }))
+    .filter(e => e.role && !NON_EMPLOYEE_ROLES.has(e.role))
+    .map(e => ({ id: e.id, name: e.name }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return (

@@ -72,46 +72,64 @@ export function LeadsClient() {
       const isTelecaller = (currentProfile.role as string) === 'lead' || (currentProfile.role as string) === 'telecaller' || (currentProfile.role as string) === 'counselor'
       const isAdmin = (currentProfile.role as string) === 'admin'
 
-      let query = supabase
-        .from('leads')
-        .select(`
-          *,
-          course:courses(id, name, is_active, created_at),
-          sub_course:sub_courses(id, name, is_active, created_at, course_id),
-          department:departments(id, name, is_active, created_at),
-          sub_section:department_sub_sections(id, name, is_active, created_at, department_id),
-          assigned_user:profiles!leads_assigned_to_fkey(id, email, full_name, role, is_active, created_at)
-        `)
-        .order('created_at', { ascending: false })
+      // Build a fresh, fully-filtered query each time (a PostgREST builder can
+      // only be awaited once, and we page through it below).
+      const buildQuery = () => {
+        let query = supabase
+          .from('leads')
+          .select(`
+            *,
+            course:courses(id, name, is_active, created_at),
+            sub_course:sub_courses(id, name, is_active, created_at, course_id),
+            department:departments(id, name, is_active, created_at),
+            sub_section:department_sub_sections(id, name, is_active, created_at, department_id),
+            assigned_user:profiles!leads_assigned_to_fkey(id, email, full_name, role, is_active, created_at)
+          `)
+          .order('created_at', { ascending: false })
 
-      // Telecallers only see their own assigned leads, Admins see ALL
-      if (isTelecaller && !isAdmin) {
-        query = query.eq('assigned_to', currentProfile.id)
+        // Telecallers only see their own assigned leads, Admins see ALL
+        if (isTelecaller && !isAdmin) {
+          query = query.eq('assigned_to', currentProfile.id)
+        }
+
+        // Apply other filters only if they are set
+        if (filters.status?.length) query = query.in('status', filters.status)
+        if (filters.source?.length) query = query.in('source', filters.source)
+        if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
+        if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
+        if (filters.form) query = query.eq('metadata->>form', filters.form)
+        if (filters.city) query = query.ilike('city', `%${filters.city}%`)
+        if (filters.mode) query = query.eq('mode', filters.mode)
+        // Created-date range. created_at is a timestamp, so make the "to" bound
+        // inclusive of the whole selected day (up to 23:59:59).
+        if (filters.created_from) query = query.gte('created_at', filters.created_from)
+        if (filters.created_to) query = query.lte('created_at', `${filters.created_to}T23:59:59`)
+        if (filters.followup_from) query = query.gte('next_followup_date', filters.followup_from)
+        if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
+        return query
       }
 
-      // Apply other filters only if they are set
-      if (filters.status?.length) query = query.in('status', filters.status)
-      if (filters.source?.length) query = query.in('source', filters.source)
-      if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
-      if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
-      if (filters.form) query = query.eq('metadata->>form', filters.form)
-      if (filters.city) query = query.ilike('city', `%${filters.city}%`)
-      if (filters.mode) query = query.eq('mode', filters.mode)
-      // Created-date range. created_at is a timestamp, so make the "to" bound
-      // inclusive of the whole selected day (up to 23:59:59).
-      if (filters.created_from) query = query.gte('created_at', filters.created_from)
-      if (filters.created_to) query = query.lte('created_at', `${filters.created_to}T23:59:59`)
-      if (filters.followup_from) query = query.gte('next_followup_date', filters.followup_from)
-      if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
-
-      const { data, error } = await query
-      if (error) {
-        console.error('Database Error:', error)
-        throw error
+      // PostgREST caps a single response at 1000 rows, so page through the
+      // full result set in chunks and accumulate — otherwise older leads
+      // (beyond the first 1000) never load into the table.
+      const CHUNK = 1000
+      let from = 0
+      let all: Lead[] = []
+      // Hard stop well above the real total to avoid any accidental infinite loop.
+      for (let guard = 0; guard < 50; guard++) {
+        const { data, error } = await buildQuery().range(from, from + CHUNK - 1)
+        if (error) {
+          console.error('Database Error:', error)
+          throw error
+        }
+        const batch = (data as Lead[]) ?? []
+        all = all.concat(batch)
+        if (batch.length < CHUNK) break
+        from += CHUNK
       }
-      
-      console.log('Fetched Leads:', data?.length)
-      setLeads((data as Lead[]) ?? [])
+
+      console.log('Fetched Leads:', all.length)
+      setLeads(all)
 
       const today = format(new Date(), 'yyyy-MM-dd')
       

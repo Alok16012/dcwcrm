@@ -509,8 +509,9 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-gray-900 leading-tight truncate">{lead.full_name}</p>
-                    <span className="text-[11px] text-gray-400 whitespace-nowrap flex-shrink-0">
+                    <span className="text-[11px] text-gray-400 whitespace-nowrap flex-shrink-0 text-right leading-tight">
                       {format(new Date(lead.created_at), 'dd MMM')}
+                      <span className="block text-[10px] text-gray-400">{format(new Date(lead.created_at), 'h:mm a')}</span>
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">{lead.city ?? ''}</p>
@@ -573,8 +574,18 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                 </DropdownMenu>
               </div>
 
-              {/* Row 3: course + assigned + followup */}
-              <div className="mt-2 ml-[52px] flex items-center gap-3 flex-wrap">
+              {/* Row 3: board/inquiry + course + assigned + followup */}
+              <div className="mt-2 ml-[52px] flex items-center gap-2 flex-wrap">
+                {(() => {
+                  // What the lead enquired about: the Board (sub_section) if set,
+                  // otherwise the capture form / campaign it came from.
+                  const board = lead.sub_section?.name
+                  const formName = (lead as { metadata?: { form?: string } }).metadata?.form
+                  const label = board || formName
+                  return label ? (
+                    <span className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-2 py-0.5 truncate max-w-[170px]">{label}</span>
+                  ) : null
+                })()}
                 {lead.course && (
                   <span className="text-[11px] text-gray-500 bg-gray-100 rounded-md px-2 py-0.5 truncate max-w-[130px]">{lead.course.name}</span>
                 )}
@@ -705,6 +716,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                   </td>
                   <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">
                     {format(new Date(lead.created_at), 'dd MMM yyyy')}
+                    <span className="block text-[10px] text-gray-400">{format(new Date(lead.created_at), 'h:mm a')}</span>
                   </td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>

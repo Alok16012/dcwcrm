@@ -132,7 +132,17 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
                 if (!isMounted) return
                 setCourses((c ?? []) as any[])
-                setCounsellors((p ?? []) as any[])
+                // Keep the currently-assigned counsellor resolvable even if they
+                // are now inactive (the active-only filter + profiles RLS would
+                // otherwise drop them, and the picker would fall back to showing
+                // the raw UUID). Pull their name from the student's joined record.
+                const activeCounsellors = (p ?? []) as any[]
+                const assignedId = student?.assigned_counsellor
+                const joinedName = (student as any)?.counsellor?.full_name
+                if (assignedId && joinedName && !activeCounsellors.some((x: any) => x.id === assignedId)) {
+                    activeCounsellors.push({ id: assignedId, full_name: joinedName })
+                }
+                setCounsellors(activeCounsellors)
                 setDepartments(d ?? [])
                 setSessions(s ?? [])
                 setAssociates((assocs ?? []) as Associate[])
@@ -554,7 +564,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
                                         <SelectTrigger className="pl-9 bg-white border-blue-200">
                                             <SelectValue placeholder="Select counsellor">
                                                 {(watch('assigned_counsellor') && watch('assigned_counsellor') !== 'none')
-                                                    ? counsellors.find(c => c.id === (watch('assigned_counsellor') || ''))?.full_name || (student as any)?.counsellor?.full_name || watch('assigned_counsellor')
+                                                    ? counsellors.find(c => c.id === (watch('assigned_counsellor') || ''))?.full_name || (student as any)?.counsellor?.full_name || 'Assigned counsellor'
                                                     : "Select counsellor"}
                                             </SelectValue>
                                         </SelectTrigger>

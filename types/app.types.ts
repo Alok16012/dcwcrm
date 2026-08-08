@@ -17,7 +17,7 @@ export type LeadStatus =
 
 export type LeadSource =
   | 'website' | 'walk_in' | 'referral' | 'whatsapp'
-  | 'phone' | 'excel_import' | 'social_media' | 'meta_ads' | 'other'
+  | 'phone' | 'excel_import' | 'social_media' | 'meta_ads' | 'ivr' | 'other'
 
 export type ActivityType =
   | 'created' | 'status_changed' | 'assigned' | 'transferred'
@@ -325,7 +325,22 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   excel_import: 'Excel Import',
   social_media: 'Social Media',
   meta_ads: 'Meta Ads',
+  ivr: 'IVR Call',
   other: 'Other',
+}
+
+// Colour per source, for the Source column badge in the leads table.
+export const LEAD_SOURCE_COLORS: Record<LeadSource, string> = {
+  website: 'bg-sky-50 text-sky-700 border-sky-200',
+  walk_in: 'bg-amber-50 text-amber-700 border-amber-200',
+  referral: 'bg-purple-50 text-purple-700 border-purple-200',
+  whatsapp: 'bg-green-50 text-green-700 border-green-200',
+  phone: 'bg-blue-50 text-blue-700 border-blue-200',
+  excel_import: 'bg-gray-50 text-gray-600 border-gray-200',
+  social_media: 'bg-pink-50 text-pink-700 border-pink-200',
+  meta_ads: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  ivr: 'bg-teal-50 text-teal-700 border-teal-200',
+  other: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {

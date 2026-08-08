@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import {
   MoreHorizontal, Search, ChevronLeft, ChevronRight,
-  ChevronDown, X, SlidersHorizontal, ArrowUpDown, Phone, MessageCircle, Download
+  ChevronDown, X, SlidersHorizontal, ArrowUpDown, Phone, PhoneIncoming, MessageCircle, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useLeadStore } from '@/store/useLeadStore'
 import { toast } from 'sonner'
 import {
-  LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, LEAD_SOURCE_LABELS,
+  LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, LEAD_SOURCE_LABELS, LEAD_SOURCE_COLORS,
   type Lead, type LeadStatus, type LeadSource, type Course, type Profile
 } from '@/types/app.types'
 
@@ -70,6 +70,27 @@ const STATUS_DOT: Record<string, string> = {
   not_reachable: 'bg-gray-400', not_interested: 'bg-rose-500',
   custom: 'bg-violet-500',
   application_sent: 'bg-cyan-500', cold: 'bg-gray-400',
+}
+
+/**
+ * Where the lead came from. IVR leads also name the agent who took the call,
+ * since that is the whole reason the lead landed with this counsellor.
+ */
+function SourceBadge({ lead }: { lead: Lead }) {
+  const label = LEAD_SOURCE_LABELS[lead.source] ?? lead.source
+  const agent = lead.source === 'ivr'
+    ? (lead.metadata as { ivr_agent?: string } | undefined)?.ivr_agent
+    : undefined
+
+  return (
+    <div className="flex flex-col gap-0.5 items-start">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${LEAD_SOURCE_COLORS[lead.source] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+        {lead.source === 'ivr' && <PhoneIncoming className="w-2.5 h-2.5 flex-shrink-0" />}
+        {label}
+      </span>
+      {agent && <span className="text-[10px] text-gray-400 pl-1">via {agent}</span>}
+    </div>
+  )
 }
 
 // Label to show for a lead's status — custom leads display their free-text label
@@ -574,8 +595,9 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                 </DropdownMenu>
               </div>
 
-              {/* Row 3: board/inquiry + course + assigned + followup */}
+              {/* Row 3: source + board/inquiry + course + assigned + followup */}
               <div className="mt-2 ml-[52px] flex items-center gap-2 flex-wrap">
+                <SourceBadge lead={lead} />
                 {(() => {
                   // What the lead enquired about: the Board (sub_section) if set,
                   // otherwise the capture form / campaign it came from.
@@ -611,7 +633,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
       {/* ── DESKTOP TABLE (≥ md) ── */}
       {!isLoading && paginated.length > 0 && (
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1000px] text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
                 <th className="pl-4 pr-2 py-3 w-10">
@@ -621,6 +643,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dept</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Board</th>
@@ -688,6 +711,9 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                  </td>
+                  <td className="px-3 py-3">
+                    <SourceBadge lead={lead} />
                   </td>
                   <td className="px-3 py-3">
                     {lead.mode ? (

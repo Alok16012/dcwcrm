@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { PublicLeadForm, type PublicForm } from '@/components/public/PublicLeadForm'
 import { MetaPixel } from '@/components/public/MetaPixel'
+import { GoogleAds } from '@/components/public/GoogleAds'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
   return (
     <>
       <MetaPixel />
+      <GoogleAds />
       <PublicLeadForm form={form as unknown as PublicForm} />
     </>
   )

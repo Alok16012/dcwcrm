@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Phone, MapPin, Mail, CheckCircle2, Loader2, GraduationCap } from 'lucide-react'
+import { reportConversion } from '@/lib/googleAds'
 
 export interface PublicFormField {
   key: string
@@ -81,6 +82,11 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
       if (!res.ok) { setError(data.error ?? 'Something went wrong, please try again'); return }
       // Browser-side Meta Pixel Lead event (if the pixel is configured)
       try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
+      // Google Ads, same place and for the same reason: only after a 2xx.
+      // Firing on submit would count every rejected and rate-limited
+      // attempt as a lead, and the campaign would learn to chase whatever
+      // produces broken submissions.
+      try { reportConversion('formSubmit', { value: 200, currency: 'INR' }) } catch { /* non-critical */ }
       setDone(data.message ?? form.success_message ?? 'Thank you! Our team will contact you shortly.')
     } catch {
       setError('Network error — please try again')

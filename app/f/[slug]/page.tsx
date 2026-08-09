@@ -14,7 +14,7 @@ function getForm(slug: string) {
   )
   return supabase
     .from('lead_capture_forms')
-    .select('slug, title, subtitle, fields, success_message, is_active')
+    .select('slug, title, subtitle, fields, success_message, terms, is_active')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle()

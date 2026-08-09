@@ -18,6 +18,8 @@ export interface PublicForm {
   subtitle?: string | null
   fields: PublicFormField[]
   success_message?: string | null
+  /** Offer conditions, one per line. Required when the offer promises a refund. */
+  terms?: string | null
 }
 
 const COMPANY = {
@@ -194,6 +196,31 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
               </p>
             </div>
           </form>
+        )}
+
+        {/* Offer terms.
+            Sits outside the form and stays visible after submission: the
+            conditions of a refund promise matter most to somebody who has
+            already applied. Rendered only when the form record carries
+            terms, so nothing changes for the other forms. */}
+        {!done && form.terms && (
+          <div className="mt-4 bg-white rounded-2xl shadow-md overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900">Offer terms</h3>
+            </div>
+            <ul className="px-5 py-4 space-y-2">
+              {form.terms
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .map((line, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-slate-600">
+                    <span aria-hidden className="text-slate-300 mt-[3px]">•</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
         )}
 
         {/* Footer — address / phone / email */}

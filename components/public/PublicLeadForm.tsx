@@ -82,8 +82,14 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Something went wrong, please try again'); return }
-      // Browser-side Meta Pixel Lead event (if the pixel is configured)
-      try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
+      // Same split as the server: a click carrying gclid came from Google,
+      // so only Google hears about it. Reporting it to both would have each
+      // platform claiming the same lead.
+      const fromGoogle = /[?&](gclid|gbraid|wbraid)=/.test(window.location.search)
+      if (!fromGoogle) {
+        // Browser-side Meta Pixel Lead event (if the pixel is configured)
+        try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
+      }
       // Google Ads, same place and for the same reason: only after a 2xx.
       // Firing on submit would count every rejected and rate-limited
       // attempt as a lead, and the campaign would learn to chase whatever

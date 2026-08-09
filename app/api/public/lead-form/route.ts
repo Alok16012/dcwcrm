@@ -57,9 +57,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Which ad platform sent this visitor.
+    //
+    // Google auto-tagging appends ?gclid= to every paid click, and Meta
+    // appends ?fbclid=, so the landing page URL tells us the channel
+    // without the form having to know anything. Previously every
+    // submission was stored as Meta, including the Google ones, which
+    // made the channel column useless.
+    const url = typeof page_url === 'string' ? page_url : ''
+    const isGoogle = /[?&](gclid|gbraid|wbraid)=/.test(url)
+      || /[?&]utm_source=google/i.test(url)
+    const channel = isGoogle ? 'google_ads' : 'meta_ads'
+    const channelLabel = isGoogle ? 'Google Ads' : 'Meta Ads'
+
     // Map values to lead columns / metadata
     const lead: Record<string, string> = {}
-    const metadata: Record<string, unknown> = { form: (form as { title: string }).title, lead_source: 'Meta Ads' }
+    const metadata: Record<string, unknown> = {
+      form: (form as { title: string }).title,
+      lead_source: channelLabel,
+      landing_page: url || null,
+    }
     const labelByKey = new Map(fields.map((f) => [f.key, f.label]))
 
     for (const [key, raw] of Object.entries(values)) {
@@ -69,7 +86,7 @@ export async function POST(req: NextRequest) {
       else metadata[labelByKey.get(key) ?? key] = val
     }
 
-    const fullName = lead.full_name || 'Meta Lead'
+    const fullName = lead.full_name || `${channelLabel} Lead`
     const phone = lead.phone
     if (!phone) {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
@@ -81,13 +98,19 @@ export async function POST(req: NextRequest) {
       email: lead.email ?? null,
       city: lead.city ?? null,
       state: lead.state ?? null,
-      source: (form as { source: string }).source || 'meta_ads',
+      // Channel detected from the URL wins over the form's default:
+      // one form is used by both Google and Meta campaigns.
+      source: channel,
       metadata,
     })
 
     // Meta Conversions API — server-side Lead event, deduped with the browser
     // pixel via event_id. Best-effort: a Meta failure never blocks the lead.
-    await sendLeadToMeta({
+    //
+    // Google-sourced leads are deliberately not reported. Feeding Meta
+    // conversions it never delivered teaches its bidding to chase traffic
+    // that came from somewhere else entirely.
+    if (!isGoogle) await sendLeadToMeta({
       eventId: event_id || crypto.randomUUID(),
       email: lead.email ?? null,
       phone,

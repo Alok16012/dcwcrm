@@ -6,11 +6,15 @@
 -- arriving in the CRM labelled "Meta Ads" makes it impossible to tell
 -- which channel actually produced it, which is the only reason to run
 -- the tracking at all.
+--
+-- The list below must repeat every value the constraint has ever gained,
+-- not just the ones from 094: 095 added 'ivr' and there are live rows
+-- using it, so omitting it makes this migration fail on existing data.
 
 ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_source_check;
 ALTER TABLE leads ADD CONSTRAINT leads_source_check CHECK (
   source = ANY (ARRAY[
     'website','walk_in','referral','whatsapp','phone',
-    'excel_import','social_media','meta_ads','google_ads','other'
+    'excel_import','social_media','meta_ads','ivr','google_ads','other'
   ])
 );

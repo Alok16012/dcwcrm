@@ -389,7 +389,7 @@ export function BackendListClient() {
       const xlsx = await import('xlsx')
       const rows = displayStudents.map((s) => ({
         Name: s.full_name,
-        "Father's Name": s.guardian_name || '-',
+        "Father's Name": s.father_name || s.guardian_name || '-',
         Phone: s.phone,
         Email: s.email || '-',
         City: s.city || '-',
@@ -465,7 +465,7 @@ export function BackendListClient() {
       cell: ({ row }) => <span className="text-gray-500 tabular-nums">{row.index + 1}</span>,
     },
     { accessorKey: 'full_name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.full_name}</span> },
-    { id: 'guardian_name', accessorFn: (row) => row.guardian_name ?? '', header: "Father's Name", cell: ({ row }) => row.original.guardian_name ?? '-' },
+    { id: 'father_name', accessorFn: (row) => row.father_name || row.guardian_name || '', header: "Father's Name", cell: ({ row }) => row.original.father_name || row.original.guardian_name || '-' },
     { accessorKey: 'phone', header: 'Phone' },
     {
       id: 'mode', accessorFn: (row) => row.mode ?? '', header: 'Mode',

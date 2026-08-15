@@ -314,10 +314,13 @@ export const InvoicePDF = ({ student, payments, logoBase64 }: InvoiceProps) => {
                 <Text style={styles.infoLabel}>Full Name:</Text>
                 <Text style={styles.infoValue}>{student.full_name}</Text>
               </View>
-              {student.guardian_name ? (
+              {/* Always the father's name — guardian_name is a separate, editable
+                  field and must never stand in here. Older records predate the
+                  father_name column, so fall back to guardian_name for those. */}
+              {(student.father_name || student.guardian_name) ? (
                 <View style={styles.infoField}>
                   <Text style={styles.infoLabel}>Father's Name:</Text>
-                  <Text style={styles.infoValue}>{student.guardian_name}</Text>
+                  <Text style={styles.infoValue}>{student.father_name || student.guardian_name}</Text>
                 </View>
               ) : null}
               <View style={styles.infoField}>

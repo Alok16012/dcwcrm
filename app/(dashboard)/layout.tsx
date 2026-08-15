@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single() as { data: { id: string; email: string; full_name: string; role: string; phone: string | null; is_active: boolean; created_at: string } | null }
+      .single() as { data: { id: string; email: string; full_name: string; role: string; phone: string | null; is_active: boolean; created_at: string; module_rights: string[] | null } | null }
 
     if (profile) {
       userProfile = {
@@ -33,13 +33,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         phone: profile.phone ?? undefined,
         is_active: profile.is_active,
         created_at: profile.created_at,
+        module_rights: profile.module_rights ?? [],
       }
     }
   }
 
   return (
     <div className="flex h-screen overflow-clip app-bg">
-      <Sidebar role={userProfile.role} />
+      <Sidebar role={userProfile.role} moduleRights={userProfile.module_rights ?? []} />
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Topbar user={userProfile} />
         <main className="flex-1 overflow-y-auto flex flex-col">

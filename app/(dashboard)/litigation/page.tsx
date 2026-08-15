@@ -12,11 +12,11 @@ export default async function LitigationPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, module_rights')
     .eq('id', user.id)
-    .single() as { data: { role: string } | null }
+    .single() as { data: { role: string; module_rights: string[] | null } | null }
 
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  if (!profile || (profile.role !== 'admin' && !(profile.module_rights ?? []).includes('litigation'))) redirect('/dashboard')
 
   const [
     { data: departments },

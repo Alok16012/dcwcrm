@@ -94,6 +94,9 @@ export interface Profile {
   phone?: string
   is_active: boolean
   created_at: string
+  /** Per-user module grants beyond the role's own rights (e.g. 'courses',
+   *  'sessions', 'litigation', 'mentorship'). Admin never needs these. */
+  module_rights?: string[]
 }
 
 export interface Course {

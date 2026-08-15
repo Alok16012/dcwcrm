@@ -18,6 +18,9 @@ interface NavItem {
   href: string
   icon: React.ElementType
   roles: UserRole[]
+  /** Also visible to users whose profile carries this module grant,
+   *  regardless of role — see profiles.module_rights. */
+  module?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -41,14 +44,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
   { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend', 'lead', 'counselor', 'housekeeping'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
-  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'] },
-  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'] },
+  { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'], module: 'courses' },
+  { label: 'Sessions', href: '/settings/sessions', icon: ListTree, roles: ['admin'], module: 'sessions' },
   { label: 'Lead Forms', href: '/settings/lead-forms', icon: FileInput, roles: ['admin', 'backend'] },
-  { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'] },
+  { label: 'Litigation', href: '/litigation', icon: Scale, roles: ['admin'], module: 'litigation' },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'backend'] },
   { label: 'Associates', href: '/associates', icon: UserCircle2, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Mentorship',          href: '/mentorship',          icon: Award, roles: ['lead', 'counselor'] },
-  { label: 'Mentorship',          href: '/mentorship-approvals',icon: Award, roles: ['admin'] },
+  { label: 'Mentorship',          href: '/mentorship-approvals',icon: Award, roles: ['admin'], module: 'mentorship' },
   { label: 'Fees', href: '/fees', icon: IndianRupee, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Tasks', href: '/tasks', icon: ClipboardList, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Student Portal', href: '/student-portal', icon: School, roles: ['admin', 'backend'] },
@@ -63,13 +66,16 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   role: UserRole
+  moduleRights?: string[]
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, moduleRights = [] }: SidebarProps) {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useUIStore()
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    item.roles.includes(role) || (item.module != null && moduleRights.includes(item.module))
+  )
 
   function NavLinks({ collapsed = false, onNavClick }: { collapsed?: boolean; onNavClick?: () => void }) {
     return (

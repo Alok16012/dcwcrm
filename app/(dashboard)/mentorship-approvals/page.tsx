@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -51,6 +52,23 @@ function inits(name: string) { return name.split(' ').map(w=>w[0]).slice(0,2).jo
 
 export default function MentorshipDashboardPage() {
   const supabase = createClient()
+  const router = useRouter()
+
+  // This page never had a guard — the sidebar link was admin-only and that
+  // was the only gate. Now that mentorship rights are granted per user, check
+  // them here too. RLS is the real enforcement; this only keeps unauthorized
+  // users from landing on a broken, empty page via the URL.
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const { data: me } = await (supabase as any).from('profiles')
+        .select('role, module_rights').eq('id', user.id).single()
+      if (me && me.role !== 'admin' && !(me.module_rights ?? []).includes('mentorship')) {
+        router.replace('/dashboard')
+      }
+    })()
+  }, [supabase, router])
 
   const [tab, setTab] = useState<'students' | 'approvals' | 'approved'>('students')
   const [students, setStudents] = useState<StudentRow[]>([])

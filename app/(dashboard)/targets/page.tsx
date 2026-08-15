@@ -36,7 +36,7 @@ export default async function TargetsPage() {
     { auth: { persistSession: false } }
   )
 
-  const [counselorRes, targetRes, paymentRes, leadRes, mentorshipRes] = await Promise.all([
+  const [counselorRes, targetRes, paymentRes, leadRes, mentorshipRes, studentRes] = await Promise.all([
     dataClient
       .from('profiles')
       .select('id, full_name, role')
@@ -72,6 +72,17 @@ export default async function TargetsPage() {
       `)
       .eq('status', 'approved')
       .order('paid_on', { ascending: false }),
+    // Conversions are counted from admissions, not from lead status. Nearly
+    // every student here is added straight through the student form without
+    // the lead ever being marked converted (232 students, 5 with a lead_id),
+    // so a lead-based count reads 0 forever. Every conversion path — convert
+    // button or direct admission — produces a student row, so this counts
+    // both without double counting.
+    dataClient
+      .from('students')
+      .select('id, assigned_counsellor, enrollment_date, created_at, status')
+      .gte('enrollment_date', fetchStart)
+      .lte('enrollment_date', fetchEnd),
   ])
 
   const counselors = profile.role === 'admin'
@@ -86,6 +97,11 @@ export default async function TargetsPage() {
     return (student?.assigned_counsellor || lead?.assigned_to) === profile.id
   })
   const leadRows = ((leadRes.data ?? []) as any[]).filter(lead => profile.role === 'admin' || lead.assigned_to === profile.id)
+  // Rejected pending admissions end up status='dropped', so excluding dropped
+  // keeps junk entries out of the conversion count.
+  const studentRows = ((studentRes.data ?? []) as any[])
+    .filter(s => s.status !== 'dropped')
+    .filter(s => profile.role === 'admin' || s.assigned_counsellor === profile.id)
   const mentorshipRows = ((mentorshipRes.data ?? []) as any[])
     .map(row => {
       const mentorship = one<{ telecaller_id: string | null; student: any }>(row.mentorship)
@@ -110,6 +126,7 @@ export default async function TargetsPage() {
       payments={paymentRows}
       mentorshipPayments={mentorshipRows}
       leads={leadRows}
+      students={studentRows}
       defaultStart={defaultStart}
       defaultEnd={defaultEnd}
     />

@@ -68,6 +68,14 @@ interface LeadRow {
   converted_at: string | null
 }
 
+interface StudentRow {
+  id: string
+  assigned_counsellor: string | null
+  enrollment_date: string | null
+  created_at: string
+  status: string
+}
+
 interface MentorshipPaymentRow {
   id: string
   amount: number
@@ -85,6 +93,7 @@ interface Props {
   payments: PaymentRow[]
   mentorshipPayments: MentorshipPaymentRow[]
   leads: LeadRow[]
+  students: StudentRow[]
   defaultStart: string
   defaultEnd: string
 }
@@ -104,23 +113,35 @@ type PerformanceRow = {
   level: Level
 }
 
+// `min` is the achievement a counsellor has to reach to hold this level, and
+// they hold it until they reach the next one. Deliberately no upper bound:
+// achievement is fractional, so a level that ended at 99 with the next
+// starting at 100 dropped anyone sitting on 99.5 out of the ladder entirely.
 type Level = {
   name: string
   title: string
   min: number
-  max: number | null
   bonus: number
   color: string
   bg: string
 }
 
 const LEVELS: Level[] = [
-  { name: 'Level 1', title: 'Performer', min: 0, max: 60, bonus: 0, color: 'text-slate-700', bg: 'bg-slate-100' },
-  { name: 'Level 2', title: 'Achiever', min: 61, max: 80, bonus: 2, color: 'text-sky-700', bg: 'bg-sky-100' },
-  { name: 'Level 3', title: 'Star Performer', min: 81, max: 100, bonus: 5, color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  { name: 'Level 4', title: 'Champion', min: 101, max: 120, bonus: 8, color: 'text-violet-700', bg: 'bg-violet-100' },
-  { name: 'Level 5', title: 'Legend', min: 121, max: null, bonus: 12, color: 'text-amber-700', bg: 'bg-amber-100' },
+  { name: 'Level 1', title: 'Performer', min: 60, bonus: 0.5, color: 'text-slate-700', bg: 'bg-slate-100' },
+  { name: 'Level 2', title: 'Achiever', min: 100, bonus: 1, color: 'text-sky-700', bg: 'bg-sky-100' },
+  { name: 'Level 3', title: 'Star Performer', min: 150, bonus: 1.5, color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  { name: 'Level 4', title: 'Champion', min: 200, bonus: 2, color: 'text-violet-700', bg: 'bg-violet-100' },
+  { name: 'Level 5', title: 'Legend', min: 250, bonus: 2.5, color: 'text-amber-700', bg: 'bg-amber-100' },
 ]
+
+// The ladder starts at 60% — anyone below it has not qualified for any level
+// and earns nothing. Kept out of LEVELS so it never renders as a sixth rung on
+// the Levels & Bonus card, but returned by getLevel so the table always has a
+// label and a rate to show instead of a blank cell.
+const NO_LEVEL: Level = {
+  name: '—', title: 'Below Level 1', min: 0, bonus: 0,
+  color: 'text-slate-500', bg: 'bg-slate-100',
+}
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Math.round(n || 0))
@@ -133,7 +154,8 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function getLevel(achievement: number) {
-  return LEVELS.find(level => achievement >= level.min && (level.max == null || achievement <= level.max)) ?? LEVELS[0]
+  // Highest level whose threshold has been cleared, so scan from the top down.
+  return [...LEVELS].reverse().find(level => achievement >= level.min) ?? NO_LEVEL
 }
 
 function inRange(dateValue: string | null | undefined, start: string, end: string) {
@@ -167,6 +189,7 @@ export default function TargetsClient({
   payments,
   mentorshipPayments,
   leads,
+  students,
   defaultStart,
   defaultEnd,
 }: Props) {
@@ -221,10 +244,19 @@ export default function TargetsClient({
       .reduce((s, p) => s + Number(p.amount ?? 0), 0)
     const achievedRevenue = feeRevenue + mentorshipRevenue
     const leadCount = leads.filter(l => l.assigned_to === counselor.id && inRange(l.assigned_at || l.created_at, startDate, endDate)).length
-    const conversionCount = leads.filter(l => l.assigned_to === counselor.id && l.status === 'converted' && inRange(l.converted_at, startDate, endDate)).length
+    // A conversion is an admission. Counted from students, not from lead
+    // status — almost every admission here is added directly through the
+    // student form without the lead ever being marked converted, so the
+    // lead-based count sat at 0 no matter how many students were enrolled.
+    const conversionCount = students.filter(s => s.assigned_counsellor === counselor.id && inRange(s.enrollment_date || s.created_at, startDate, endDate)).length
     const achievement = pct(achievedRevenue, targetAmount)
-    const extraRevenue = Math.max(achievedRevenue - targetAmount, 0)
-    const bonusRate = myTargets.length ? Math.max(...myTargets.map(t => Number(t.bonus_percentage ?? 0))) : getLevel(achievement).bonus
+    const level = getLevel(achievement)
+    // The level the counsellor reached sets the rate. A target row may still
+    // carry a hand-entered bonus_percentage, and that wins when someone has
+    // actually set one — but 0 is the field's default, not a decision, so a
+    // blank one must not silently cancel the level's incentive.
+    const manualRate = Math.max(0, ...myTargets.map(t => Number(t.bonus_percentage ?? 0)))
+    const bonusRate = manualRate > 0 ? manualRate : level.bonus
     return {
       counselor,
       targets: myTargets,
@@ -236,10 +268,13 @@ export default function TargetsClient({
       conversionCount,
       pending: Math.max(targetAmount - achievedRevenue, 0),
       achievement,
-      bonus: extraRevenue * (bonusRate / 100),
-      level: getLevel(achievement),
+      // Incentive is a cut of everything collected, not only of what came in
+      // above target — the ladder pays from 60% achievement, where there is no
+      // above-target revenue to take a cut of.
+      bonus: achievedRevenue * (bonusRate / 100),
+      level,
     }
-  }).sort((a, b) => b.achievement - a.achievement || b.achievedRevenue - a.achievedRevenue), [visibleCounselors, activeTargets, payments, mentorshipPayments, leads, startDate, endDate])
+  }).sort((a, b) => b.achievement - a.achievement || b.achievedRevenue - a.achievedRevenue), [visibleCounselors, activeTargets, payments, mentorshipPayments, leads, students, startDate, endDate])
 
   const totals = rows.reduce((acc, row) => {
     acc.target += row.targetAmount
@@ -428,7 +463,7 @@ export default function TargetsClient({
             </Select>
             <Input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
             <Input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
-            <Input type="number" value={form.bonus_percentage} onChange={e => setForm(f => ({ ...f, bonus_percentage: e.target.value }))} placeholder="Bonus % above target" />
+            <Input type="number" value={form.bonus_percentage} onChange={e => setForm(f => ({ ...f, bonus_percentage: e.target.value }))} placeholder="Custom incentive % (blank = use level)" />
             <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Remarks" className="md:col-span-2 xl:col-span-3 min-h-10" />
           </div>
           <div className="mt-3 flex justify-end gap-2">
@@ -579,9 +614,9 @@ export default function TargetsClient({
                 <div key={level.name} className="flex items-center justify-between rounded-xl border px-3 py-2">
                   <div>
                     <p className="text-xs font-bold text-gray-900">{level.name} - {level.title}</p>
-                    <p className="text-[11px] text-gray-400">{level.max == null ? `${level.min}%+` : `${level.min}% - ${level.max}%`} achievement</p>
+                    <p className="text-[11px] text-gray-400">{level.min}% target achievement</p>
                   </div>
-                  <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${level.bg} ${level.color}`}>{level.bonus}% bonus</span>
+                  <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${level.bg} ${level.color}`}>{level.bonus}% incentive</span>
                 </div>
               ))}
             </div>

@@ -13,8 +13,10 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null } : { data: null }
 
-  // Non-admin users get redirected to their module (excluding telecallers who now have access)
-  if (profile?.role === 'backend') redirect('/backend')
+  // Associates get their own portal. Backend used to be bounced to /backend
+  // too, which made the sidebar's Dashboard entry a dead link for them — they
+  // now get the org-wide view, the same numbers they already see in Finance
+  // and Analytics.
   if (profile?.role === 'associate') redirect('/associate')
 
   const now = new Date()

@@ -81,7 +81,13 @@ export function Sidebar({ role, moduleRights = [] }: SidebarProps) {
     return (
       <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+          // '/associate' is the associate portal's Dashboard link, and every
+          // other associate route ('/associate/students', '/associate/account',
+          // ...) starts with that same prefix. Plain startsWith would keep
+          // Dashboard highlighted as "active" on every one of those pages —
+          // MobileBottomNav already special-cases this; match it here.
+          const isActive = pathname === item.href
+            || (item.href !== '/' && item.href !== '/dashboard' && item.href !== '/associate' && pathname.startsWith(item.href))
           return (
             <Link
               key={item.href}

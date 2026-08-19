@@ -103,9 +103,49 @@ export async function PATCH(request: Request) {
 
   const body = await request.json()
   const id = String(body.id ?? '')
-  const { data, error } = await adminClient()
+  if (!id) return NextResponse.json({ error: 'Missing target id' }, { status: 400 })
+
+  // status-only calls (archive/reactivate) keep working exactly as before.
+  // Anything else is a full edit — the admin correcting a number they typed
+  // wrong, or raising/lowering a target as the month goes — and every editable
+  // field is optional so the caller only sends what changed.
+  const update: Record<string, unknown> = {}
+  if (body.status !== undefined) update.status = body.status === 'archived' ? 'archived' : 'active'
+  if (body.title !== undefined) update.title = String(body.title || 'Revenue Target')
+  if (body.target_amount !== undefined) update.target_amount = Number(body.target_amount ?? 0)
+  if (body.lead_target !== undefined) update.lead_target = Number(body.lead_target ?? 0)
+  if (body.conversion_target !== undefined) update.conversion_target = Number(body.conversion_target ?? 0)
+  if (body.period_type !== undefined) update.period_type = body.period_type
+  if (body.start_date !== undefined) update.start_date = String(body.start_date ?? '')
+  if (body.end_date !== undefined) update.end_date = String(body.end_date ?? '')
+  if (body.bonus_percentage !== undefined) update.bonus_percentage = Number(body.bonus_percentage ?? 0)
+  if (body.notes !== undefined) update.notes = body.notes ? String(body.notes) : null
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
+
+  const admin = adminClient()
+
+  // Only fetch the existing row when a date is changing and the edit didn't
+  // touch both ends of the range — otherwise there's nothing to validate
+  // against and it's a wasted round trip.
+  if (update.start_date !== undefined || update.end_date !== undefined) {
+    const { data: existing } = await admin
+      .from('revenue_targets')
+      .select('start_date, end_date')
+      .eq('id', id)
+      .single() as { data: { start_date: string; end_date: string } | null }
+    const nextStart = (update.start_date as string) ?? existing?.start_date
+    const nextEnd = (update.end_date as string) ?? existing?.end_date
+    if (nextStart && nextEnd && nextEnd < nextStart) {
+      return NextResponse.json({ error: 'Invalid target date range' }, { status: 400 })
+    }
+  }
+
+  const { data, error } = await admin
     .from('revenue_targets')
-    .update({ status: body.status === 'archived' ? 'archived' : 'active' })
+    .update(update)
     .eq('id', id)
     .select('*, assignee:profiles!revenue_targets_assignee_id_fkey(id, full_name, role)')
     .single()

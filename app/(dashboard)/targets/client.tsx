@@ -201,6 +201,7 @@ export default function TargetsClient({
   const [counselorFilter, setCounselorFilter] = useState(isAdmin ? 'all' : currentUserId)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, startTransition] = useTransition()
   const [form, setForm] = useState({
     assignee_id: counselors[0]?.id ?? '',
@@ -313,6 +314,40 @@ export default function TargetsClient({
     .sort((a, b) => b.payment_date.localeCompare(a.payment_date))
     .slice(0, 8)
 
+  function startCreate() {
+    setEditingId(null)
+    setForm({
+      assignee_id: counselors[0]?.id ?? '',
+      title: 'Monthly Revenue Target',
+      target_amount: '',
+      lead_target: '',
+      conversion_target: '',
+      period_type: 'monthly',
+      start_date: defaultStart,
+      end_date: defaultEnd,
+      bonus_percentage: '0',
+      notes: '',
+    })
+    setShowForm(true)
+  }
+
+  function startEdit(target: RevenueTarget) {
+    setEditingId(target.id)
+    setForm({
+      assignee_id: target.assignee_id,
+      title: target.title,
+      target_amount: String(target.target_amount ?? ''),
+      lead_target: String(target.lead_target ?? ''),
+      conversion_target: String(target.conversion_target ?? ''),
+      period_type: target.period_type,
+      start_date: target.start_date,
+      end_date: target.end_date,
+      bonus_percentage: String(target.bonus_percentage ?? '0'),
+      notes: target.notes ?? '',
+    })
+    setShowForm(true)
+  }
+
   function submitTarget() {
     if (!isAdmin) return
     if (!form.assignee_id) return toast.error('Counselor select karo')
@@ -336,9 +371,9 @@ export default function TargetsClient({
         created_by: currentUserId,
       }
       const res = await fetch('/api/targets', {
-        method: 'POST',
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -346,9 +381,11 @@ export default function TargetsClient({
         return
       }
       const assignee = counselors.find(c => c.id === form.assignee_id) ?? null
-      setTargets(prev => [{ ...(json.target as RevenueTarget), assignee }, ...prev])
+      const saved = { ...(json.target as RevenueTarget), assignee }
+      setTargets(prev => editingId ? prev.map(t => t.id === editingId ? saved : t) : [saved, ...prev])
       setShowForm(false)
-      toast.success('Target assigned')
+      setEditingId(null)
+      toast.success(editingId ? 'Target updated' : 'Target assigned')
       router.refresh()
     })
   }
@@ -399,7 +436,7 @@ export default function TargetsClient({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
-            <Button onClick={() => setShowForm(v => !v)} className="gap-2">
+            <Button onClick={() => (showForm ? setShowForm(false) : startCreate())} className="gap-2">
               <Plus className="w-4 h-4" /> Assign Target
             </Button>
           )}
@@ -440,6 +477,7 @@ export default function TargetsClient({
 
       {showForm && isAdmin && (
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="mb-3 text-sm font-bold text-gray-900">{editingId ? 'Edit Target' : 'Assign New Target'}</p>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Select value={form.assignee_id} onValueChange={v => setForm(f => ({ ...f, assignee_id: v }))}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Counselor">{selectedAssigneeName}</SelectValue></SelectTrigger>
@@ -467,8 +505,8 @@ export default function TargetsClient({
             <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Remarks" className="md:col-span-2 xl:col-span-3 min-h-10" />
           </div>
           <div className="mt-3 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button onClick={submitTarget} disabled={busy}>Save Target</Button>
+            <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null) }}>Cancel</Button>
+            <Button onClick={submitTarget} disabled={busy}>{editingId ? 'Update Target' : 'Save Target'}</Button>
           </div>
         </div>
       )}
@@ -646,7 +684,10 @@ export default function TargetsClient({
                       <p className="text-xs text-gray-500">{assignee?.full_name ?? 'Counselor'} · {format(parseISO(target.start_date), 'dd MMM')} to {format(parseISO(target.end_date), 'dd MMM yyyy')}</p>
                     </div>
                     {isAdmin && (
-                      <button className="text-xs font-semibold text-red-500 hover:underline" onClick={() => archiveTarget(target.id)}>Archive</button>
+                      <div className="flex shrink-0 gap-3">
+                        <button className="text-xs font-semibold text-blue-600 hover:underline" onClick={() => startEdit(target)}>Edit</button>
+                        <button className="text-xs font-semibold text-red-500 hover:underline" onClick={() => archiveTarget(target.id)}>Archive</button>
+                      </div>
                     )}
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2">

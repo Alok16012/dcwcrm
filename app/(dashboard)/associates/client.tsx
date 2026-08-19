@@ -51,6 +51,10 @@ export default function AssociatesClient() {
   const db = supabase as any
 
   const [isAdmin, setIsAdmin] = useState(false)
+  const [viewerId, setViewerId] = useState<string | null>(null)
+  // Same coordinator scoping as AssociateManager: admin/backend run the whole
+  // network, lead/counselor only see the associates assigned to them.
+  const [canSeeAllAssociates, setCanSeeAllAssociates] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'approvals' | 'recharges'>('all')
 
   // Hero dashboard stats (shown above the tabs)
@@ -61,15 +65,30 @@ export default function AssociatesClient() {
   const fmtAgg = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`
 
   const loadHero = useCallback(async () => {
-    const [{ data: assoc }, { data: studs }] = await Promise.all([
-      (supabase as any).from('associates').select('id, status'),
-      (supabase as any).from('students').select('total_fee, amount_paid').not('referred_by_associate', 'is', null),
-    ])
-    setHeroAssociates((assoc ?? []) as any[])
-    setHeroStudents((studs ?? []) as any[])
-  }, [supabase])
+    if (!viewerId) return
+    let assocQuery = (supabase as any).from('associates').select('id, status')
+    if (!canSeeAllAssociates) assocQuery = assocQuery.eq('coordinator_id', viewerId)
+    const { data: assoc } = await assocQuery
+    const associateIds = ((assoc ?? []) as { id: string }[]).map(a => a.id)
 
-  useEffect(() => { loadHero() }, [loadHero, reloadKey])
+    // A coordinator's "Students Referred / Total Fee / Received" cards should
+    // total only the students their own associates brought in, not the whole
+    // network's. When scoped and there's nothing to sum yet, skip the query
+    // instead of asking for every student in the college.
+    let studs: any[] = []
+    if (canSeeAllAssociates) {
+      const { data } = await (supabase as any).from('students').select('total_fee, amount_paid').not('referred_by_associate', 'is', null)
+      studs = data ?? []
+    } else if (associateIds.length > 0) {
+      const { data } = await (supabase as any).from('students').select('total_fee, amount_paid').in('referred_by_associate', associateIds)
+      studs = data ?? []
+    }
+
+    setHeroAssociates((assoc ?? []) as any[])
+    setHeroStudents(studs)
+  }, [supabase, viewerId, canSeeAllAssociates])
+
+  useEffect(() => { if (viewerId !== null) loadHero() }, [loadHero, reloadKey, viewerId])
 
   const heroApproved = heroAssociates.filter(a => a.status === 'approved').length
   const heroPending = heroAssociates.filter(a => a.status === 'pending').length
@@ -79,8 +98,13 @@ export default function AssociatesClient() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }: any) => {
       if (!user) return
+      setViewerId(user.id)
       ;(supabase as any).from('profiles').select('role').eq('id', user.id).single()
-        .then(({ data }: any) => setIsAdmin(data?.role === 'admin'))
+        .then(({ data }: any) => {
+          const role = data?.role
+          setIsAdmin(role === 'admin')
+          setCanSeeAllAssociates(role === 'admin' || role === 'backend')
+        })
     })
   }, [supabase])
 

@@ -59,6 +59,12 @@ export function AssociateManager() {
   const supabase = createClient()
   const db = supabase as any
   const [isAdmin, setIsAdmin] = useState(false)
+  const [viewerId, setViewerId] = useState<string | null>(null)
+  // Admin and backend run the whole associate network and see everyone.
+  // Lead/counselor are "coordinators" — each associate is assigned to one via
+  // coordinator_id, and a coordinator should only ever see their own, the
+  // same way a counselor only sees their own leads.
+  const [canSeeAllAssociates, setCanSeeAllAssociates] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [associates, setAssociates] = useState<Associate[]>([])
   const [aggStudents, setAggStudents] = useState<any[]>([])
@@ -86,15 +92,21 @@ export function AssociateManager() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
+      setViewerId(user.id)
       const { data } = await (supabase as any).from('profiles').select('role').eq('id', user.id).single()
-      if ((data as any)?.role === 'admin') setIsAdmin(true)
+      const role = (data as any)?.role
+      if (role === 'admin') setIsAdmin(true)
+      setCanSeeAllAssociates(role === 'admin' || role === 'backend')
     })
   }, [supabase])
 
   const load = useCallback(async () => {
+    if (!viewerId) return
     setLoading(true)
+    let assocQuery = db.from('associates').select('*').order('created_at', { ascending: false })
+    if (!canSeeAllAssociates) assocQuery = assocQuery.eq('coordinator_id', viewerId)
     const [{ data }, { data: studs }] = await Promise.all([
-      db.from('associates').select('*').order('created_at', { ascending: false }),
+      assocQuery,
       db.from('students')
         .select('id, total_fee, amount_paid, status, referred_by_associate, sub_section:department_sub_sections(name)')
         .not('referred_by_associate', 'is', null),
@@ -102,9 +114,13 @@ export function AssociateManager() {
     setAssociates((data ?? []) as Associate[])
     setAggStudents((studs ?? []) as any[])
     setLoading(false)
-  }, [db])
+  }, [db, viewerId, canSeeAllAssociates])
 
-  useEffect(() => { load() }, [load])
+  // Waits on viewerId/canSeeAllAssociates so the first fetch is already
+  // scoped — loading unscoped and re-fetching a moment later would flash
+  // every associate's bank and ID details in front of a coordinator, if only
+  // for a frame.
+  useEffect(() => { if (viewerId !== null) load() }, [load, viewerId])
 
   function openEdit(a: Associate) {
     setEditTarget(a)

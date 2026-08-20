@@ -9,25 +9,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LeadTimeline } from '@/components/leads/LeadTimeline'
+import { LeadAppointments } from '@/components/leads/LeadAppointments'
 import { LeadTransferModal } from '@/components/leads/LeadTransferModal'
 import { ConvertLeadModal } from '@/components/leads/ConvertLeadModal'
 import { LeadForm } from '@/components/leads/LeadForm'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { AppointmentForm } from '@/components/appointments/AppointmentForm'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, LEAD_SOURCE_LABELS,
   PAYMENT_MODE_LABELS, formatCurrency,
-  type Lead, type LeadActivity, type Payment, type LeadStatus
+  type Lead, type LeadActivity, type Payment, type LeadStatus, type Appointment
 } from '@/types/app.types'
 
 interface LeadDetailClientProps {
   lead: Lead
   activities: LeadActivity[]
   payments: Payment[]
+  appointments: Appointment[]
 }
 
-export function LeadDetailClient({ lead: initialLead, activities: initialActivities, payments }: LeadDetailClientProps) {
+export function LeadDetailClient({ lead: initialLead, activities: initialActivities, payments, appointments: initialAppointments }: LeadDetailClientProps) {
+  const [appointments, setAppointments] = useState(initialAppointments)
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false)
   const [associates, setAssociates] = useState<{ id: string; name: string; associate_code: string | null }[]>([])
   const [assigningAssoc, setAssigningAssoc] = useState(false)
   const supabase2 = createClient()
@@ -142,6 +147,9 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <h1 className="text-lg font-bold flex-1 truncate">{lead.full_name}</h1>
+        <Button variant="outline" size="sm" onClick={() => setShowAppointmentForm(true)} className="px-2 sm:px-3">
+          <CalendarClock className="w-4 h-4" /><span className="hidden sm:inline ml-1">Schedule</span>
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)} className="px-2 sm:px-3">
           <ArrowRightLeft className="w-4 h-4" /><span className="hidden sm:inline ml-1">Transfer</span>
         </Button>
@@ -336,8 +344,14 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
           </Card>
         </div>
 
-        {/* Right: Timeline */}
-        <div>
+        {/* Right: Appointments + Timeline */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Appointments</CardTitle></CardHeader>
+            <CardContent>
+              <LeadAppointments appointments={appointments as never} />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
             <CardContent>
@@ -346,6 +360,21 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
           </Card>
         </div>
       </div>
+
+      {/* Schedule appointment dialog */}
+      <Dialog open={showAppointmentForm} onOpenChange={(o) => { if (!o) setShowAppointmentForm(false) }}>
+        <DialogContent className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Schedule Appointment</DialogTitle></DialogHeader>
+          <AppointmentForm
+            lockedLead={{ id: lead.id, full_name: lead.full_name, phone: lead.phone }}
+            onSuccess={(appointment) => {
+              setAppointments((prev) => [appointment, ...prev])
+              setShowAppointmentForm(false)
+            }}
+            onCancel={() => setShowAppointmentForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>

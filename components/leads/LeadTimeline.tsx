@@ -2,7 +2,8 @@
 import { format } from 'date-fns'
 import {
   UserPlus, ArrowRightLeft, MessageSquare, Bell,
-  CreditCard, CheckCircle, FileText, Phone, Tag, Edit
+  CreditCard, CheckCircle, FileText, Phone, Tag, Edit,
+  CalendarClock, CalendarCheck, CalendarX
 } from 'lucide-react'
 import type { LeadActivity, ActivityType } from '@/types/app.types'
 
@@ -18,6 +19,9 @@ const ACTIVITY_ICONS: Record<ActivityType, React.ElementType> = {
   document_uploaded: FileText,
   call_made: Phone,
   updated: Edit,
+  appointment_scheduled: CalendarClock,
+  appointment_completed: CalendarCheck,
+  appointment_cancelled: CalendarX,
 }
 
 const ACTIVITY_COLORS: Record<ActivityType, string> = {
@@ -32,6 +36,9 @@ const ACTIVITY_COLORS: Record<ActivityType, string> = {
   document_uploaded: 'bg-cyan-100 text-cyan-600',
   call_made: 'bg-pink-100 text-pink-600',
   updated: 'bg-blue-100 text-blue-600',
+  appointment_scheduled: 'bg-blue-100 text-blue-600',
+  appointment_completed: 'bg-green-100 text-green-600',
+  appointment_cancelled: 'bg-red-100 text-red-600',
 }
 
 function getActivityText(activity: LeadActivity): string {
@@ -47,6 +54,9 @@ function getActivityText(activity: LeadActivity): string {
     case 'document_uploaded': return `Document uploaded: ${activity.new_value}`
     case 'call_made': return activity.note ?? 'Call logged'
     case 'updated': return `Lead details updated: ${activity.note}`
+    case 'appointment_scheduled': return `Appointment scheduled — ${activity.new_value}`
+    case 'appointment_completed': return 'Appointment marked completed'
+    case 'appointment_cancelled': return 'Appointment cancelled'
     default: return 'Activity recorded'
   }
 }

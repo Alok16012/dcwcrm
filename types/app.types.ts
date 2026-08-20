@@ -23,6 +23,11 @@ export type ActivityType =
   | 'created' | 'status_changed' | 'assigned' | 'transferred'
   | 'note_added' | 'followup_set' | 'payment_received'
   | 'converted' | 'document_uploaded' | 'call_made' | 'updated'
+  | 'appointment_scheduled' | 'appointment_completed' | 'appointment_cancelled'
+
+export type AppointmentType = 'office_visit' | 'google_meet'
+
+export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
 
 export type PaymentMode =
   | 'cash' | 'upi' | 'card' | 'neft' | 'rtgs' | 'cheque' | 'other'
@@ -171,6 +176,27 @@ export interface Lead {
   session?: Session
   assigned_user?: Profile
   created_by_user?: Profile
+}
+
+export interface Appointment {
+  id: string
+  lead_id: string
+  appointment_type: AppointmentType
+  meet_link?: string | null
+  host_id: string
+  created_by: string
+  scheduled_date: string
+  scheduled_time: string
+  duration_minutes: number
+  status: AppointmentStatus
+  notes?: string | null
+  review_note?: string | null
+  created_at: string
+  updated_at: string
+  // joins
+  lead?: Pick<Lead, 'id' | 'full_name' | 'phone'>
+  host?: Profile
+  creator?: Profile
 }
 
 export interface LeadActivity {

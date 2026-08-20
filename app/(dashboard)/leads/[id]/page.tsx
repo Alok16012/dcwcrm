@@ -49,11 +49,27 @@ export default async function LeadDetailPage({ params }: Props) {
     console.error('Failed to fetch payments:', err)
   }
 
+  // So opening a lead immediately answers "has someone already booked a
+  // visit with this student" instead of counselors finding out by accident.
+  let appointments: any[] = []
+  try {
+    const { data } = await supabase
+      .from('appointments')
+      .select('*, host:profiles!appointments_host_id_fkey(id, full_name), creator:profiles!appointments_created_by_fkey(id, full_name)')
+      .eq('lead_id', id)
+      .order('scheduled_date', { ascending: false })
+      .order('scheduled_time', { ascending: false })
+    appointments = data ?? []
+  } catch (err) {
+    console.error('Failed to fetch appointments:', err)
+  }
+
   return (
     <LeadDetailClient
       lead={lead as never}
       activities={(activities ?? []) as never}
       payments={(payments ?? []) as never}
+      appointments={(appointments ?? []) as never}
     />
   )
 }

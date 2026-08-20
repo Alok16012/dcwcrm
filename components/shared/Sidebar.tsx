@@ -7,7 +7,7 @@ import {
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, Briefcase, UserCircle2,
   Wallet, Package, Bell, User, IndianRupee, HeartHandshake, ClipboardList, School,
-  Award, Truck, FileInput,
+  Award, Truck, FileInput, CalendarClock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Centre Fee', href: '/centre-fee', icon: Building2, roles: ['admin', 'backend'] },
   { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },
   { label: 'Targets', href: '/targets', icon: TrendingUp, roles: ['admin', 'lead', 'counselor'] },
+  { label: 'Appointments', href: '/appointments', icon: CalendarClock, roles: ['admin', 'lead', 'counselor'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
   { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend', 'lead', 'counselor', 'housekeeping'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },

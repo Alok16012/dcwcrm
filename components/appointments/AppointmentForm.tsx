@@ -30,7 +30,7 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
   const [hosts, setHosts] = useState<Profile[]>([])
 
   const [appointmentType, setAppointmentType] = useState<AppointmentType>('office_visit')
-  const [hostId, setHostId] = useState('')
+  const [hostId, setHostId] = useState<string | undefined>(undefined)
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
   const [meetLink, setMeetLink] = useState('')
@@ -41,7 +41,10 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setCurrentUserId(user.id); setHostId((prev) => prev || user.id) }
+      if (user) {
+        setCurrentUserId(user.id)
+        setHostId((prev) => prev || user.id)
+      }
     })
     supabase.from('profiles').select('id, full_name, role')
       .in('role', HOST_ROLES as unknown as string[])
@@ -158,11 +161,11 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
       )}
 
       <div>
-        <Label className="mb-1.5 block">Host</Label>
-        <Select value={hostId} onValueChange={(v) => { setHostId(v || ''); setScheduledTime('') }}>
+        <Label className="mb-1.5 block">Host (Counselor who will conduct the visit)</Label>
+        <Select value={hostId ?? ''} onValueChange={(v) => { setHostId(v || undefined); setScheduledTime('') }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Who will host?">
-              {hosts.find((h) => h.id === hostId)?.full_name ?? 'Who will host?'}
+              {hostId && hosts.find((h) => h.id === hostId)?.full_name ?? 'Who will host?'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -186,7 +189,7 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
       <div>
         <Label className="mb-1.5 block">Slot</Label>
         <SlotPicker
-          hostId={hostId || null}
+          hostId={hostId ?? null}
           date={scheduledDate}
           value={scheduledTime}
           onChange={setScheduledTime}

@@ -39,14 +39,15 @@ export async function proxy(request: NextRequest) {
   const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
   // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
-  // forms (Meta ads landing pages at /f/{slug}) — no auth
+  // forms (Meta ads landing pages at /f/{slug}) + walk-in registration page
   const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/')
+  const isWalkinRoute    = pathname === '/walkin'
   // PWA install assets. These were being redirected to /login, so "Add to Home
   // Screen" never picked up the app name or icons.
   const isPwaAsset       = pathname === '/manifest.webmanifest' || pathname === '/sw.js'
-  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute
 
-  if (isApiRoute || isPublicLink || isPwaAsset) return response
+  if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute) return response
 
   if (user) {
     const { data: profile } = await supabase
@@ -94,7 +95,7 @@ export async function proxy(request: NextRequest) {
     if (isStudentRoute) {
       return NextResponse.redirect(new URL('/student/login', request.url))
     }
-    if (!isAdminLogin && !isStudentLogin && !isAssociateRoute) {
+    if (!isAdminLogin && !isStudentLogin && !isAssociateRoute && !isWalkinRoute) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }

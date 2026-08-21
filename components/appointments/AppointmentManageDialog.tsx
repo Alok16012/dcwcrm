@@ -8,7 +8,38 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SlotPicker } from './SlotPicker'
+import { format, parseISO } from 'date-fns'
+import { MessageCircle } from 'lucide-react'
 import type { Appointment, AppointmentStatus, Profile } from '@/types/app.types'
+
+function normalizePhone(raw?: string): string | null {
+  if (!raw) return null
+  let digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) digits = '91' + digits
+  else if (digits.length === 12 && digits.startsWith('91')) { /* already ok */ }
+  else if (digits.length === 11 && digits.startsWith('0')) digits = '91' + digits.slice(1)
+  return digits.length >= 11 ? digits : null
+}
+
+function waMessage(appointment: Appointment): string {
+  const date = format(parseISO(appointment.scheduled_date), 'dd MMM yyyy')
+  const time = appointment.scheduled_time.slice(0, 5)
+  const typeLabel = appointment.appointment_type === 'google_meet' ? 'Google Meet' : 'Office Visit'
+  const hostName = appointment.host?.full_name ?? 'our counselor'
+  const lines = [
+    `Hello ${appointment.lead?.full_name ?? ''},`,
+    '',
+    `Your ${typeLabel} appointment has been scheduled at DCW.`,
+    `📅 Date: ${date}`,
+    `⏰ Time: ${time}`,
+    `👤 Host: ${hostName}`,
+  ]
+  if (appointment.appointment_type === 'google_meet' && appointment.meet_link) {
+    lines.push(`🔗 Link: ${appointment.meet_link}`)
+  }
+  lines.push('', '- Team Distance Courses Wala')
+  return lines.join('\n')
+}
 
 interface AppointmentManageDialogProps {
   appointment: Appointment
@@ -79,6 +110,17 @@ export function AppointmentManageDialog({ appointment, currentUserId, isAdmin, h
     toast.success('Appointment updated')
     onUpdated(data as unknown as Appointment)
     onClose()
+  }
+
+  function handleWhatsApp() {
+    const phone = normalizePhone(appointment.lead?.phone)
+    if (!phone) {
+      toast.error('No valid phone number for this lead')
+      return
+    }
+    const msg = waMessage(appointment)
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -155,7 +197,10 @@ export function AppointmentManageDialog({ appointment, currentUserId, isAdmin, h
               </>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={handleWhatsApp} className="text-green-700 hover:bg-green-50 gap-1.5">
+                <MessageCircle className="w-4 h-4" /> WhatsApp
+              </Button>
               <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
               <Button onClick={handleSave} disabled={saving || (isAdmin && !scheduledTime)}>
                 {saving ? 'Saving…' : 'Save'}

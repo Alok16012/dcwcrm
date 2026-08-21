@@ -4,7 +4,7 @@ interface StatCardProps {
   label: string
   value: string | number
   sub?: string
-  color?: 'default' | 'green' | 'amber' | 'red' | 'blue'
+  color?: 'default' | 'green' | 'amber' | 'red' | 'blue' | 'indigo' | 'emerald'
 }
 
 const colorMap = {
@@ -13,6 +13,8 @@ const colorMap = {
   amber: 'border-l-4 border-amber-500 bg-white',
   red: 'border-l-4 border-red-500 bg-white',
   blue: 'border-l-4 border-blue-500 bg-white',
+  indigo: 'border-l-4 border-indigo-500 bg-white',
+  emerald: 'border-l-4 border-emerald-500 bg-white',
 }
 
 const valueColorMap = {
@@ -21,6 +23,8 @@ const valueColorMap = {
   amber: 'text-amber-700',
   red: 'text-red-700',
   blue: 'text-blue-700',
+  indigo: 'text-indigo-700',
+  emerald: 'text-emerald-700',
 }
 
 export function StatCard({ label, value, sub, color = 'default' }: StatCardProps) {

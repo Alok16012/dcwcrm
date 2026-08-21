@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
   ClipboardList, Clock, AlertTriangle, Zap, CheckCircle2, ChevronRight,
-  Phone, MessageCircle, FileText, ArrowRight,
+  Phone, MessageCircle, FileText, ArrowRight, Calendar, Building2, Video,
 } from 'lucide-react'
 
 interface FollowupLead {
@@ -42,6 +42,16 @@ interface DepartmentStat {
   pending_fee: number
 }
 
+interface UpcomingAppt {
+  id: string
+  scheduled_date: string
+  scheduled_time: string
+  appointment_type: string
+  status: string
+  lead: { id: string; full_name: string; phone: string } | null
+  host: { id: string; full_name: string } | null
+}
+
 interface DashboardClientProps {
   totalLeads: number
   newToday: number
@@ -51,6 +61,9 @@ interface DashboardClientProps {
   outstandingFees: number
   activeStudents: number
   droppedStudents: number
+  todayAppointments: number
+  upcomingAppointments: number
+  upcomingApptRaw: UpcomingAppt[]
   followupsToday: FollowupLead[]
   interestedStats: InterestedStat[]
   incentiveHistory?: IncentiveRow[]
@@ -81,6 +94,15 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
+function normalizePhoneForDash(raw?: string): string | null {
+  if (!raw) return null
+  let digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) digits = '91' + digits
+  else if (digits.length === 12 && digits.startsWith('91')) { /* already ok */ }
+  else if (digits.length === 11 && digits.startsWith('0')) digits = '91' + digits.slice(1)
+  return digits.length >= 11 ? digits : null
+}
+
 type Tab = 'overview' | 'interested' | 'followups' | 'incentives' | 'departments'
 
 function TabBtn({ active, onClick, icon: Icon, label, badge }: {
@@ -108,6 +130,7 @@ function TabBtn({ active, onClick, icon: Icon, label, badge }: {
 export default function DashboardClient({
   totalLeads, newToday, convertedThisMonth, conversionRate,
   totalFeeCollected, outstandingFees, activeStudents, droppedStudents,
+  todayAppointments, upcomingAppointments, upcomingApptRaw,
   followupsToday, interestedStats, incentiveHistory = [],
   isLead = false, docReceivedCount = 0, expectedEnrollmentCount = 0, departmentStats = [],
 }: DashboardClientProps) {
@@ -165,6 +188,52 @@ export default function DashboardClient({
             {isLead && <StatCard label="Doc Received" value={docReceivedCount} color="blue" />}
             {isLead && <StatCard label="Exp. Enrollment" value={expectedEnrollmentCount} color="green" />}
           </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label="Today's Appointments" value={todayAppointments} color="indigo" />
+            <StatCard label="Upcoming (7 days)" value={upcomingAppointments} color="emerald" />
+          </div>
+
+          {upcomingApptRaw.length > 0 && (
+            <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+              <div className="px-4 py-3.5 border-b bg-gradient-to-r from-indigo-50 to-blue-50 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                <h2 className="font-semibold text-sm text-indigo-800">Upcoming Appointments (next 7 days)</h2>
+              </div>
+              <div className="divide-y">
+                {upcomingApptRaw.map((a) => {
+                  const aDate = format(parseISO(a.scheduled_date), 'dd MMM')
+                  const aTime = a.scheduled_time.slice(0, 5)
+                  const aPhone = normalizePhoneForDash(a.lead?.phone)
+                  return (
+                    <div key={a.id} className="px-4 py-3 flex items-center gap-3 hover:bg-indigo-50/30 transition-colors">
+                      <Link href={`/leads/${a.lead?.id ?? '#'}`} className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{a.lead?.full_name ?? '—'}</p>
+                          <p className="text-xs text-gray-500">{aDate} · {aTime} · {a.host?.full_name ?? '—'}</p>
+                        </div>
+                      </Link>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {aPhone && (
+                          <a href={`https://wa.me/${aPhone}?text=${encodeURIComponent(`Hello ${a.lead?.full_name ?? ''}, this is a reminder about your appointment on ${aDate} at ${aTime}. - Team DCW`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 rounded-lg hover:bg-green-100 transition-colors" title="WhatsApp">
+                            <MessageCircle className="w-3.5 h-3.5 text-green-600" />
+                          </a>
+                        )}
+                        <Link href="/appointments" className="px-2 py-1 text-[11px] font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="px-4 py-2.5 border-t bg-slate-50">
+                <Link href="/appointments" className="text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1">
+                  View all appointments <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          )}
 
           {isLead && (
             <div className="grid grid-cols-3 gap-2.5">

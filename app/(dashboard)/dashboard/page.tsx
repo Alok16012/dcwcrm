@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import DashboardClient from '../dashboard-client'
 
@@ -57,6 +57,12 @@ export default async function DashboardPage() {
     'students'
   )
 
+  // Appointment queries: admin sees all, counselors see where they host or booked
+  const todayApptDate = format(startOfDay(now), 'yyyy-MM-dd')
+  const apptScope = isLead
+    ? (q: any) => q.or(`host_id.eq.${user!.id},created_by.eq.${user!.id}`)
+    : (q: any) => q
+
   const [
     { count: totalLeads },
     { count: newToday },
@@ -66,7 +72,10 @@ export default async function DashboardPage() {
     { data: studentFees },
     { count: activeStudents },
     { count: droppedStudents },
+    { count: todayAppointments },
+    { count: upcomingAppointments },
     { data: recentLeadsRaw },
+    { data: upcomingApptRaw },
     { data: followupLeads },
     { data: telecallersRaw },
     { data: interestedLeadsRaw },
@@ -80,7 +89,10 @@ export default async function DashboardPage() {
     applyScope(supabase.from('students').select('total_fee, amount_paid'), 'students'),
     applyScope(supabase.from('students').select('*', { count: 'exact', head: true }), 'students'),
     droppedStudentsQuery,
+    apptScope(supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('scheduled_date', todayApptDate).neq('status', 'cancelled')).then((r: any) => ({ count: r.count })),
+    apptScope(supabase.from('appointments').select('*', { count: 'exact', head: true }).gte('scheduled_date', todayApptDate).lte('scheduled_date', addDays(now, 7)).eq('status', 'scheduled')).then((r: any) => ({ count: r.count })),
     applyScope(supabase.from('leads').select('id, full_name, status, created_at, courses ( name )'), 'leads').order('created_at', { ascending: false }).limit(10),
+    apptScope(supabase.from('appointments').select('*, lead:leads(id, full_name, phone), host:profiles!appointments_host_id_fkey(id, full_name)').eq('status', 'scheduled').gte('scheduled_date', todayApptDate).lte('scheduled_date', addDays(now, 7)).order('scheduled_date').order('scheduled_time').limit(5)),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
     supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
     applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested'), 'leads'),
@@ -189,6 +201,9 @@ export default async function DashboardPage() {
       outstandingFees={outstandingFees}
       activeStudents={activeStudents ?? 0}
       droppedStudents={droppedStudents ?? 0}
+      todayAppointments={todayAppointments ?? 0}
+      upcomingAppointments={upcomingAppointments ?? 0}
+      upcomingApptRaw={(upcomingApptRaw ?? []) as any[]}
       followupsToday={followupsToday}
       interestedStats={counselorInterestedStats}
       incentiveHistory={incentiveHistory}

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search, Building2, Video } from 'lucide-react'
+import { Plus, Search, Building2, Video, MessageCircle } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { AppointmentForm } from '@/components/appointments/AppointmentForm'
 import { AppointmentManageDialog } from '@/components/appointments/AppointmentManageDialog'
 import { AppointmentStatusBadge } from '@/components/appointments/AppointmentStatusBadge'
 import { SlotPicker } from '@/components/appointments/SlotPicker'
+import { toast } from 'sonner'
 import type { Appointment, AppointmentStatus, Profile } from '@/types/app.types'
 
 interface AppointmentsClientProps {
@@ -27,6 +28,38 @@ export default function AppointmentsClient({ currentUserId, role, hosts, initial
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [showForm, setShowForm] = useState(false)
   const [managing, setManaging] = useState<Appointment | null>(null)
+
+  function normalizePhone(raw?: string): string | null {
+    if (!raw) return null
+    let digits = raw.replace(/\D/g, '')
+    if (digits.length === 10) digits = '91' + digits
+    else if (digits.length === 12 && digits.startsWith('91')) { /* already ok */ }
+    else if (digits.length === 11 && digits.startsWith('0')) digits = '91' + digits.slice(1)
+    return digits.length >= 11 ? digits : null
+  }
+
+  function handleWhatsApp(appointment: Appointment) {
+    const phone = normalizePhone(appointment.lead?.phone)
+    if (!phone) { toast.error('No valid phone number'); return }
+    const date = format(parseISO(appointment.scheduled_date), 'dd MMM yyyy')
+    const time = appointment.scheduled_time.slice(0, 5)
+    const typeLabel = appointment.appointment_type === 'google_meet' ? 'Google Meet' : 'Office Visit'
+    const hostName = appointment.host?.full_name ?? 'our counselor'
+    const lines = [
+      `Hello ${appointment.lead?.full_name ?? ''},`,
+      '',
+      `Your ${typeLabel} appointment has been scheduled at DCW.`,
+      `📅 Date: ${date}`,
+      `⏰ Time: ${time}`,
+      `👤 Host: ${hostName}`,
+    ]
+    if (appointment.appointment_type === 'google_meet' && appointment.meet_link) {
+      lines.push(`🔗 Link: ${appointment.meet_link}`)
+    }
+    lines.push('', '- Team Distance Courses Wala')
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   // Slot browser
   const [browseHostId, setBrowseHostId] = useState(currentUserId)
@@ -157,9 +190,20 @@ export default function AppointmentsClient({ currentUserId, role, hosts, initial
                           <TableCell><AppointmentStatusBadge status={a.status} /></TableCell>
                           <TableCell className="text-sm text-gray-500">{a.creator?.full_name ?? '—'}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="sm" disabled={!canManage} onClick={() => setManaging(a)}>
-                              Manage
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Send via WhatsApp"
+                                className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                onClick={() => handleWhatsApp(a)}
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" disabled={!canManage} onClick={() => setManaging(a)}>
+                                Manage
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       )

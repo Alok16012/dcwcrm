@@ -459,7 +459,7 @@ export default function TargetsClient({
             <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search counselor or target" className="pl-9" />
           </div>
           {isAdmin && (
-            <Select value={counselorFilter} onValueChange={setCounselorFilter}>
+            <Select value={counselorFilter} onValueChange={v => setCounselorFilter(v ?? '')}>
               <SelectTrigger className="min-w-[190px]">
                 <SelectValue placeholder="Counselor">{counselorFilterName}</SelectValue>
               </SelectTrigger>

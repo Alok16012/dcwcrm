@@ -217,7 +217,6 @@ export default function TargetsClient({
   })
 
   const activeTargets = useMemo(() => targets.filter(t => {
-    if (t.status !== 'active') return false
     if (t.end_date < startDate || t.start_date > endDate) return false
     if (counselorFilter !== 'all' && t.assignee_id !== counselorFilter) return false
     const assignee = targetAssignee(t)

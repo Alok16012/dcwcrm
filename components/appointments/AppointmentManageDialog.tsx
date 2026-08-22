@@ -125,7 +125,7 @@ export function AppointmentManageDialog({ appointment, currentUserId, isAdmin, h
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent>
+      <DialogContent className="w-full max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Manage Appointment</DialogTitle></DialogHeader>
 
         {!canManage ? (
@@ -198,11 +198,11 @@ export function AppointmentManageDialog({ appointment, currentUserId, isAdmin, h
             )}
 
             <div className="flex flex-wrap justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={handleWhatsApp} className="text-green-700 hover:bg-green-50 gap-1.5">
-                <MessageCircle className="w-4 h-4" /> WhatsApp
+              <Button variant="ghost" onClick={handleWhatsApp} className="text-green-700 hover:bg-green-50 gap-1.5 h-10">
+                <MessageCircle className="w-4 h-4" /> <span className="hidden sm:inline">WhatsApp</span>
               </Button>
-              <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
-              <Button onClick={handleSave} disabled={saving || (isAdmin && !scheduledTime)}>
+              <Button variant="outline" onClick={onClose} disabled={saving} className="h-10">Close</Button>
+              <Button onClick={handleSave} disabled={saving || (isAdmin && !scheduledTime)} className="h-10">
                 {saving ? 'Saving…' : 'Save'}
               </Button>
             </div>

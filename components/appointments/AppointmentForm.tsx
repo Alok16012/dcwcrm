@@ -133,14 +133,14 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
 
       <div>
         <Label className="mb-1.5 block">Type</Label>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {(['office_visit', 'google_meet'] as AppointmentType[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setAppointmentType(t)}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors',
                 appointmentType === t
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -202,9 +202,9 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Purpose of the visit…" className="min-h-16" />
       </div>
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} disabled={submitting}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={submitting || !scheduledTime}>
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onCancel} disabled={submitting} className="w-full sm:w-auto h-11 text-base">Cancel</Button>
+        <Button onClick={handleSubmit} disabled={submitting || !scheduledTime} className="w-full sm:w-auto h-11 text-base">
           {submitting ? 'Scheduling…' : 'Schedule Appointment'}
         </Button>
       </div>

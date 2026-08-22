@@ -217,7 +217,7 @@ export default function AppointmentsClient({ currentUserId, role, hosts, initial
       </Tabs>
 
       <Dialog open={showForm} onOpenChange={(o) => { if (!o) setShowForm(false) }}>
-        <DialogContent className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Schedule Appointment</DialogTitle></DialogHeader>
           <AppointmentForm onSuccess={handleCreated} onCancel={() => setShowForm(false)} />
         </DialogContent>

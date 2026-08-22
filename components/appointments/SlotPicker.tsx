@@ -54,7 +54,7 @@ export function SlotPicker({ hostId, date, value, onChange, readOnly, refreshKey
   const slots = generateDaySlots()
 
   return (
-    <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
       {slots.map((slot) => {
         const isBooked = booked.has(slot)
         const isSelected = value === slot
@@ -65,12 +65,12 @@ export function SlotPicker({ hostId, date, value, onChange, readOnly, refreshKey
             disabled={readOnly || isBooked}
             onClick={() => onChange?.(slot)}
             className={cn(
-              'h-8 rounded-md text-xs font-medium border transition-colors',
+              'h-11 rounded-lg text-sm font-semibold border transition-colors',
               isBooked
                 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through'
                 : isSelected
                   ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:text-blue-700'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:text-blue-700 active:scale-95'
             )}
             title={isBooked ? 'Already booked' : slot}
           >

@@ -152,3 +152,22 @@ export async function PATCH(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ target: data })
 }
+
+export async function DELETE(request: Request) {
+  const profile = await currentProfile()
+  if (!profile || profile.role !== 'admin') {
+    return NextResponse.json({ error: 'Only admin can delete targets' }, { status: 403 })
+  }
+
+  const body = await request.json()
+  const id = String(body.id ?? '')
+  if (!id) return NextResponse.json({ error: 'Missing target id' }, { status: 400 })
+
+  const { error } = await adminClient()
+    .from('revenue_targets')
+    .delete()
+    .eq('id', id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}

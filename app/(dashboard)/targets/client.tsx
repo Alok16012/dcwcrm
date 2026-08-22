@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import {
   Award,
-  Archive,
   BarChart3,
   CalendarDays,
   CheckCircle2,
@@ -226,11 +225,6 @@ export default function TargetsClient({
     return true
   }), [targets, startDate, endDate, counselorFilter, search])
 
-  const archivedTargets = useMemo(() => targets.filter(t => {
-    if (t.status !== 'archived') return false
-    return true
-  }), [targets])
-
   const visibleCounselors = useMemo(() => counselors.filter(c => {
     if (!isAdmin && c.id !== currentUserId) return false
     if (counselorFilter !== 'all' && c.id !== counselorFilter) return false
@@ -396,39 +390,21 @@ export default function TargetsClient({
     })
   }
 
-  function archiveTarget(id: string) {
+  function deleteTarget(id: string) {
     if (!isAdmin) return
     startTransition(async () => {
       const res = await fetch('/api/targets', {
-        method: 'PATCH',
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'archived' }),
+        body: JSON.stringify({ id }),
       })
       const json = await res.json()
       if (!res.ok) {
-        toast.error(json.error ?? 'Target archive nahi hua')
+        toast.error(json.error ?? 'Target delete nahi hua')
         return
       }
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, status: 'archived' } : t))
-      toast.success('Target archived')
-    })
-  }
-
-  function unarchiveTarget(id: string) {
-    if (!isAdmin) return
-    startTransition(async () => {
-      const res = await fetch('/api/targets', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'active' }),
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        toast.error(json.error ?? 'Target restore nahi hua')
-        return
-      }
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, status: 'active' } : t))
-      toast.success('Target restored — ab active hai')
+      setTargets(prev => prev.filter(t => t.id !== id))
+      toast.success('Target deleted')
     })
   }
 
@@ -710,7 +686,7 @@ export default function TargetsClient({
                     {isAdmin && (
                       <div className="flex shrink-0 gap-3">
                         <button className="text-xs font-semibold text-blue-600 hover:underline" onClick={() => startEdit(target)}>Edit</button>
-                        <button className="text-xs font-semibold text-red-500 hover:underline" onClick={() => archiveTarget(target.id)}>Archive</button>
+                        <button className="text-xs font-semibold text-red-500 hover:underline" onClick={() => deleteTarget(target.id)}>Delete</button>
                       </div>
                     )}
                   </div>
@@ -724,34 +700,6 @@ export default function TargetsClient({
             })}
           </div>
         </div>
-
-        {isAdmin && archivedTargets.length > 0 && (
-        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b bg-gray-50 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Archive className="h-4 w-4 text-gray-500" />
-              <h2 className="text-sm font-bold text-gray-900">Archived Targets</h2>
-            </div>
-            <span className="text-xs font-semibold text-gray-500">{archivedTargets.length}</span>
-          </div>
-          <div className="divide-y">
-            {archivedTargets.map(target => {
-              const assignee = targetAssignee(target)
-              return (
-                <div key={target.id} className="p-4 opacity-70">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-bold text-gray-700 line-through decoration-gray-400">{target.title}</p>
-                      <p className="text-xs text-gray-400">{assignee?.full_name ?? 'Counselor'} · {format(parseISO(target.start_date), 'dd MMM')} to {format(parseISO(target.end_date), 'dd MMM yyyy')}</p>
-                    </div>
-                    <button className="shrink-0 text-xs font-semibold text-emerald-600 hover:underline" onClick={() => unarchiveTarget(target.id)}>Restore</button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        )}
 
         <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
           <div className="flex items-center justify-between border-b bg-gray-50 px-4 py-3">

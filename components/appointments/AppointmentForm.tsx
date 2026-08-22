@@ -165,7 +165,7 @@ export function AppointmentForm({ lockedLead, onSuccess, onCancel }: Appointment
         <Select value={hostId ?? ''} onValueChange={(v) => { setHostId(v || undefined); setScheduledTime('') }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Who will host?">
-              {hostId && hosts.find((h) => h.id === hostId)?.full_name ?? 'Who will host?'}
+              {(hostId && hosts.find((h) => h.id === hostId)?.full_name) ?? 'Who will host?'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

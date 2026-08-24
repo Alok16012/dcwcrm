@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { cycleWindow, cycleIncentive } from '@/lib/payroll/cycle'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -104,21 +105,31 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
         } as never).eq('id', (existing as any).id)
       } else {
         // No payroll yet this month — build a full row from the employee's salary
-        // structure so basic/HRA/allowances aren't lost.
+        // structure so basic/HRA/allowances aren't lost, and seed it with the cycle's
+        // earned incentive (admissions + mentorship). Seeding with only the manual
+        // amount left the row looking generated, so the cycle's admission incentive
+        // never landed and the month paid short.
         const { data: emp } = await (supabase as any).from('employees')
-          .select('basic_salary, hra, allowances, pf_deduction, tds_deduction').eq('id', selectedEmployee).maybeSingle()
+          .select('profile_id, basic_salary, hra, allowances, pf_deduction, tds_deduction, salary_cycle_start_day')
+          .eq('id', selectedEmployee).maybeSingle()
         const basic = Number(emp?.basic_salary ?? 0)
         const hra = Number(emp?.hra ?? 0)
         const allowances = Number(emp?.allowances ?? 0)
         const pf = Number(emp?.pf_deduction ?? 0)
         const tds = Number(emp?.tds_deduction ?? 0)
-        const gross = basic + hra + allowances + incentiveAmt
+        const month = Number(addMonth)
+        const year = Number(addYear)
+        const { total } = emp?.profile_id
+          ? await cycleIncentive(supabase, emp.profile_id, cycleWindow(month, year, Number(emp.salary_cycle_start_day ?? 1)))
+          : { total: 0 }
+        const incentive = total + incentiveAmt
+        const gross = basic + hra + allowances + incentive
         await supabase.from('payroll').insert({
           employee_id: selectedEmployee,
-          month: Number(addMonth),
-          year: Number(addYear),
+          month,
+          year,
           basic, hra, allowances,
-          incentive: incentiveAmt,
+          incentive,
           gross,
           pf, tds, other_deductions: 0, leave_deduction: 0,
           net: gross - pf - tds,

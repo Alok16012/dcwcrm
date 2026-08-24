@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { cycleWindow, cycleIncentive } from '@/lib/payroll/cycle'
 
 type ExistingPayroll = {
     id: string
@@ -24,18 +25,6 @@ type EmployeeSalary = {
 
 type AttendanceRow = {
     status: string | null
-}
-
-type StudentIncentiveRow = {
-    incentive_amount: number | null
-}
-
-type MentorPayRow = {
-    incentive_amount: number | null
-    salary_percentage: number | null
-    paid_on: string | null
-    approved_at: string | null
-    created_at: string | null
 }
 
 type AdvanceRow = {
@@ -84,27 +73,7 @@ export async function POST(req: NextRequest) {
         const tds = emp.tds_deduction || 0
         const od = emp.other_deductions || 0
         const startDay = emp.salary_cycle_start_day || 1
-        let startDate: Date;
-        let endDate: Date;
-
-        if (startDay === 1) {
-            startDate = new Date(year, month - 1, 1)
-            endDate = new Date(year, month, 0)
-        } else {
-            // e.g. if month is March (3), startDay is 15
-            // startDate is Feb 15th, endDate is March 14th
-            startDate = new Date(year, month - 2, startDay)
-            endDate = new Date(year, month - 1, startDay - 1)
-        }
-
-        // Format as local calendar dates. toISOString() converts to UTC and, on
-        // an IST machine, shifts local midnight to the previous day — which slid
-        // the whole cycle window one day early and put boundary-day incentives
-        // in the wrong month's payroll.
-        const fmtDate = (d: Date) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        const startStr = fmtDate(startDate)
-        const endStr = fmtDate(endDate)
+        const { start: startStr, end: endStr } = cycleWindow(month, year, startDay)
 
         // Fetch attendance for this range
         const { data: attendance } = await supabase
@@ -135,32 +104,14 @@ export async function POST(req: NextRequest) {
         const perDayRate = (basic + hra + allow) / 26
         const leaveDeduction = Math.round(perDayRate * lopDays)
 
-        // Fetch incentives for this range
-        const { data: studentIncentives } = await supabase
-            .from('students')
-            .select('incentive_amount')
-            .eq('assigned_counsellor', emp.profile_id)
-            .gte('enrollment_date', startStr)
-            .lte('enrollment_date', endStr)
+        // Incentive for this cycle: admissions + approved mentorship payments.
+        const {
+            admission: admissionIncentive,
+            mentorship: mentorshipIncentive,
+            total: earnedIncentive,
+        } = await cycleIncentive(supabase, emp.profile_id, { start: startStr, end: endStr })
 
-        const studentIncentiveRows = (studentIncentives ?? []) as StudentIncentiveRow[]
-        const admissionIncentive = studentIncentiveRows.reduce((acc, s) => acc + (Number(s.incentive_amount) || 0), 0)
-
-        // Mentorship incentive: approved mentorship payments credited to this
-        // employee (as telecaller/mentor) whose payment date falls in the cycle.
-        const { data: mentorPays } = await supabase
-            .from('mentorship_payments')
-            .select('incentive_amount, salary_percentage, paid_on, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id)')
-            .eq('status', 'approved')
-            .eq('mentorship.telecaller_id', emp.profile_id)
-        const mentorshipIncentive = ((mentorPays ?? []) as unknown as MentorPayRow[]).reduce((acc, p) => {
-            const when = (p.paid_on ?? p.approved_at ?? p.created_at ?? '').slice(0, 10)
-            if (!when || when < startStr || when > endStr) return acc
-            return acc + (Number(p.incentive_amount ?? p.salary_percentage) || 0)
-        }, 0)
-
-        const cycleIncentive = admissionIncentive + mentorshipIncentive
-        const inc = cycleIncentive || Number(incentive) || 0
+        const inc = earnedIncentive || Number(incentive) || 0
 
         const { data: existing } = await supabase
             .from('payroll')

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { cycleWindow, cycleMonthYear, cycleIncentive } from '@/lib/payroll/cycle'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
@@ -228,19 +229,6 @@ export default function MentorshipDashboardPage() {
     }
   }
 
-  // Map a date to the employee's billing cycle. e.g. cycle start 22 → June
-  // payroll covers 22 May–21 June, so a date on/after the 22nd belongs to the
-  // next month's payroll period.
-  function cycleMonthYear(d: Date, cycleStartDay: number) {
-    let m = d.getMonth() // 0-based
-    let year = d.getFullYear()
-    if (cycleStartDay > 1 && d.getDate() >= cycleStartDay) {
-      m += 1
-      if (m > 11) { m = 0; year += 1 }
-    }
-    return { month: m + 1, year }
-  }
-
   // Add the incentive to the mentor's payroll so it shows in HRMS + their
   // Incentive page. The cycle is picked from the payment date (paid_on) so it
   // matches what payroll generate/recalculate computes — approval delays must
@@ -273,17 +261,23 @@ export default function MentorshipDashboardPage() {
       }).eq('id', existing.id)
     } else {
       // No payroll generated yet this month — build a full row from the employee's
-      // salary structure so basic/HRA/allowances aren't lost (mentorship incentive added on top)
+      // salary structure so basic/HRA/allowances aren't lost. The incentive must be
+      // the WHOLE cycle's earning (admissions + mentorship), not just this payment:
+      // a row seeded with only the mentorship amount looked "generated" afterwards,
+      // so the cycle's admission incentive was never added and the month paid short.
       const basic = Number(emp.basic_salary ?? 0)
       const hra = Number(emp.hra ?? 0)
       const allowances = Number(emp.allowances ?? 0)
       const pf = Number(emp.pf_deduction ?? 0)
       const tds = Number(emp.tds_deduction ?? 0)
-      const gross = basic + hra + allowances + amount
+      // `amount` is already approved in the DB by now, so it is inside `total`.
+      const { total } = await cycleIncentive(supabase, mentorProfileId, cycleWindow(month, year, cycleStartDay))
+      const incentive = total || amount
+      const gross = basic + hra + allowances + incentive
       const net = gross - pf - tds
       await (supabase as any).from('payroll').insert({
         employee_id: emp.id, month, year,
-        basic, hra, allowances, incentive: amount, gross,
+        basic, hra, allowances, incentive, gross,
         pf, tds, other_deductions: 0, leave_deduction: 0, net, status: 'draft',
       })
     }

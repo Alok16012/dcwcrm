@@ -166,6 +166,9 @@ function StatCard({ label, value, sub, icon: Icon, color = 'default' }: {
 
 // ─── Receipt Generator ────────────────────────────────────────────────────────
 function downloadReceipt(payment: LitigationPayment, litigation: Litigation) {
+  // The refund target is what the case is actually about — a receipt showing only
+  // the total fee left the reader unable to tell how much was owed back.
+  const refundable = litigation.amount_refunded ?? 0
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -201,6 +204,7 @@ ${payment.receipt_no ? `<div class="receipt-no">Receipt No: <strong>${payment.re
   <tr><td>Case Type</td><td>${litigation.litigation_type ?? '—'}</td></tr>
   ${litigation.reason ? `<tr><td>Reason</td><td>${litigation.reason}</td></tr>` : ''}
   <tr><td>Total Amount</td><td>₹${litigation.litigation_amount.toLocaleString('en-IN')}</td></tr>
+  ${refundable > 0 ? `<tr><td>Amount to be Refunded</td><td>₹${refundable.toLocaleString('en-IN')}</td></tr>` : ''}
   <tr><td>Payment Date</td><td>${new Date(payment.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td></tr>
   <tr><td>Payment Mode</td><td>${payment.payment_mode ?? '—'}</td></tr>
   ${payment.notes ? `<tr><td>Notes</td><td>${payment.notes}</td></tr>` : ''}

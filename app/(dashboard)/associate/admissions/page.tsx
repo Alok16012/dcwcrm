@@ -30,8 +30,18 @@ interface Lead {
   email: string | null
   status: string
   created_at: string
-  remarks: string | null
+  remarks: string | null   // not a leads column — read from the lead_activities note
   course?: { name: string } | null
+}
+
+// The associate's own record, needed on every submission: the coordinator owns
+// the lead in the CRM, and the name/code label it as theirs.
+interface AssociateInfo {
+  id: string
+  name: string | null
+  associate_code: string | null
+  coordinator_id: string | null
+  coordinator_name: string | null
 }
 
 export default function AssociateAdmissionsPage() {
@@ -39,7 +49,7 @@ export default function AssociateAdmissionsPage() {
   const db = supabase as any
   const searchParams = useSearchParams()
 
-  const [assocId, setAssocId] = useState<string | null>(null)
+  const [associate, setAssociate] = useState<AssociateInfo | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -59,18 +69,37 @@ export default function AssociateAdmissionsPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
-    const { data: assoc } = await db.from('associates').select('id').eq('user_id', user.id).single()
+    const { data: assoc } = await db.from('associates')
+      .select('id, name, associate_code, coordinator_id, coordinator_name')
+      .eq('user_id', user.id).single()
     if (!assoc) { setLoading(false); return }
-    setAssocId(assoc.id)
+    setAssociate(assoc as AssociateInfo)
 
     const [leadRes, courseRes] = await Promise.all([
       supabase.from('leads')
-        .select('id, full_name, phone, email, status, created_at, remarks, course:courses(name)')
+        .select('id, full_name, phone, email, status, created_at, course:courses(name)')
         .eq('referred_by_associate', assoc.id)
         .order('created_at', { ascending: false }),
       supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
     ])
-    setLeads((leadRes.data ?? []) as Lead[])
+    const leadRows = (leadRes.data ?? []) as Lead[]
+
+    // Remarks live in the CRM's activity timeline, not on leads — the earlier
+    // `leads.remarks` column never existed, which is what broke submission.
+    if (leadRows.length) {
+      const { data: notes } = await db.from('lead_activities')
+        .select('lead_id, note, created_at')
+        .in('lead_id', leadRows.map(l => l.id))
+        .eq('activity_type', 'note_added')
+        .order('created_at', { ascending: false })
+      const firstNote: Record<string, string> = {}
+      for (const n of (notes ?? []) as { lead_id: string; note: string | null }[]) {
+        if (n.note && !firstNote[n.lead_id]) firstNote[n.lead_id] = n.note
+      }
+      leadRows.forEach(l => { l.remarks = firstNote[l.id] ?? null })
+    }
+
+    setLeads(leadRows)
     setCourses((courseRes.data ?? []) as { id: string; name: string }[])
     setSubCourses([])
     setLoading(false)
@@ -101,23 +130,49 @@ export default function AssociateAdmissionsPage() {
 
   async function handleAddLead() {
     if (!form.full_name.trim() || !form.phone.trim()) { toast.error('Name and phone are required'); return }
-    if (!assocId) return
+    if (!associate) return
     setSubmitting(true)
     try {
-      const { error } = await (supabase as any).from('leads').insert({
+      const remark = form.remarks.trim()
+      // Assigning to the associate's coordinator is what puts the lead in a
+      // counsellor's CRM at all: the leads list filters non-admins down to
+      // assigned_to, so an unassigned referral is invisible to everyone but an
+      // admin. metadata carries the associate's identity for the Source badge.
+      const { data: created, error } = await (supabase as any).from('leads').insert({
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim() || null,
         city: form.city.trim() || null,
         state: form.state.trim() || null,
-        remarks: form.remarks.trim() || null,
         course_id: courseId || null,
         sub_course_id: subCourseId || null,
-        referred_by_associate: assocId,
+        referred_by_associate: associate.id,
+        source: 'associate',
+        assigned_to: associate.coordinator_id || null,
+        assigned_at: associate.coordinator_id ? new Date().toISOString() : null,
+        metadata: {
+          associate_name: associate.name ?? null,
+          associate_code: associate.associate_code ?? null,
+        },
         status: 'new',
-      })
+      }).select('id').single()
       if (error) { toast.error(error.message); return }
-      toast.success('Lead added successfully!')
+
+      // Remarks belong on the activity timeline, where the coordinator reads
+      // them — leads has no remarks column.
+      if (created && remark) {
+        await (supabase as any).from('lead_activities').insert({
+          lead_id: created.id,
+          activity_type: 'note_added',
+          note: remark,
+        })
+      }
+
+      toast.success(
+        associate.coordinator_name
+          ? `Lead submitted to ${associate.coordinator_name}`
+          : 'Lead added successfully!'
+      )
       setDialogOpen(false)
       setForm({ full_name: '', phone: '', email: '', city: '', state: '', remarks: '' })
       setCourseId('')

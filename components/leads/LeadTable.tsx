@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import {
   MoreHorizontal, Search, ChevronLeft, ChevronRight,
-  ChevronDown, X, SlidersHorizontal, ArrowUpDown, Phone, PhoneIncoming, MessageCircle, Download
+  ChevronDown, X, SlidersHorizontal, ArrowUpDown, Phone, PhoneIncoming, MessageCircle, Download, UserCheck
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,22 +73,26 @@ const STATUS_DOT: Record<string, string> = {
 }
 
 /**
- * Where the lead came from. IVR leads also name the agent who took the call,
- * since that is the whole reason the lead landed with this counsellor.
+ * Where the lead came from. IVR leads also name the agent who took the call
+ * and associate referrals name the associate, since in both cases that person
+ * is the whole reason the lead landed with this counsellor.
  */
 function SourceBadge({ lead }: { lead: Lead }) {
   const label = LEAD_SOURCE_LABELS[lead.source] ?? lead.source
-  const agent = lead.source === 'ivr'
-    ? (lead.metadata as { ivr_agent?: string } | undefined)?.ivr_agent
+  const meta = lead.metadata as { ivr_agent?: string; associate_name?: string; associate_code?: string } | undefined
+  const via = lead.source === 'ivr' ? meta?.ivr_agent
+    : lead.source === 'associate' ? meta?.associate_name
     : undefined
+  const code = lead.source === 'associate' ? meta?.associate_code : undefined
 
   return (
     <div className="flex flex-col gap-0.5 items-start">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${LEAD_SOURCE_COLORS[lead.source] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
         {lead.source === 'ivr' && <PhoneIncoming className="w-2.5 h-2.5 flex-shrink-0" />}
+        {lead.source === 'associate' && <UserCheck className="w-2.5 h-2.5 flex-shrink-0" />}
         {label}
       </span>
-      {agent && <span className="text-[10px] text-gray-400 pl-1">via {agent}</span>}
+      {via && <span className="text-[10px] text-gray-400 pl-1">via {via}{code ? ` (${code})` : ''}</span>}
     </div>
   )
 }

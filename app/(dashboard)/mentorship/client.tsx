@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   GraduationCap, RefreshCw, Award, X, BookMarked, Phone, Users, Clock,
-  Search, Eye, Wallet, FileText, CheckCircle2,
+  Search, Eye, Wallet, FileText, CheckCircle2, ChevronDown,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
@@ -20,6 +20,8 @@ interface AssignedStudent {
   father_name: string | null
   city: string | null
   course: { name: string } | null
+  sub_course: { name: string } | null
+  department: { name: string } | null
   sub_section: { name: string } | null
   session: { name: string } | null
   verification_status: string
@@ -82,6 +84,16 @@ function avatarPalette(name: string) {
 }
 const num = (s: string) => parseFloat(s) || 0
 
+// Every session's students now sit in one list, so a mentor needs to narrow by
+// more than board. Each filter reads one joined name off the student row.
+type FilterKey = 'department' | 'board' | 'standard' | 'session'
+const FILTER_DEFS: { key: FilterKey; label: string; of: (s: AssignedStudent) => string | null }[] = [
+  { key: 'department', label: 'Department', of: s => s.department?.name ?? null },
+  { key: 'board',      label: 'Board',      of: s => s.sub_section?.name ?? null },
+  { key: 'standard',   label: 'Standard',   of: s => s.sub_course?.name ?? null },
+  { key: 'session',    label: 'Session',    of: s => s.session?.name ?? null },
+]
+
 interface CaseRow { id: string; student_id: string; managed_by: string | null; total_amount: number | null; stages: any; status: string }
 
 export default function MentorshipClient() {
@@ -89,7 +101,9 @@ export default function MentorshipClient() {
   const [students, setStudents] = useState<AssignedStudent[]>([])
   const [cases, setCases] = useState<Record<string, CaseRow>>({})
   const [loading, setLoading] = useState(true)
-  const [boardFilter, setBoardFilter] = useState('all')
+  const [filters, setFilters] = useState<Record<FilterKey, string>>({
+    department: '', board: '', standard: '', session: '',
+  })
   const [search, setSearch] = useState('')
   const [detailStudent, setDetailStudent] = useState<AssignedStudent | null>(null)
 
@@ -110,7 +124,8 @@ export default function MentorshipClient() {
       const { data: studs, error } = await (supabase as any).from('students')
         .select(`id, full_name, enrollment_number, phone, father_name, city,
           verification_status, exam_status, result_status, admit_card_url, portal_active, total_fee, amount_paid,
-          course:courses(name), sub_section:department_sub_sections(name), session:sessions(name)`)
+          course:courses(name), sub_course:sub_courses(name), department:departments(name),
+          sub_section:department_sub_sections(name), session:sessions(name)`)
         .eq('mentor_telecaller_id', user.id).order('full_name')
       if (error) throw error
       setStudents((studs ?? []) as AssignedStudent[])
@@ -329,10 +344,35 @@ export default function MentorshipClient() {
     }
   }
 
-  const boards = ['all', ...Array.from(new Set(students.map(s => s.sub_section?.name).filter(Boolean) as string[]))]
+  const matchesExcept = (s: AssignedStudent, skip: FilterKey | null) =>
+    FILTER_DEFS.every(f => f.key === skip || !filters[f.key] || f.of(s) === filters[f.key])
+
+  // Options for each dropdown are narrowed by the OTHER active filters, so a
+  // mentor never picks a session that would empty the list. The count next to
+  // each option is what selecting it would actually show.
+  const optionsFor = (f: (typeof FILTER_DEFS)[number]) => {
+    const pool = students.filter(s => matchesExcept(s, f.key))
+    const tally = new Map<string, number>()
+    pool.forEach(s => { const v = f.of(s); if (v) tally.set(v, (tally.get(v) ?? 0) + 1) })
+    // Keep the current selection listed even when the other filters rule it out
+    // (Board=Nios with Session=Oct 2026 matches nobody) — a <select> whose value
+    // has no matching option renders blank, hiding what is actually applied.
+    const cur = filters[f.key]
+    if (cur && !tally.has(cur)) tally.set(cur, 0)
+    return [...tally.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }
+
+  const term = search.trim().toLowerCase()
   const filtered = students
-    .filter(s => boardFilter === 'all' || s.sub_section?.name === boardFilter)
-    .filter(s => !search || s.full_name.toLowerCase().includes(search.toLowerCase()) || s.phone.includes(search) || fmtEnroll(s.enrollment_number).toLowerCase().includes(search.toLowerCase()))
+    .filter(s => matchesExcept(s, null))
+    .filter(s => !term
+      || s.full_name.toLowerCase().includes(term)
+      || s.phone.includes(term)
+      || (s.father_name ?? '').toLowerCase().includes(term)
+      || fmtEnroll(s.enrollment_number).toLowerCase().includes(term))
+
+  const activeFilters = FILTER_DEFS.filter(f => filters[f.key])
+  const clearFilters = () => setFilters({ department: '', board: '', standard: '', session: '' })
 
   const caseCount = Object.keys(cases).length
 
@@ -403,25 +443,60 @@ export default function MentorshipClient() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1.5 flex-wrap">
-          {boards.map(b => {
-            const count = b === 'all' ? students.length : students.filter(s => s.sub_section?.name === b).length
+      {/* Toolbar — search, then a dropdown per filter. Native selects so the
+          phone opens its own picker instead of a cramped custom menu. */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-3 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input type="text" placeholder="Search name, enrollment, phone..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-9 h-10 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:border-blue-400 transition-colors" />
+          {search && (
+            <button onClick={() => setSearch('')} aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {FILTER_DEFS.map(f => {
+            const opts = optionsFor(f)
+            const on = !!filters[f.key]
             return (
-              <button key={b} onClick={() => setBoardFilter(b)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${boardFilter === b ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-                {b === 'all' ? 'All Students' : b}
-                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${boardFilter === b ? 'bg-white/25' : 'bg-gray-100 text-gray-500'}`}>{count}</span>
-              </button>
+              <div key={f.key} className="relative">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">{f.label}</label>
+                <select
+                  value={filters[f.key]}
+                  onChange={e => setFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  className={`w-full h-10 pl-3 pr-8 text-sm rounded-xl border appearance-none cursor-pointer focus:outline-none transition-colors ${on ? 'bg-blue-50 border-blue-300 text-blue-800 font-semibold' : 'bg-gray-50 border-gray-200 text-gray-600 focus:border-blue-400'}`}>
+                  <option value="">All {f.label}s</option>
+                  {opts.map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
+                </select>
+                <ChevronDown className={`absolute right-2.5 bottom-3 w-4 h-4 pointer-events-none ${on ? 'text-blue-500' : 'text-gray-400'}`} />
+              </div>
             )
           })}
         </div>
-        <div className="relative ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input type="text" placeholder="Search name, phone..." value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-3 h-9 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 w-52" />
-        </div>
+
+        {(activeFilters.length > 0 || term) && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-gray-100">
+            <span className="text-xs text-gray-400 font-medium">
+              {filtered.length} of {students.length}
+            </span>
+            {activeFilters.map(f => (
+              <button key={f.key} onClick={() => setFilters(prev => ({ ...prev, [f.key]: '' }))}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 pl-2 pr-1 py-1 rounded-lg hover:bg-blue-100 transition-colors">
+                {filters[f.key]}
+                <X className="w-3 h-3" />
+              </button>
+            ))}
+            {activeFilters.length > 0 && (
+              <button onClick={clearFilters} className="text-[11px] font-semibold text-gray-500 hover:text-gray-800 px-1.5 py-1">
+                Clear all
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -429,14 +504,80 @@ export default function MentorshipClient() {
         <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
           <GraduationCap className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <p className="font-semibold text-gray-500">No students found</p>
+          {(activeFilters.length > 0 || term) && (
+            <button onClick={() => { clearFilters(); setSearch('') }}
+              className="mt-3 text-sm font-semibold text-blue-600 hover:underline">Clear filters</button>
+          )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <>
+        {/* Mobile: cards. The 12-column table only works with horizontal
+            scrolling, which is unusable on a phone. */}
+        <div className="lg:hidden space-y-2.5">
+          {filtered.map((s, idx) => {
+            const { pct } = lifecycleProgress(s)
+            const palette = avatarPalette(s.full_name)
+            const initials = s.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+            const sum = caseSummary(s.id)
+            return (
+              <div key={s.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${palette} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>{initials}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-bold text-gray-900 text-[15px] leading-tight">{s.full_name}</p>
+                      <span className="text-[10px] text-gray-300 font-medium tabular-nums flex-shrink-0 mt-0.5">#{idx + 1}</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-gray-500 mt-0.5">{fmtEnroll(s.enrollment_number)}</p>
+                    {s.father_name && <p className="text-[11px] text-gray-400 mt-0.5 truncate">s/o {s.father_name}</p>}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {s.department?.name && <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-lg font-semibold">{s.department.name}</span>}
+                  {s.sub_section?.name && <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border ${boardBadge(s.sub_section.name)}`}>{s.sub_section.name}</span>}
+                  {s.sub_course?.name && <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-semibold">{s.sub_course.name}</span>}
+                  {s.session?.name && <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-semibold">{s.session.name}</span>}
+                </div>
+
+                <div className="flex items-center gap-2 mt-2.5">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-500 tabular-nums">{pct}%</span>
+                  {sum && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${sum.c.managed_by === 'self' ? 'bg-gray-200 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {sum.c.managed_by === 'self' ? 'Self' : `₹${sum.collected}/${sum.total}`}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <Button size="sm" onClick={() => openManage(s)} className="flex-1 h-9 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
+                    <BookMarked className="w-3.5 h-3.5" /> Manage
+                  </Button>
+                  {s.phone && (
+                    <a href={`tel:${s.phone}`} className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white active:bg-gray-100" title="Call">
+                      <Phone className="w-4 h-4 text-blue-600" />
+                    </a>
+                  )}
+                  <button onClick={() => setDetailStudent(s)} className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white active:bg-gray-100" title="Lifecycle">
+                    <Eye className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+          <p className="text-center text-xs text-gray-400 font-medium py-2">{filtered.length} student{filtered.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Desktop: full table */}
+        <div className="hidden lg:block bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <table className="text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['S.No', 'Enrollment No', 'Student', "Father's Name", 'Phone', 'City', 'Course', 'Board', 'Session', 'Progress', 'Mentorship', 'Actions'].map(h => (
+                  {['S.No', 'Enrollment No', 'Student', "Father's Name", 'Phone', 'City', 'Department', 'Course', 'Standard', 'Board', 'Session', 'Progress', 'Mentorship', 'Actions'].map(h => (
                     <th key={h} className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -465,7 +606,9 @@ export default function MentorshipClient() {
                         ) : <span className="text-gray-400 text-xs">—</span>}
                       </td>
                       <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{s.city || '—'}</td>
+                      <td className="px-3 py-3">{s.department?.name ? <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.department.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                       <td className="px-3 py-3"><span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.course?.name ?? '—'}</span></td>
+                      <td className="px-3 py-3">{s.sub_course?.name ? <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.sub_course.name}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                       <td className="px-3 py-3">{boardName ? <span className={`text-xs px-2 py-0.5 rounded-lg font-bold border whitespace-nowrap ${boardBadge(boardName)}`}>{boardName}</span> : <span className="text-gray-400 text-xs">—</span>}</td>
                       <td className="px-3 py-3"><span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-medium whitespace-nowrap">{s.session?.name ?? '—'}</span></td>
                       <td className="px-3 py-3">
@@ -496,6 +639,7 @@ export default function MentorshipClient() {
           </div>
           <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 font-medium">{filtered.length} student{filtered.length !== 1 ? 's' : ''}</div>
         </div>
+      </>
       )}
 
       {/* Lifecycle detail */}

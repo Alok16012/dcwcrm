@@ -72,6 +72,8 @@ export default function PayrollTable({
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [recalcId, setRecalcId] = useState<string | null>(null)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false)
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
 
@@ -331,6 +333,70 @@ export default function PayrollTable({
     if (ok > 0) toast.success(`Generated payroll for ${ok} employee${ok !== 1 ? 's' : ''}`)
   }
 
+  // ── Row selection (only real/generated rows can be selected) ──
+  const selectableRows = data.filter((r) => r.generated !== false)
+  const toggleRow = (id: string) =>
+    setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  const allSelected = selectableRows.length > 0 && selectableRows.every((r) => selected.has(r.id))
+  const toggleAll = () =>
+    setSelected((prev) => {
+      const s = new Set(prev)
+      if (allSelected) selectableRows.forEach((r) => s.delete(r.id))
+      else selectableRows.forEach((r) => s.add(r.id))
+      return s
+    })
+  const clearSelection = () => setSelected(new Set())
+
+  const selectedRows = data.filter((r) => selected.has(r.id) && r.generated !== false)
+  const selDraft = selectedRows.filter((r) => r.status === 'draft')
+  const selProcessed = selectedRows.filter((r) => r.status === 'processed')
+  const selDeletable = selectedRows.filter((r) => r.status !== 'paid')
+
+  // Bulk status change on the selected rows only
+  const updateSelectedStatus = (from: 'draft' | 'processed', to: 'processed' | 'paid') => {
+    const ids = selectedRows.filter((r) => r.status === from).map((r) => r.id)
+    if (ids.length === 0) return
+    startTransition(async () => {
+      try {
+        const update: Record<string, unknown> = { status: to }
+        if (to === 'paid') update.payment_date = new Date().toISOString()
+        const { error } = await supabase.from('payroll').update(update as never).in('id', ids)
+        if (error) throw error
+        setData((prev) => prev.map((r) => ids.includes(r.id)
+          ? { ...r, status: to, payment_date: to === 'paid' ? new Date().toISOString() : r.payment_date }
+          : r))
+        setSelected((prev) => { const s = new Set(prev); ids.forEach((id) => s.delete(id)); return s })
+        toast.success(`${ids.length} payroll ${to}`)
+      } catch {
+        toast.error('Failed to update payroll')
+      }
+    })
+  }
+
+  const deleteSelected = () => {
+    const rows = selDeletable
+    if (rows.length === 0) { setConfirmDeleteSelected(false); return }
+    startTransition(async () => {
+      let ok = 0
+      for (const row of rows) {
+        try {
+          const res = await fetch(`/api/hrms/payroll/${row.id}`, { method: 'DELETE' })
+          if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'failed') }
+          ok++
+        } catch (e: any) {
+          toast.error(`${row.employee_name} ${row.month}/${row.year}: ${e?.message ?? 'delete failed'}`)
+        }
+      }
+      if (ok > 0) {
+        const deletedIds = new Set(rows.map((r) => r.id))
+        setData((prev) => prev.filter((r) => !deletedIds.has(r.id)))
+        setSelected(new Set())
+        toast.success(`Deleted ${ok} payroll ${ok !== 1 ? 'rows' : 'row'}`)
+      }
+      setConfirmDeleteSelected(false)
+    })
+  }
+
   const hasUngenerated = data.some((r) => r.generated === false)
   const hasDraft = data.some((r) => r.generated !== false && r.status === 'draft')
   const hasProcessed = data.some((r) => r.generated !== false && r.status === 'processed')
@@ -363,10 +429,45 @@ export default function PayrollTable({
         </div>
       )}
 
+      {isAdmin && selectedRows.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap rounded-md border bg-blue-50 px-3 py-2">
+          <span className="text-xs font-semibold text-blue-700">{selectedRows.length} selected</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="outline" disabled={isPending || selDraft.length === 0}
+              onClick={() => updateSelectedStatus('draft', 'processed')}>
+              Process{selDraft.length ? ` (${selDraft.length})` : ''}
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPending || selProcessed.length === 0}
+              onClick={() => updateSelectedStatus('processed', 'paid')}>
+              Mark Paid{selProcessed.length ? ` (${selProcessed.length})` : ''}
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50"
+              disabled={isPending || selDeletable.length === 0}
+              onClick={() => setConfirmDeleteSelected(true)}>
+              <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete{selDeletable.length ? ` (${selDeletable.length})` : ''}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={isPending} onClick={clearSelection}>Clear</Button>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-xs">
+              {isAdmin && (
+                <th className="px-3 py-2 text-center w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    className="h-4 w-4 accent-blue-600 cursor-pointer align-middle"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allSelected }}
+                    disabled={selectableRows.length === 0}
+                    onChange={toggleAll}
+                  />
+                </th>
+              )}
               <th className="px-3 py-2 text-left">Employee</th>
               <th className="px-3 py-2 text-left">Month</th>
               <th className="px-3 py-2 text-right">Basic</th>
@@ -386,7 +487,20 @@ export default function PayrollTable({
           </thead>
           <tbody>
             {data.map((row) => (
-              <tr key={row.id} className="border-b hover:bg-muted/30">
+              <tr key={row.id} className={`border-b hover:bg-muted/30 ${selected.has(row.id) ? 'bg-blue-50/50' : ''}`}>
+                {isAdmin && (
+                  <td className="px-3 py-2 text-center">
+                    {row.generated !== false ? (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${row.employee_name} ${format(new Date(row.year, row.month - 1), 'MMM yyyy')}`}
+                        className="h-4 w-4 accent-blue-600 cursor-pointer align-middle"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleRow(row.id)}
+                      />
+                    ) : null}
+                  </td>
+                )}
                 <td className="px-3 py-2 font-medium">{row.employee_name}</td>
                 <td className="px-3 py-2 text-xs font-semibold text-blue-700 whitespace-nowrap">
                   {format(new Date(row.year, row.month - 1), 'MMM yyyy')}
@@ -549,6 +663,17 @@ export default function PayrollTable({
           confirmLabel="Delete"
           onConfirm={() => handleDelete(deleteRow)}
           onCancel={() => setDeleteRow(null)}
+        />
+      )}
+
+      {confirmDeleteSelected && (
+        <ConfirmDialog
+          open
+          title="Delete Selected Payroll"
+          description={`Delete ${selDeletable.length} selected payroll ${selDeletable.length !== 1 ? 'rows' : 'row'}? Paid rows are skipped. Isse jude advance wapas pending ho jayenge.`}
+          confirmLabel="Delete"
+          onConfirm={deleteSelected}
+          onCancel={() => setConfirmDeleteSelected(false)}
         />
       )}
 

@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee,
   TrendingUp, Bell, Users, Wallet, ArrowRight, AlertCircle, Copy,
   UserCheck, BarChart2, ChevronRight, Package, Phone, PhoneCall,
-  School, UserCog,
+  School, UserCog, FileText,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -283,6 +283,7 @@ export default function AssociateClient() {
           { label: 'Add Lead',    href: '/associate/admissions?new=1',icon: Users,         color: 'text-blue-600',    bg: 'bg-blue-50' },
           { label: 'My Students', href: '/associate/students',         icon: GraduationCap, color: 'text-indigo-600',  bg: 'bg-indigo-50' },
           { label: 'Accounts',    href: '/associate/account',          icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Fees',        href: '/associate/fees',             icon: FileText,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Dispatch',    href: '/associate/dispatch',         icon: Package,       color: 'text-blue-600',  bg: 'bg-blue-50' },
           { label: 'Resources',   href: '/associate/resources',        icon: BarChart2,     color: 'text-orange-600',  bg: 'bg-orange-50' },
           { label: 'Support',     href: '/associate/support',          icon: AlertCircle,   color: 'text-rose-600',    bg: 'bg-rose-50' },

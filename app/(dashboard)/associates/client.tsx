@@ -20,7 +20,7 @@ const fmt = (n: number) =>
 type AStatus = 'pending' | 'approved' | 'rejected'
 
 interface Associate {
-  id: string; name: string; phone: string; father_phone: string | null
+  id: string; name: string; phone: string; father_phone: string | null; father_name: string | null
   email: string; aadhar_number: string | null; pan_number: string | null
   current_address: string | null; current_city: string | null
   current_state: string | null; current_pincode: string | null
@@ -469,7 +469,7 @@ export default function AssociatesClient() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <D label="Full Name" value={selected.name} /><D label="Phone" value={selected.phone} />
-                <D label="Father's Phone" value={selected.father_phone} /><D label="Email" value={selected.email} />
+                <D label="Father's Name" value={selected.father_name ?? selected.father_phone} /><D label="Email" value={selected.email} />
                 <D label="Aadhaar" value={selected.aadhar_number} /><D label="PAN" value={selected.pan_number} />
                 <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Current Address</div>
                 <D label="Address" value={selected.current_address} /><D label="City" value={selected.current_city} />

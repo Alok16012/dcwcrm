@@ -19,7 +19,7 @@ const INDIA_STATES = [
 ]
 
 const EMPTY = {
-  name: '', phone: '', father_phone: '', email: '',
+  name: '', phone: '', father_name: '', email: '',
   aadhar_number: '', pan_number: '',
   state: '', district: '', city: '',
   institution_name: '', institution_address: '',
@@ -135,7 +135,7 @@ export function CreateAssociateDialog({ open, onOpenChange, onSuccess }: Props) 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <F label="Full Name *"><Input placeholder="Ramesh Kumar" value={form.name} onChange={e => set('name', e.target.value)} required /></F>
               <F label="Mobile *"><Input placeholder="98XXXXXXXX" value={form.phone} onChange={e => set('phone', e.target.value)} required /></F>
-              <F label="Father's Mobile"><Input placeholder="98XXXXXXXX" value={form.father_phone} onChange={e => set('father_phone', e.target.value)} /></F>
+              <F label="Father's Name"><Input placeholder="e.g. Suresh Kumar" value={form.father_name} onChange={e => set('father_name', e.target.value)} /></F>
               <F label="Email *"><Input type="email" placeholder="email@example.com" value={form.email} onChange={e => set('email', e.target.value)} required /></F>
               <F label="Aadhaar Number"><Input placeholder="XXXX XXXX XXXX" value={form.aadhar_number} onChange={e => set('aadhar_number', e.target.value)} /></F>
               <F label="PAN Number"><Input placeholder="ABCDE1234F" value={form.pan_number} onChange={e => set('pan_number', e.target.value)} className="uppercase" /></F>

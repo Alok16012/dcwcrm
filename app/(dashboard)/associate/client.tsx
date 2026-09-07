@@ -252,22 +252,24 @@ export default function AssociateClient() {
         const name = coordinator?.name ?? SUPPORT_DESK.name
         const ph = phoneParts(coordinator?.phone) ?? phoneParts(SUPPORT_DESK.phone)!
         return (
-          <div className="bg-gradient-to-r from-emerald-900/80 to-green-900/80 border border-emerald-700/50 rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-10 h-10 bg-emerald-400/20 rounded-xl flex items-center justify-center shrink-0">
-              <Phone className="w-5 h-5 text-emerald-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-0.5">Your Co-ordinator</p>
-              <p className="text-sm font-bold text-white truncate">{name}</p>
-              <p className="text-xs font-mono text-emerald-300">{ph.display}</p>
+          <div className="bg-gradient-to-r from-emerald-900/80 to-green-900/80 border border-emerald-700/50 rounded-2xl px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 bg-emerald-400/20 rounded-xl flex items-center justify-center shrink-0">
+                <Phone className="w-5 h-5 text-emerald-300" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-0.5 whitespace-nowrap">Your Co-ordinator</p>
+                <p className="text-sm font-bold text-white truncate">{name}</p>
+                <p className="text-xs font-mono text-emerald-300 whitespace-nowrap">{ph.display}</p>
+              </div>
             </div>
             <div className="flex gap-2 shrink-0">
               <a href={`tel:+${ph.intl}`}
-                className="flex items-center gap-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold px-3 py-2 sm:py-1.5 rounded-xl transition-colors">
                 <PhoneCall className="h-3.5 w-3.5" /> Call
               </a>
               <a href={`https://wa.me/${ph.intl}`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors">
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold px-3 py-2 sm:py-1.5 rounded-xl transition-colors">
                 <Phone className="h-3.5 w-3.5" /> WhatsApp
               </a>
             </div>

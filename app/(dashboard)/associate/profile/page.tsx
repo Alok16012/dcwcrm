@@ -8,6 +8,7 @@ interface Associate {
   name: string
   phone: string
   father_phone: string | null
+  father_name: string | null
   email: string
   associate_code: string | null
   aadhar_number: string | null
@@ -71,7 +72,7 @@ export default function AssociateProfilePage() {
       <Section title="Personal Information">
         <Row label="Full Name" value={associate.name} />
         <Row label="Phone" value={associate.phone} />
-        <Row label="Father's Phone" value={associate.father_phone} />
+        <Row label="Father's Name" value={associate.father_name ?? associate.father_phone} />
         <Row label="Email" value={associate.email} copyable />
         <Row label="Associate Code" value={associate.associate_code} copyable />
         <Row label="Aadhaar Number" value={associate.aadhar_number} masked />

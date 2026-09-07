@@ -244,7 +244,7 @@ export default function AssociateDetailClient({ id }: { id: string }) {
         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Associate Details</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
           <D label="Email" value={assoc.email} />
-          <D label="Father's Phone" value={assoc.father_phone} />
+          <D label="Father's Name" value={assoc.father_name ?? assoc.father_phone} />
           <D label="Aadhaar" value={assoc.aadhar_number} />
           <D label="PAN" value={assoc.pan_number} />
           <D label="City" value={assoc.current_city || assoc.city} />

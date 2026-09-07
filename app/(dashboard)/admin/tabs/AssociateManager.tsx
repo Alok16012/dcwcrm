@@ -21,6 +21,7 @@ interface Associate {
   name: string
   phone: string
   father_phone: string | null
+  father_name: string | null
   email: string
   aadhar_number: string | null
   pan_number: string | null
@@ -125,7 +126,7 @@ export function AssociateManager() {
   function openEdit(a: Associate) {
     setEditTarget(a)
     setEditForm({
-      name: a.name, phone: a.phone, father_phone: a.father_phone ?? '',
+      name: a.name, phone: a.phone, father_name: a.father_name ?? a.father_phone ?? '',
       email: a.email, aadhar_number: a.aadhar_number ?? '', pan_number: a.pan_number ?? '',
       state: a.state ?? '', district: a.district ?? '', city: a.city ?? '',
       institution_name: a.institution_name ?? '', institution_address: a.institution_address ?? '',
@@ -403,7 +404,7 @@ export function AssociateManager() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <F label="Full Name"><Input value={editForm.name ?? ''} onChange={ef('name')} /></F>
                 <F label="Mobile"><Input value={editForm.phone ?? ''} onChange={ef('phone')} /></F>
-                <F label="Father's Mobile"><Input value={editForm.father_phone ?? ''} onChange={ef('father_phone')} /></F>
+                <F label="Father's Name"><Input value={editForm.father_name ?? ''} onChange={ef('father_name')} /></F>
                 <F label="Email"><Input type="email" value={editForm.email ?? ''} onChange={ef('email')} /></F>
                 <F label="Aadhaar Number"><Input value={editForm.aadhar_number ?? ''} onChange={ef('aadhar_number')} /></F>
                 <F label="PAN Number"><Input value={editForm.pan_number ?? ''} onChange={ef('pan_number')} className="uppercase" /></F>

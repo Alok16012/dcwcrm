@@ -31,6 +31,8 @@ interface Associate {
   account_holder_name: string | null; status: AStatus
   associate_code: string | null; created_at: string
   aadhar_doc_url: string | null; pan_doc_url: string | null; cheque_doc_url: string | null
+  state: string | null; district: string | null; city: string | null; pincode: string | null
+  institution_name: string | null; institution_address: string | null; photo_url: string | null
 }
 
 interface RechargeRequest {
@@ -55,7 +57,7 @@ export default function AssociatesClient() {
   // Same coordinator scoping as AssociateManager: admin/backend run the whole
   // network, lead/counselor only see the associates assigned to them.
   const [canSeeAllAssociates, setCanSeeAllAssociates] = useState(false)
-  const [activeTab, setActiveTab] = useState<'all' | 'approvals' | 'recharges'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'approved' | 'approvals' | 'recharges'>('all')
 
   // Hero dashboard stats (shown above the tabs)
   const [heroAssociates, setHeroAssociates] = useState<any[]>([])
@@ -280,7 +282,7 @@ export default function AssociatesClient() {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 border-b border-slate-200 overflow-x-auto whitespace-nowrap">
         <button
           onClick={() => setActiveTab('all')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
@@ -288,6 +290,19 @@ export default function AssociatesClient() {
           }`}
         >
           All Associates
+        </button>
+        <button
+          onClick={() => setActiveTab('approved')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === 'approved' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4" /> Approved
+          {heroApproved > 0 && (
+            <span className="bg-green-600 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+              {heroApproved}
+            </span>
+          )}
         </button>
         {isAdmin && (
           <>
@@ -323,6 +338,7 @@ export default function AssociatesClient() {
 
       {/* ── ALL ASSOCIATES ── */}
       {activeTab === 'all' && <AssociateManager key={reloadKey} />}
+      {activeTab === 'approved' && <AssociateManager key={`approved-${reloadKey}`} lockedStatus="approved" />}
 
       <CreateAssociateDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={() => { setCreateOpen(false); setReloadKey(k => k + 1) }} />
 
@@ -471,20 +487,21 @@ export default function AssociatesClient() {
                 <D label="Full Name" value={selected.name} /><D label="Phone" value={selected.phone} />
                 <D label="Father's Name" value={selected.father_name ?? selected.father_phone} /><D label="Email" value={selected.email} />
                 <D label="Aadhaar" value={selected.aadhar_number} /><D label="PAN" value={selected.pan_number} />
-                <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Current Address</div>
-                <D label="Address" value={selected.current_address} /><D label="City" value={selected.current_city} />
-                <D label="State" value={selected.current_state} /><D label="Pincode" value={selected.current_pincode} />
-                <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">
-                  Permanent Address {selected.same_as_current && <span className="text-green-600 normal-case">(same)</span>}
-                </div>
-                <D label="Address" value={selected.permanent_address} /><D label="City" value={selected.permanent_city} />
-                <D label="State" value={selected.permanent_state} /><D label="Pincode" value={selected.permanent_pincode} />
+                <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Location</div>
+                <D label="State" value={selected.state ?? selected.current_state} /><D label="District" value={selected.district} />
+                <D label="City" value={selected.city ?? selected.current_city} /><D label="Pincode" value={selected.pincode ?? selected.current_pincode} />
+                <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Institution</div>
+                <D label="Institution Name" value={selected.institution_name} /><D label="Institution Address" value={selected.institution_address} />
                 <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Bank Details</div>
                 <D label="Account Holder" value={selected.account_holder_name} /><D label="Bank" value={selected.bank_name} />
                 <D label="Account No." value={selected.account_number} /><D label="IFSC" value={selected.ifsc_code} />
-                {(selected.aadhar_doc_url || selected.pan_doc_url || selected.cheque_doc_url) && (
+                {(selected.photo_url || selected.aadhar_doc_url || selected.pan_doc_url || selected.cheque_doc_url) && (
                   <>
                     <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Documents</div>
+                    {selected.photo_url && (
+                      <div><p className="text-xs text-muted-foreground">Passport Photo</p>
+                        <a href={selected.photo_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>
+                    )}
                     {selected.aadhar_doc_url && (
                       <div><p className="text-xs text-muted-foreground">Aadhaar Card</p>
                         <a href={selected.aadhar_doc_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>

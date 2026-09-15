@@ -9,12 +9,16 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
-  ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search, UserCog,
+  ChevronLeft, ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search, UserCog, Download,
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDialog'
+import { CreateAssociateDialog, PhotoUpload } from '@/components/associates/CreateAssociateDialog'
+import { Textarea } from '@/components/ui/textarea'
 
 type AssociateStatus = 'pending' | 'approved' | 'rejected'
+
+const PAGE_SIZES = [10, 20, 50, 100]
 
 interface Associate {
   id: string
@@ -33,6 +37,8 @@ interface Associate {
   city: string | null
   institution_name: string | null
   institution_address: string | null
+  pincode: string | null
+  photo_url: string | null
   current_address: string | null
   current_city: string | null
   current_state: string | null
@@ -55,7 +61,8 @@ interface Associate {
   created_at: string
 }
 
-export function AssociateManager() {
+// lockedStatus pins the list to one status (e.g. the "Approved" tab) and hides the status filter
+export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateStatus } = {}) {
   const router = useRouter()
   const supabase = createClient()
   const db = supabase as any
@@ -75,6 +82,9 @@ export function AssociateManager() {
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [coordFilter, setCoordFilter] = useState('all') // 'all' | coordinator name | 'unassigned'
+  const [pageSize, setPageSize] = useState(20)
+  // Page is remembered per filter combination, so changing any filter lands back on page 1
+  const [pageState, setPageState] = useState({ key: '', page: 1 })
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
@@ -84,6 +94,8 @@ export function AssociateManager() {
   const [editTarget, setEditTarget] = useState<Associate | null>(null)
   const [editForm, setEditForm] = useState<Partial<Associate>>({})
   const [saving, setSaving] = useState(false)
+  const [editPhoto, setEditPhoto] = useState<File | null>(null)
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null)
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<Associate | null>(null)
@@ -125,16 +137,14 @@ export function AssociateManager() {
 
   function openEdit(a: Associate) {
     setEditTarget(a)
+    setEditPhoto(null)
+    setEditPhotoPreview(null)
     setEditForm({
       name: a.name, phone: a.phone, father_name: a.father_name ?? a.father_phone ?? '',
       email: a.email, aadhar_number: a.aadhar_number ?? '', pan_number: a.pan_number ?? '',
       state: a.state ?? '', district: a.district ?? '', city: a.city ?? '',
       institution_name: a.institution_name ?? '', institution_address: a.institution_address ?? '',
-      current_address: a.current_address ?? '', current_city: a.current_city ?? '',
-      current_state: a.current_state ?? '', current_pincode: a.current_pincode ?? '',
-      same_as_current: a.same_as_current,
-      permanent_address: a.permanent_address ?? '', permanent_city: a.permanent_city ?? '',
-      permanent_state: a.permanent_state ?? '', permanent_pincode: a.permanent_pincode ?? '',
+      pincode: a.pincode ?? a.current_pincode ?? '', photo_url: a.photo_url,
       bank_name: a.bank_name ?? '', account_number: a.account_number ?? '',
       ifsc_code: a.ifsc_code ?? '', account_holder_name: a.account_holder_name ?? '',
     })
@@ -145,8 +155,17 @@ export function AssociateManager() {
     if (!editTarget) return
     setSaving(true)
     try {
+      if (editForm.pincode && !/^\d{6}$/.test(editForm.pincode)) { toast.error('Pincode must be 6 digits'); return }
+      let photo_url = editForm.photo_url ?? null
+      if (editPhoto) {
+        const path = `associate-docs/${editTarget.id}/photo-${Date.now()}.${editPhoto.name.split('.').pop()}`
+        const { error: upErr } = await supabase.storage.from('student-documents').upload(path, editPhoto, { upsert: true })
+        if (upErr) { toast.error(`Photo upload failed: ${upErr.message}`); return }
+        photo_url = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
+      }
       const { error } = await db.from('associates').update({
         ...editForm,
+        photo_url,
         updated_at: new Date().toISOString(),
       }).eq('id', editTarget.id)
       if (error) { toast.error(error.message); return }
@@ -168,12 +187,14 @@ export function AssociateManager() {
     } finally { setDeleting(false) }
   }
 
-  const allStates = [...new Set(associates.map(a => a.state).filter(Boolean))].sort() as string[]
+  const base = lockedStatus ? associates.filter(a => a.status === lockedStatus) : associates
+
+  const allStates = [...new Set(base.map(a => a.state).filter(Boolean))].sort() as string[]
   const allDistricts = [...new Set(
-    associates.filter(a => !filterState || a.state === filterState).map(a => a.district).filter(Boolean)
+    base.filter(a => !filterState || a.state === filterState).map(a => a.district).filter(Boolean)
   )].sort() as string[]
 
-  const filtered = associates.filter(a => {
+  const filtered = base.filter(a => {
     const q = search.toLowerCase()
     const matchSearch = !q ||
       a.name.toLowerCase().includes(q) ||
@@ -190,6 +211,43 @@ export function AssociateManager() {
       (!filterDistrict || a.district === filterDistrict) &&
       (!filterStatus || a.status === filterStatus)
   })
+
+  // ── Pagination ──
+  const filterKey = [search, filterState, filterDistrict, filterStatus, coordFilter, pageSize].join('|')
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const safePage = Math.min(pageState.key === filterKey ? pageState.page : 1, totalPages)
+  const pageStart = (safePage - 1) * pageSize
+  const pageRows = filtered.slice(pageStart, pageStart + pageSize)
+  const goToPage = (p: number) => setPageState({ key: filterKey, page: Math.min(Math.max(1, p), totalPages) })
+  const windowStart = Math.max(1, Math.min(safePage - 2, totalPages - 4))
+  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => windowStart + i)
+
+  // Exports every row matching the current filters (all pages, not just the visible one)
+  function exportExcel() {
+    const rows = filtered.map((a, i) => ({
+      'S.No': i + 1,
+      'Associate Code': a.associate_code ?? '',
+      Name: a.name,
+      Phone: a.phone,
+      Email: a.email,
+      "Father's Name": a.father_name ?? a.father_phone ?? '',
+      Coordinator: a.coordinator_name ?? 'Unassigned',
+      State: a.state ?? '',
+      District: a.district ?? '',
+      City: a.city ?? '',
+      Institution: a.institution_name ?? '',
+      Status: a.status.charAt(0).toUpperCase() + a.status.slice(1),
+      'Wallet Balance': a.wallet_balance ?? 0,
+      'Joined On': new Date(a.created_at).toLocaleDateString('en-IN'),
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [6, 14, 22, 13, 26, 20, 16, 16, 16, 14, 24, 10, 14, 12].map(w => ({ wch: w }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Associates')
+    const tag = [lockedStatus ?? filterStatus, coordFilter !== 'all' ? coordFilter : '', filterState, filterDistrict]
+      .filter(Boolean).join('_').replace(/[^\w-]+/g, '_')
+    XLSX.writeFile(wb, `DCW_Associates${tag ? `_${tag}` : ''}.xlsx`)
+  }
 
   const statusBadge = (s: AssociateStatus) => {
     if (s === 'approved') return <Badge className="bg-green-100 text-green-800 border-0 gap-1"><CheckCircle2 className="w-3 h-3" />Approved</Badge>
@@ -228,7 +286,7 @@ export function AssociateManager() {
   ).sort((a, b) => b[1] - a[1])
 
   const associatesByCoordinator = Object.entries(
-    associates.reduce((acc: Record<string, number>, a: any) => {
+    base.reduce((acc: Record<string, number>, a: any) => {
       const c = a.coordinator_name ?? 'Unassigned'
       acc[c] = (acc[c] ?? 0) + 1; return acc
     }, {})
@@ -251,17 +309,25 @@ export function AssociateManager() {
     <div className="space-y-5">
       {/* Toolbar: Add Associate */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">All Associates</p>
-        <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 h-8">
-          <UserPlus className="w-3.5 h-3.5" /> Add Associate
-        </Button>
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+          {lockedStatus === 'approved' ? 'Approved Associates' : 'All Associates'}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={exportExcel} disabled={loading || filtered.length === 0}
+            className="gap-1.5 h-8 text-green-700 border-green-200 hover:bg-green-50">
+            <Download className="w-3.5 h-3.5" /> Export Excel ({filtered.length})
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 h-8">
+            <UserPlus className="w-3.5 h-3.5" /> Add Associate
+          </Button>
+        </div>
       </div>
 
       {/* Coordinator filter chips (which coordinator has how many associates) */}
       <div className="flex gap-1.5 flex-wrap">
         <button onClick={() => setCoordFilter('all')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${coordFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
-          All <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${coordFilter === 'all' ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{associates.length}</span>
+          All <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${coordFilter === 'all' ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{base.length}</span>
         </button>
         {associatesByCoordinator.filter(([c]) => c !== 'Unassigned').map(([c, n]) => (
           <button key={c} onClick={() => setCoordFilter(c)}
@@ -287,13 +353,15 @@ export function AssociateManager() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, phone, institution…"
             className="w-full pl-8 pr-3 h-8 text-xs border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="border rounded-lg px-2 h-8 text-xs bg-white min-w-28">
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
+        {!lockedStatus && (
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="border rounded-lg px-2 h-8 text-xs bg-white min-w-28">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        )}
         <select value={filterState} onChange={e => { setFilterState(e.target.value); setFilterDistrict('') }}
           className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32">
           <option value="">All States</option>
@@ -312,10 +380,10 @@ export function AssociateManager() {
 
       {loading ? (
         <div className="text-center py-16 text-muted-foreground text-sm">Loading…</div>
-      ) : associates.length === 0 ? (
+      ) : base.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No associates yet</p>
+          <p className="font-medium">{lockedStatus === 'approved' ? 'No approved associates yet' : 'No associates yet'}</p>
           <p className="text-xs mt-1">Click "Add Associate" to register one</p>
         </div>
       ) : (
@@ -334,9 +402,9 @@ export function AssociateManager() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((a, idx) => (
+              {pageRows.map((a, idx) => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/associates/${a.id}`)}>
-                  <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{idx + 1}</td>
+                  <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{pageStart + idx + 1}</td>
                   <td className="px-4 py-3">
                     {a.associate_code
                       ? <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg whitespace-nowrap">{a.associate_code}</span>
@@ -385,8 +453,38 @@ export function AssociateManager() {
               ))}
             </tbody>
           </table>
-          <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">
-            Showing {filtered.length} of {associates.length} associates
+          {filtered.length === 0 && (
+            <div className="text-center py-10 text-sm text-slate-400">No associates match these filters</div>
+          )}
+          {/* Pagination bar */}
+          <div className="px-4 py-2.5 border-t bg-slate-50 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span>Rows per page</span>
+              <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+                className="border rounded-md px-1.5 h-7 bg-white text-slate-700">
+                {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <span className="tabular-nums">
+                {filtered.length === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + pageSize, filtered.length)} of {filtered.length}
+                {filtered.length !== base.length && ` (filtered from ${base.length})`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={safePage === 1}
+                onClick={() => goToPage(safePage - 1)} title="Previous page">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              {pageNumbers.map(p => (
+                <Button key={p} variant={p === safePage ? 'default' : 'outline'} size="sm"
+                  className="h-7 min-w-7 px-2 text-xs tabular-nums" onClick={() => goToPage(p)}>
+                  {p}
+                </Button>
+              ))}
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={safePage === totalPages}
+                onClick={() => goToPage(safePage + 1)} title="Next page">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -417,37 +515,26 @@ export function AssociateManager() {
                 </F>
                 <F label="District"><Input value={editForm.district ?? ''} onChange={ef('district')} placeholder="e.g. Jaipur" /></F>
                 <F label="City"><Input value={editForm.city ?? ''} onChange={ef('city')} placeholder="e.g. Jaipur" /></F>
+                <F label="Pincode"><Input value={editForm.pincode ?? ''} inputMode="numeric" maxLength={6} placeholder="800020"
+                  onChange={e => setEditForm(p => ({ ...p, pincode: e.target.value.replace(/\D/g, '') }))} /></F>
               </div>
+              <PhotoUpload
+                preview={editPhotoPreview ?? editForm.photo_url ?? null}
+                onSelect={f => {
+                  if (f.size > 2 * 1024 * 1024) { toast.error('Photo must be under 2 MB'); return }
+                  setEditPhoto(f); setEditPhotoPreview(URL.createObjectURL(f))
+                }}
+                onClear={() => { setEditPhoto(null); setEditPhotoPreview(null); setEditForm(p => ({ ...p, photo_url: null })) }}
+              />
             </Sec>
             <Sec title="Institution Details">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <F label="Institution Name"><Input value={editForm.institution_name ?? ''} onChange={ef('institution_name')} /></F>
-                <F label="Institution Address"><Input value={editForm.institution_address ?? ''} onChange={ef('institution_address')} /></F>
+                <F label="Institution Address">
+                  <Textarea rows={3} value={editForm.institution_address ?? ''} className="resize-y"
+                    onChange={e => setEditForm(p => ({ ...p, institution_address: e.target.value }))} />
+                </F>
               </div>
-            </Sec>
-            <Sec title="Current Address">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <F label="Full Address" className="lg:col-span-3"><Input value={editForm.current_address ?? ''} onChange={ef('current_address')} /></F>
-                <F label="City"><Input value={editForm.current_city ?? ''} onChange={ef('current_city')} /></F>
-                <F label="State"><Input value={editForm.current_state ?? ''} onChange={ef('current_state')} /></F>
-                <F label="Pincode"><Input value={editForm.current_pincode ?? ''} onChange={ef('current_pincode')} /></F>
-              </div>
-            </Sec>
-            <Sec title="Permanent Address">
-              <label className="flex items-center gap-2 mb-3 cursor-pointer w-fit">
-                <input type="checkbox" className="w-4 h-4 rounded"
-                  checked={editForm.same_as_current ?? false}
-                  onChange={e => setEditForm(p => ({ ...p, same_as_current: e.target.checked }))} />
-                <span className="text-sm font-medium text-slate-700">Same as current address</span>
-              </label>
-              {!editForm.same_as_current && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <F label="Full Address" className="lg:col-span-3"><Input value={editForm.permanent_address ?? ''} onChange={ef('permanent_address')} /></F>
-                  <F label="City"><Input value={editForm.permanent_city ?? ''} onChange={ef('permanent_city')} /></F>
-                  <F label="State"><Input value={editForm.permanent_state ?? ''} onChange={ef('permanent_state')} /></F>
-                  <F label="Pincode"><Input value={editForm.permanent_pincode ?? ''} onChange={ef('permanent_pincode')} /></F>
-                </div>
-              )}
             </Sec>
             <Sec title="Bank Details">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

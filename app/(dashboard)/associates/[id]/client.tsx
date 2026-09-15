@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   ArrowLeft, GraduationCap, School, UserCog, Clock, CheckCircle2,
-  IndianRupee, Wallet, FileText, Phone, MapPin, Building2, RefreshCw,
+  IndianRupee, Wallet, FileText, Phone, MapPin, Building2, RefreshCw, FileDown, Loader2,
 } from 'lucide-react'
 import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 
@@ -30,6 +30,7 @@ export default function AssociateDetailClient({ id }: { id: string }) {
   const [counselors, setCounselors] = useState<CounselorOpt[]>([])
   const [loading, setLoading] = useState(true)
   const [changingCoord, setChangingCoord] = useState(false)
+  const [downloadingForm, setDownloadingForm] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,6 +98,22 @@ export default function AssociateDetailClient({ id }: { id: string }) {
     }
   }
 
+  async function downloadApplicationForm() {
+    if (!assoc) return
+    setDownloadingForm(true)
+    try {
+      const { downloadAssociateApplicationPdf } = await import('@/components/associates/AssociateApplicationPDF')
+      await downloadAssociateApplicationPdf(
+        { ...assoc, pincode: assoc.pincode ?? assoc.current_pincode },
+        assoc.photo_url,
+      )
+    } catch {
+      toast.error('Could not generate the application form')
+    } finally {
+      setDownloadingForm(false)
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" /></div>
   }
@@ -135,9 +152,15 @@ export default function AssociateDetailClient({ id }: { id: string }) {
         <button onClick={() => router.push('/associates')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 font-medium">
           <ArrowLeft className="w-4 h-4" /> Back to Associates
         </button>
-        <button onClick={load} className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadApplicationForm} disabled={downloadingForm}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg px-3 py-1.5 hover:bg-blue-700 disabled:opacity-60">
+            {downloadingForm ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />} Application Form
+          </button>
+          <button onClick={load} className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Hero */}
@@ -145,6 +168,10 @@ export default function AssociateDetailClient({ id }: { id: string }) {
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-3">
+              {assoc.photo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={assoc.photo_url} alt={`${assoc.name} photo`} className="w-14 h-16 object-cover rounded-lg border-2 border-white/30" />
+              )}
               <h1 className="text-2xl font-extrabold">{assoc.name}</h1>
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${st.cls}`}>{st.label}</span>
             </div>
@@ -247,15 +274,19 @@ export default function AssociateDetailClient({ id }: { id: string }) {
           <D label="Father's Name" value={assoc.father_name ?? assoc.father_phone} />
           <D label="Aadhaar" value={assoc.aadhar_number} />
           <D label="PAN" value={assoc.pan_number} />
-          <D label="City" value={assoc.current_city || assoc.city} />
-          <D label="State" value={assoc.current_state || assoc.state} />
+          <D label="State" value={assoc.state || assoc.current_state} />
+          <D label="District" value={assoc.district} />
+          <D label="City" value={assoc.city || assoc.current_city} />
+          <D label="Pincode" value={assoc.pincode || assoc.current_pincode} />
+          <D label="Institution Address" value={assoc.institution_address} />
           <D label="Bank" value={assoc.bank_name} />
           <D label="Account Holder" value={assoc.account_holder_name} />
           <D label="Account No." value={assoc.account_number} />
           <D label="IFSC" value={assoc.ifsc_code} />
         </div>
-        {(assoc.aadhar_doc_url || assoc.pan_doc_url || assoc.cheque_doc_url) && (
+        {(assoc.photo_url || assoc.aadhar_doc_url || assoc.pan_doc_url || assoc.cheque_doc_url) && (
           <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-50">
+            {assoc.photo_url && <DocLink label="Photo" url={assoc.photo_url} />}
             {assoc.aadhar_doc_url && <DocLink label="Aadhaar" url={assoc.aadhar_doc_url} />}
             {assoc.pan_doc_url && <DocLink label="PAN" url={assoc.pan_doc_url} />}
             {assoc.cheque_doc_url && <DocLink label="Cancelled Cheque" url={assoc.cheque_doc_url} />}

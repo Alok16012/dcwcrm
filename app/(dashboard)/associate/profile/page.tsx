@@ -33,6 +33,8 @@ interface Associate {
   city: string | null
   institution_name: string | null
   institution_address: string | null
+  pincode: string | null
+  photo_url: string | null
 }
 
 export default function AssociateProfilePage() {
@@ -64,9 +66,15 @@ export default function AssociateProfilePage() {
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Your registered information</p>
+      <div className="flex items-center gap-4">
+        {associate.photo_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={associate.photo_url} alt="Your photo" className="w-16 h-20 object-cover rounded-lg border" />
+        )}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Your registered information</p>
+        </div>
       </div>
 
       <Section title="Personal Information">
@@ -80,6 +88,7 @@ export default function AssociateProfilePage() {
         <Row label="State" value={associate.state} />
         <Row label="District" value={associate.district} />
         <Row label="City" value={associate.city} />
+        <Row label="Pincode" value={associate.pincode ?? associate.current_pincode} />
         <Row label="Coordinator Name" value={associate.coordinator_name} />
       </Section>
 
@@ -89,20 +98,6 @@ export default function AssociateProfilePage() {
           <Row label="Institution Address" value={associate.institution_address} />
         </Section>
       )}
-
-      <Section title="Current Address">
-        <Row label="Address" value={associate.current_address} />
-        <Row label="City" value={associate.current_city} />
-        <Row label="State" value={associate.current_state} />
-        <Row label="Pincode" value={associate.current_pincode} />
-      </Section>
-
-      <Section title={`Permanent Address${associate.same_as_current ? ' (same as current)' : ''}`}>
-        <Row label="Address" value={associate.same_as_current ? associate.current_address : associate.permanent_address} />
-        <Row label="City" value={associate.same_as_current ? associate.current_city : associate.permanent_city} />
-        <Row label="State" value={associate.same_as_current ? associate.current_state : associate.permanent_state} />
-        <Row label="Pincode" value={associate.same_as_current ? associate.current_pincode : associate.permanent_pincode} />
-      </Section>
 
       <Section title="Bank Details">
         <Row label="Account Holder" value={associate.account_holder_name} />

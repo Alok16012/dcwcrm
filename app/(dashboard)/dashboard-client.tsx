@@ -71,6 +71,9 @@ interface DashboardClientProps {
   docReceivedCount?: number
   expectedEnrollmentCount?: number
   departmentStats?: DepartmentStat[]
+  /** Payments recorded with today's date (IST) — admin/backend only */
+  todaysCollection?: number
+  todaysCollectionCount?: number
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -133,6 +136,7 @@ export default function DashboardClient({
   todayAppointments, upcomingAppointments, upcomingApptRaw,
   followupsToday, interestedStats, incentiveHistory = [],
   isLead = false, docReceivedCount = 0, expectedEnrollmentCount = 0, departmentStats = [],
+  todaysCollection = 0, todaysCollectionCount = 0,
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [myTasks, setMyTasks] = useState<any[]>([])
@@ -190,6 +194,14 @@ export default function DashboardClient({
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {!isLead && (
+              <StatCard
+                label="Today's Collection"
+                value={fmt(todaysCollection)}
+                color="green"
+                sub={`${todaysCollectionCount} payment${todaysCollectionCount === 1 ? '' : 's'} today`}
+              />
+            )}
             <StatCard label="Today's Appointments" value={todayAppointments} color="indigo" />
             <StatCard label="Upcoming (7 days)" value={upcomingAppointments} color="emerald" />
           </div>

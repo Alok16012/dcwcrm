@@ -28,6 +28,9 @@ export default async function DashboardPage() {
 
   const isLead = profile?.role === 'lead' || profile?.role === 'telecaller' || profile?.role === 'counselor'
 
+  // payment_date is a calendar date; the server runs in UTC, so take "today" in IST
+  const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
+
   const applyScope = (q: any, table: string) => {
     if (isLead) {
       if (table === 'leads') return q.eq('assigned_to', user!.id)
@@ -80,6 +83,7 @@ export default async function DashboardPage() {
     { data: telecallersRaw },
     { data: interestedLeadsRaw },
     { data: departmentsRaw },
+    { data: todaysPaymentsRaw },
   ] = await Promise.all([
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd), 'leads'),
@@ -97,7 +101,12 @@ export default async function DashboardPage() {
     supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
     applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested'), 'leads'),
     supabase.from('departments').select('id, name, students(id, amount_paid, total_fee)'),
+    // Org-wide collection card is admin/backend only, so counsellors skip the query
+    isLead ? Promise.resolve({ data: [] }) : supabase.from('payments').select('amount').eq('payment_date', todayIst),
   ])
+
+  const todaysPayments = (todaysPaymentsRaw ?? []) as { amount: number }[]
+  const todaysCollection = todaysPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
 
   const feeCollectedThisMonth = ((paymentsThisMonth ?? []) as { amount: number }[]).reduce((s, p) => s + (p.amount ?? 0), 0)
   const outstandingFees = ((studentFees ?? []) as { total_fee: number | null; amount_paid: number | null }[]).reduce((s, r) => s + Math.max(0, (r.total_fee ?? 0) - (r.amount_paid ?? 0)), 0)
@@ -211,6 +220,8 @@ export default async function DashboardPage() {
       docReceivedCount={docReceivedCount}
       expectedEnrollmentCount={expectedEnrollmentCount}
       departmentStats={departmentStats}
+      todaysCollection={todaysCollection}
+      todaysCollectionCount={todaysPayments.length}
     />
   )
 }

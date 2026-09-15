@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
   ChevronLeft, ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search, UserCog, Download,
+  Upload, FileCheck2, X, FileText,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -19,6 +20,20 @@ import { Textarea } from '@/components/ui/textarea'
 type AssociateStatus = 'pending' | 'approved' | 'rejected'
 
 const PAGE_SIZES = [10, 20, 50, 100]
+
+const DOC_KEYS = ['aadhar', 'pan', 'cheque'] as const
+type DocKey = typeof DOC_KEYS[number]
+const DOC_LABELS: Record<DocKey, string> = { aadhar: 'Aadhaar Card', pan: 'PAN Card', cheque: 'Cancelled Cheque' }
+const EMPTY_EDIT_DOCS: Record<DocKey, File | null> = { aadhar: null, pan: null, cheque: null }
+
+/** Display-only: a bare 10-digit number gets the +91 country code; anything else is shown as stored. */
+const fmtPhone = (raw: string | null | undefined) => {
+  if (!raw) return '—'
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) return `+91 ${digits}`
+  if (digits.length === 12 && digits.startsWith('91')) return `+91 ${digits.slice(2)}`
+  return raw
+}
 
 interface Associate {
   id: string
@@ -96,6 +111,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
   const [saving, setSaving] = useState(false)
   const [editPhoto, setEditPhoto] = useState<File | null>(null)
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null)
+  const [editDocs, setEditDocs] = useState(EMPTY_EDIT_DOCS)
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<Associate | null>(null)
@@ -139,12 +155,14 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
     setEditTarget(a)
     setEditPhoto(null)
     setEditPhotoPreview(null)
+    setEditDocs(EMPTY_EDIT_DOCS)
     setEditForm({
       name: a.name, phone: a.phone, father_name: a.father_name ?? a.father_phone ?? '',
       email: a.email, aadhar_number: a.aadhar_number ?? '', pan_number: a.pan_number ?? '',
       state: a.state ?? '', district: a.district ?? '', city: a.city ?? '',
       institution_name: a.institution_name ?? '', institution_address: a.institution_address ?? '',
       pincode: a.pincode ?? a.current_pincode ?? '', photo_url: a.photo_url,
+      aadhar_doc_url: a.aadhar_doc_url, pan_doc_url: a.pan_doc_url, cheque_doc_url: a.cheque_doc_url,
       bank_name: a.bank_name ?? '', account_number: a.account_number ?? '',
       ifsc_code: a.ifsc_code ?? '', account_holder_name: a.account_holder_name ?? '',
     })
@@ -163,8 +181,19 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
         if (upErr) { toast.error(`Photo upload failed: ${upErr.message}`); return }
         photo_url = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
       }
+      // Newly picked documents replace the stored ones; untouched ones keep their URL
+      const docUrls: Partial<Record<`${DocKey}_doc_url`, string>> = {}
+      for (const key of DOC_KEYS) {
+        const file = editDocs[key]
+        if (!file) continue
+        const path = `associate-docs/${editTarget.id}/${key}-${Date.now()}.${file.name.split('.').pop()}`
+        const { error: upErr } = await supabase.storage.from('student-documents').upload(path, file, { upsert: true })
+        if (upErr) { toast.error(`${DOC_LABELS[key]} upload failed: ${upErr.message}`); return }
+        docUrls[`${key}_doc_url`] = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
+      }
       const { error } = await db.from('associates').update({
         ...editForm,
+        ...docUrls,
         photo_url,
         updated_at: new Date().toISOString(),
       }).eq('id', editTarget.id)
@@ -411,7 +440,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                       : <span className="text-slate-400 text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{a.name}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{a.phone}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">{fmtPhone(a.phone)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {a.coordinator_name
                       ? <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full"><UserCog className="w-3 h-3" />{a.coordinator_name}</span>
@@ -544,6 +573,23 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                 <F label="IFSC Code"><Input value={editForm.ifsc_code ?? ''} onChange={ef('ifsc_code')} className="uppercase" /></F>
               </div>
             </Sec>
+            <Sec title="Documents">
+              <p className="text-xs text-slate-500 -mt-1 mb-1">Upload scanned copies or photos (JPG, PNG, PDF). Changes save with &quot;Save Changes&quot;.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {DOC_KEYS.map(key => (
+                  <EditDocUpload key={key} label={DOC_LABELS[key]}
+                    file={editDocs[key]}
+                    existingUrl={editForm[`${key}_doc_url`] ?? null}
+                    onSelect={f => {
+                      if (f.size > 5 * 1024 * 1024) { toast.error(`${DOC_LABELS[key]} must be under 5 MB`); return }
+                      setEditDocs(d => ({ ...d, [key]: f }))
+                    }}
+                    onClearFile={() => setEditDocs(d => ({ ...d, [key]: null }))}
+                    onRemoveExisting={() => setEditForm(p => ({ ...p, [`${key}_doc_url`]: null }))}
+                  />
+                ))}
+              </div>
+            </Sec>
             <div className="flex gap-3 justify-end pt-1">
               <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
               <Button onClick={handleSaveEdit} disabled={saving} className="min-w-28">
@@ -637,6 +683,49 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
       </Dialog>
 
       <CreateAssociateDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={load} />
+    </div>
+  )
+}
+
+/** Document slot in the edit dialog: shows the stored file (view/replace/remove) or a picked replacement. */
+function EditDocUpload({ label, file, existingUrl, onSelect, onClearFile, onRemoveExisting }: {
+  label: string
+  file: File | null
+  existingUrl: string | null
+  onSelect: (f: File) => void
+  onClearFile: () => void
+  onRemoveExisting: () => void
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-slate-600">{label}</Label>
+      <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) onSelect(f); e.target.value = '' }} />
+      {file ? (
+        <div className="flex items-center gap-2 border border-green-300 bg-green-50 rounded-lg px-3 py-2.5 text-sm">
+          <FileCheck2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+          <span className="text-green-800 text-xs truncate flex-1">{file.name}</span>
+          <button type="button" onClick={onClearFile} title="Cancel this file" className="text-green-500 hover:text-red-500 flex-shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : existingUrl ? (
+        <div className="flex items-center gap-2 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2 text-xs">
+          <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+          <a href={existingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 font-medium hover:underline flex-1 truncate">View ↗</a>
+          <button type="button" onClick={() => ref.current?.click()} className="text-blue-600 hover:underline font-medium">Replace</button>
+          <button type="button" onClick={onRemoveExisting} title="Remove" className="text-slate-400 hover:text-red-600">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()}
+          className="w-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 rounded-lg py-4 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+          <Upload className="w-5 h-5" />
+          <span className="text-xs font-medium">Click to upload</span>
+        </button>
+      )}
     </div>
   )
 }

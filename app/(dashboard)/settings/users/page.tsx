@@ -18,7 +18,7 @@ export default async function UsersSettingsPage() {
       .order('created_at', { ascending: false }),
     (supabase as any)
       .from('associates')
-      .select('id, name, email, phone, associate_code, status, current_city, current_state, wallet_balance, created_at')
+      .select('id, name, email, phone, associate_code, status, current_city, current_state, wallet_balance, created_at, profile_id')
       .order('created_at', { ascending: false }),
   ])
 

@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2, PauseCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,17 +45,20 @@ interface AssociateRow {
   email: string
   phone: string
   associate_code: string | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'hold' | 'inactive'
   current_city: string | null
   current_state: string | null
   wallet_balance: number
   created_at: string
+  profile_id: string | null
 }
 
 const ASSOC_STATUS: Record<string, { label: string; cls: string }> = {
   pending:  { label: 'Pending',  cls: 'bg-amber-100 text-amber-800' },
   approved: { label: 'Approved', cls: 'bg-green-100 text-green-800' },
   rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-800' },
+  hold:     { label: 'Hold',     cls: 'bg-orange-100 text-orange-800' },
+  inactive: { label: 'Inactive', cls: 'bg-gray-100 text-gray-600' },
 }
 
 type Tab = 'staff' | 'associates'
@@ -74,6 +77,7 @@ export function UsersSettingsClient({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>('staff')
   const [users, setUsers] = useState(initialUsers)
+  const [associates, setAssociates] = useState(initialAssociates)
   const [open, setOpen] = useState(false)
   const [confirmUser, setConfirmUser] = useState<Profile | null>(null)
   const [deleteUser, setDeleteUser] = useState<Profile | null>(null)
@@ -81,6 +85,11 @@ export function UsersSettingsClient({
   const [newPassword, setNewPassword] = useState('')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
+
+  // Associate action states
+  const [assocPasswordTarget, setAssocPasswordTarget] = useState<AssociateRow | null>(null)
+  const [assocNewPassword, setAssocNewPassword] = useState('')
+  const [assocDeleteTarget, setAssocDeleteTarget] = useState<AssociateRow | null>(null)
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<CreateUserData>({
     resolver: zodResolver(createUserSchema),
@@ -164,8 +173,62 @@ export function UsersSettingsClient({
     })
   }
 
+  // ── Associate action handlers ─────────────────────────────────────────────
+  async function toggleAssocStatus(assoc: AssociateRow) {
+    const newStatus = assoc.status === 'approved' ? 'inactive' : 'approved'
+    try {
+      const { error } = await (supabase as any).from('associates').update({ status: newStatus }).eq('id', assoc.id)
+      if (error) throw error
+      setAssociates(prev => prev.map(a => a.id === assoc.id ? { ...a, status: newStatus as AssociateRow['status'] } : a))
+      toast.success(`Associate marked ${newStatus}`)
+    } catch { toast.error('Failed to update status') }
+  }
+
+  async function toggleAssocHold(assoc: AssociateRow) {
+    const newStatus = assoc.status === 'hold' ? 'approved' : 'hold'
+    try {
+      const { error } = await (supabase as any).from('associates').update({ status: newStatus }).eq('id', assoc.id)
+      if (error) throw error
+      setAssociates(prev => prev.map(a => a.id === assoc.id ? { ...a, status: newStatus as AssociateRow['status'] } : a))
+      toast.success(`Associate ${newStatus === 'hold' ? 'put on hold' : 'removed from hold'}`)
+    } catch { toast.error('Failed to update status') }
+  }
+
+  async function handleAssocPassword() {
+    if (!assocPasswordTarget || assocNewPassword.length < 8) { toast.error('Password must be at least 8 characters'); return }
+    const userId = assocPasswordTarget.profile_id
+    if (!userId) { toast.error('No linked auth user found'); return }
+    startTransition(async () => {
+      try {
+        const res = await fetch('/api/admin/update-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, newPassword: assocNewPassword }),
+        })
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error)
+        toast.success(`Password updated for ${assocPasswordTarget.name}`)
+        setAssocPasswordTarget(null); setAssocNewPassword('')
+      } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to update password') }
+    })
+  }
+
+  async function handleAssocDelete(assoc: AssociateRow) {
+    try {
+      const { error } = await (supabase as any).from('associates').delete().eq('id', assoc.id)
+      if (error) throw error
+      setAssociates(prev => prev.filter(a => a.id !== assoc.id))
+      toast.success('Associate deleted')
+    } catch { toast.error('Failed to delete associate') }
+    setAssocDeleteTarget(null)
+  }
+
   // ── Staff columns (profile + merged employee info) ───────────────────────────
   const staffColumns: ColumnDef<StaffRow>[] = [
+    {
+      id: 'sno', header: 'S.No',
+      cell: ({ row }) => <span className="text-xs font-medium text-gray-500">{row.index + 1}</span>
+    },
     {
       accessorKey: 'full_name', header: 'Name',
       cell: ({ row }) => (
@@ -231,6 +294,10 @@ export function UsersSettingsClient({
 
   // ── Associate columns ────────────────────────────────────────────────────────
   const associateColumns: ColumnDef<AssociateRow>[] = [
+    {
+      id: 'sno', header: 'S.No',
+      cell: ({ row }) => <span className="text-xs font-medium text-gray-500">{row.index + 1}</span>
+    },
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
     { accessorKey: 'associate_code', header: 'Code', cell: ({ row }) => row.original.associate_code ? <span className="font-mono text-xs text-indigo-700">{row.original.associate_code}</span> : '-' },
     { accessorKey: 'email', header: 'Email', cell: ({ row }) => <span className="text-xs">{row.original.email}</span> },
@@ -256,6 +323,43 @@ export function UsersSettingsClient({
     {
       accessorKey: 'created_at', header: 'Joined',
       cell: ({ row }) => <span className="text-xs text-gray-500">{format(new Date(row.original.created_at), 'dd MMM yyyy')}</span>
+    },
+    {
+      id: 'actions', header: 'Actions',
+      cell: ({ row }) => {
+        const a = row.original
+        const isActive = a.status === 'approved'
+        const isHold   = a.status === 'hold'
+        return (
+          <div className="flex items-center gap-1">
+            {/* Password */}
+            <Button variant="ghost" size="sm" title="Change Password"
+              onClick={() => { setAssocPasswordTarget(a); setAssocNewPassword('') }}>
+              <KeyRound className="w-4 h-4 text-blue-500" />
+            </Button>
+            {/* Active / Inactive */}
+            <Button variant="ghost" size="sm"
+              title={isActive ? 'Mark Inactive' : 'Mark Active'}
+              onClick={() => toggleAssocStatus(a)}>
+              {isActive
+                ? <UserX className="w-4 h-4 text-red-500" />
+                : <UserCheck className="w-4 h-4 text-green-500" />}
+            </Button>
+            {/* Hold */}
+            <Button variant="ghost" size="sm"
+              title={isHold ? 'Remove Hold' : 'Put on Hold'}
+              onClick={() => toggleAssocHold(a)}>
+              <PauseCircle className={`w-4 h-4 ${isHold ? 'text-green-500' : 'text-orange-500'}`} />
+            </Button>
+            {/* Delete */}
+            <Button variant="ghost" size="sm" title="Delete"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+              onClick={() => setAssocDeleteTarget(a)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )
+      }
     },
   ]
 
@@ -325,8 +429,8 @@ export function UsersSettingsClient({
         })}
       </div>
 
-      {activeTab === 'staff'      && <DataTable data={staffRows}            columns={staffColumns} />}
-      {activeTab === 'associates' && <DataTable data={initialAssociates}    columns={associateColumns} />}
+      {activeTab === 'staff'      && <DataTable data={staffRows}  columns={staffColumns} />}
+      {activeTab === 'associates' && <DataTable data={associates}  columns={associateColumns} />}
 
       {/* ── Dialogs ── */}
       {confirmUser && (
@@ -369,6 +473,39 @@ export function UsersSettingsClient({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Associate: Change Password ── */}
+      <Dialog open={!!assocPasswordTarget} onOpenChange={o => { if (!o) { setAssocPasswordTarget(null); setAssocNewPassword('') } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Change Password — {assocPasswordTarget?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>New Password</Label>
+              <Input type="password" placeholder="Min 8 characters" value={assocNewPassword} onChange={e => setAssocNewPassword(e.target.value)} />
+              {assocNewPassword.length > 0 && assocNewPassword.length < 8 && <p className="text-xs text-red-500 mt-1">Minimum 8 characters required</p>}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setAssocPasswordTarget(null); setAssocNewPassword('') }}>Cancel</Button>
+              <Button onClick={handleAssocPassword} disabled={isPending || assocNewPassword.length < 8}>
+                {isPending ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Associate: Delete Confirm ── */}
+      {assocDeleteTarget && (
+        <ConfirmDialog
+          open
+          title="Delete Associate"
+          description={`Are you sure you want to delete ${assocDeleteTarget.name}? This cannot be undone.`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => handleAssocDelete(assocDeleteTarget)}
+          onCancel={() => setAssocDeleteTarget(null)}
+        />
+      )}
     </div>
   )
 }

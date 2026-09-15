@@ -233,9 +233,10 @@ export function BackendListClient() {
       if (modeFilter) query = query.eq('mode', modeFilter)
       if (departmentFilter) query = query.eq('department_id', departmentFilter)
       if (boardFilter) query = query.eq('sub_section_id', boardFilter)
-      if (paymentFilter === 'paid') query = query.gt('amount_paid', 0).gte('amount_paid', 'total_fee')
+      // PostgREST can't compare two columns (amount_paid vs total_fee), so only the
+      // "> 0" half runs here; paid/partial are finished client-side in displayStudents.
       if (paymentFilter === 'unpaid') query = query.eq('amount_paid', 0)
-      if (paymentFilter === 'partial') query = query.gt('amount_paid', 0).lt('amount_paid', 'total_fee')
+      if (paymentFilter === 'paid' || paymentFilter === 'partial') query = query.gt('amount_paid', 0)
 
       const { data, error } = await query
       if (error) {
@@ -252,13 +253,16 @@ export function BackendListClient() {
 
   // Payment-wise ordering (paid amount or pending dues), else keep server order
   const displayStudents = useMemo(() => {
-    if (!sortBy) return students
     const dues = (s: Student) => (s.total_fee ?? 0) - (s.amount_paid ?? 0)
     const paid = (s: Student) => s.amount_paid ?? 0
+    const list = paymentFilter === 'paid' ? students.filter(s => paid(s) > 0 && dues(s) <= 0)
+      : paymentFilter === 'partial' ? students.filter(s => paid(s) > 0 && dues(s) > 0)
+      : students
+    if (!sortBy) return list
     const get = sortBy.startsWith('paid') ? paid : dues
     const desc = sortBy.endsWith('desc')
-    return [...students].sort((a, b) => desc ? get(b) - get(a) : get(a) - get(b))
-  }, [students, sortBy])
+    return [...list].sort((a, b) => desc ? get(b) - get(a) : get(a) - get(b))
+  }, [students, sortBy, paymentFilter])
 
   // Header click cycles: descending → ascending → off
   function toggleSort(field: 'paid' | 'dues') {
@@ -849,7 +853,11 @@ export function BackendListClient() {
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? '')}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-32 h-9">
+            <span className={`text-sm truncate ${statusFilter ? '' : 'text-muted-foreground'}`}>
+              {({ active: 'Active', completed: 'Completed', dropped: 'Dropped', on_hold: 'On Hold' } as Record<string, string>)[statusFilter] ?? 'Status'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Status</SelectItem>
             <SelectItem value="active">Active</SelectItem>
@@ -859,7 +867,11 @@ export function BackendListClient() {
           </SelectContent>
         </Select>
         <Select value={modeFilter} onValueChange={(v) => setModeFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Mode" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${modeFilter ? '' : 'text-muted-foreground'}`}>
+              {({ attending: 'Attending', 'non-attending': 'Non-Attending' } as Record<string, string>)[modeFilter] ?? 'Mode'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Modes</SelectItem>
             <SelectItem value="attending">Attending</SelectItem>
@@ -867,28 +879,44 @@ export function BackendListClient() {
           </SelectContent>
         </Select>
         <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Course" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${courseFilter ? '' : 'text-muted-foreground'}`}>
+              {courses.find(c => c.id === courseFilter)?.name ?? 'Course'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Courses</SelectItem>
             {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={sessionFilter} onValueChange={(v) => setSessionFilter(v ?? '')}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Session" /></SelectTrigger>
+          <SelectTrigger className="w-32 h-9">
+            <span className={`text-sm truncate ${sessionFilter ? '' : 'text-muted-foreground'}`}>
+              {sessions.find(s => s.id === sessionFilter)?.name ?? 'Session'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Sessions</SelectItem>
             {sessions.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={counsellorFilter} onValueChange={(v) => setCounsellorFilter(v ?? '')}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Counsellor" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${counsellorFilter ? '' : 'text-muted-foreground'}`}>
+              {counsellors.find(c => c.id === counsellorFilter)?.name ?? 'Counsellor'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Counsellors</SelectItem>
             {counsellors.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v ?? '')}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Payment" /></SelectTrigger>
+          <SelectTrigger className="w-32 h-9">
+            <span className={`text-sm truncate ${paymentFilter ? '' : 'text-muted-foreground'}`}>
+              {({ paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid' } as Record<string, string>)[paymentFilter] ?? 'Payment'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>

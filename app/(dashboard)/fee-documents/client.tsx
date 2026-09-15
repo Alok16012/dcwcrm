@@ -39,7 +39,40 @@ const uniq = (arr: (string | null | undefined)[]) =>
 
 // Open School departments pick a board; everything else picks a university/college
 const subLabel = (dept: string) => /open/i.test(dept) ? 'Board' : dept ? 'University / College' : 'Board / University'
-const subHint = (dept: string) => /open/i.test(dept) ? 'e.g. NIOS, BOSSE' : 'e.g. IGNOU, Jamia'
+
+// Predefined boards/universities per department keyword
+const DEPT_BOARDS: Record<string, string[]> = {
+  'Open School': ['NIOS', 'BOSSE', 'BOSE', 'HBSE Open', 'MPBSE Open', 'RBSE Open', 'UP Open'],
+  'Distance': ['IGNOU', 'Jamia Millia Islamia', 'Annamalai University', 'Madhya Pradesh Bhoj Open University', 'Netaji Subhas Open University'],
+  'Regular': ['CBSE', 'ICSE', 'RBSE', 'HBSE', 'MPBSE', 'UP Board', 'Bihar Board'],
+}
+
+// Predefined levels per board keyword
+const BOARD_LEVELS: Record<string, string[]> = {
+  'NIOS':  ['10th', '12th'],
+  'BOSSE': ['10th', '12th'],
+  'BOSE':  ['10th', '12th'],
+  'CBSE':  ['10th', '12th'],
+  'ICSE':  ['10th', '12th'],
+  'RBSE':  ['10th', '12th'],
+  'HBSE':  ['10th', '12th'],
+  'MPBSE': ['10th', '12th'],
+  'UP Board': ['10th', '12th'],
+  'Bihar Board': ['10th', '12th'],
+  'IGNOU': ['BA', 'BCom', 'BSc', 'MA', 'MCom', 'MSc', 'BCA', 'MCA', 'BED', 'MBA'],
+}
+
+function getBoardOptions(dept: string, existingSubs: string[]): string[] {
+  const key = Object.keys(DEPT_BOARDS).find(k => dept.toLowerCase().includes(k.toLowerCase())) ?? ''
+  const predefined = key ? DEPT_BOARDS[key] : []
+  return uniq([...predefined, ...existingSubs])
+}
+
+function getLevelOptions(board: string, existingLevels: string[]): string[] {
+  const key = Object.keys(BOARD_LEVELS).find(k => board.toLowerCase().includes(k.toLowerCase())) ?? ''
+  const predefined = key ? BOARD_LEVELS[key] : []
+  return uniq([...predefined, ...existingLevels])
+}
 
 const selectCls = 'w-full border border-gray-200 rounded-lg px-3 h-10 text-sm bg-white text-gray-800 disabled:bg-gray-50 disabled:text-gray-400'
 
@@ -240,9 +273,7 @@ export function FeeDocumentsClient() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpload} className="space-y-3 mt-1">
-            <datalist id="fd-subs">{uploadSubs.map(s => <option key={s} value={s} />)}</datalist>
-            <datalist id="fd-levels">{uploadLevels.map(l => <option key={l} value={l} />)}</datalist>
-
+            {/* Step 1 – Department */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">1. Department *</Label>
               <select className={selectCls} value={form.category} required
@@ -251,16 +282,50 @@ export function FeeDocumentsClient() {
                 {uploadDepts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
+
+            {/* Step 2 – Board / University (cascades from department) */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">2. {subLabel(form.category)} *</Label>
-              <Input list="fd-subs" placeholder={subHint(form.category)} value={form.sub_category} disabled={!form.category}
-                onChange={e => setForm(f => ({ ...f, sub_category: e.target.value }))} required />
+              <select
+                className={selectCls}
+                value={form.sub_category}
+                disabled={!form.category}
+                required
+                onChange={e => setForm(f => ({ ...f, sub_category: e.target.value, level: '' }))}
+              >
+                <option value="">
+                  {form.category ? `Select ${subLabel(form.category).toLowerCase()}…` : 'Select department first'}
+                </option>
+                {getBoardOptions(form.category, uploadSubs).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-600">3. Level <span className="text-gray-400 font-normal">(optional)</span></Label>
-              <Input list="fd-levels" placeholder="e.g. 10th / 12th — leave blank if none" value={form.level}
-                onChange={e => setForm(f => ({ ...f, level: e.target.value }))} />
-            </div>
+
+            {/* Step 3 – Level (cascades from board; only shown if there are options) */}
+            {(() => {
+              const lvlOpts = getLevelOptions(form.sub_category, uploadLevels)
+              return (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-gray-600">
+                    3. Level <span className="text-gray-400 font-normal">(optional)</span>
+                  </Label>
+                  <select
+                    className={selectCls}
+                    value={form.level}
+                    disabled={!form.sub_category}
+                    onChange={e => setForm(f => ({ ...f, level: e.target.value }))}
+                  >
+                    <option value="">
+                      {form.sub_category ? 'Select level… (or leave blank)' : 'Select board first'}
+                    </option>
+                    {lvlOpts.map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })()}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">Fee PDF *</Label>
               {file ? (

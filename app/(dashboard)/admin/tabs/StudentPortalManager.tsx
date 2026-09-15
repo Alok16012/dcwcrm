@@ -130,6 +130,8 @@ export function StudentPortalManager() {
   // Credentials
   const [pass,       setPass]       = useState('')
   const [savingCred, setSavingCred] = useState(false)
+  const [togglingStatus, setTogglingStatus] = useState(false)
+  const [deletingAccess, setDeletingAccess] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -350,6 +352,45 @@ export function StudentPortalManager() {
       if (updated) setSelected(updated)
     } catch { toast.error('Failed') }
     finally { setSavingCred(false) }
+  }
+
+  async function toggleStatus() {
+    if (!selected) return
+    setTogglingStatus(true)
+    try {
+      const newStatus = !selected.portal_active
+      const { error } = await supabase.from('students').update({ portal_active: newStatus }).eq('id', selected.id)
+      if (error) throw error
+      toast.success(newStatus ? 'Portal Activated' : 'Portal Deactivated')
+      await load()
+      setSelected(prev => prev ? { ...prev, portal_active: newStatus } : prev)
+    } catch {
+      toast.error('Failed to update status')
+    } finally {
+      setTogglingStatus(false)
+    }
+  }
+
+  async function deleteAccess() {
+    if (!selected || !selected.portal_username) return
+    if (!confirm('Are you sure you want to delete portal access? This will permanently remove their credentials.')) return
+    setDeletingAccess(true)
+    try {
+      const res = await fetch('/api/students/delete-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: selected.id })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to delete')
+      toast.success('Portal Access Deleted')
+      await load()
+      setSelected(prev => prev ? { ...prev, portal_active: false, portal_username: null, portal_temp_password: null, portal_user_id: null } : prev)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete access')
+    } finally {
+      setDeletingAccess(false)
+    }
   }
 
   const allCats = [...DEFAULT_CATEGORIES, ...customCats]
@@ -857,7 +898,7 @@ export function StudentPortalManager() {
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selected.portal_active ? 'bg-green-100' : 'bg-gray-200'}`}>
                       <ShieldCheck className={`w-5 h-5 ${selected.portal_active ? 'text-green-600' : 'text-gray-400'}`} />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="font-semibold text-gray-900">{selected.portal_active ? 'Portal Active' : 'Portal Inactive'}</p>
                       {selected.portal_username ? (
                         <p className="text-xs text-gray-500 font-mono mt-0.5">Login: {fmtEnroll(selected.portal_username)}</p>
@@ -865,6 +906,29 @@ export function StudentPortalManager() {
                         <p className="text-xs text-gray-400 mt-0.5">No credentials set</p>
                       )}
                     </div>
+                    {selected.portal_username && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={toggleStatus} 
+                          disabled={togglingStatus}
+                          className={`h-8 ${selected.portal_active ? 'text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700' : 'text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700'}`}
+                        >
+                          {togglingStatus ? '...' : selected.portal_active ? 'Set Inactive' : 'Set Active'}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={deleteAccess} 
+                          disabled={deletingAccess}
+                          className="h-8 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                          title="Delete Portal Access"
+                        >
+                          {deletingAccess ? '...' : <Trash2 className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">

@@ -21,6 +21,17 @@ type AssociateStatus = 'pending' | 'approved' | 'rejected'
 
 const PAGE_SIZES = [10, 20, 50, 100]
 
+// Working status of an approved associate (associates.activity_status, migration 103)
+type ActivityStatus = 'active' | 'inactive' | 'hold'
+const ACTIVITY_LABELS: Record<ActivityStatus, string> = { active: 'Active', inactive: 'Non Active', hold: 'Hold' }
+const ACTIVITY_STYLES: Record<ActivityStatus, string> = {
+  active: 'bg-green-50 text-green-700 border-green-200',
+  inactive: 'bg-slate-100 text-slate-600 border-slate-200',
+  hold: 'bg-amber-50 text-amber-700 border-amber-200',
+}
+const EMPTY_STATS = { admissions: 0, active: 0, revenue: 0, received: 0 }
+const inr = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`
+
 const DOC_KEYS = ['aadhar', 'pan', 'cheque'] as const
 type DocKey = typeof DOC_KEYS[number]
 const DOC_LABELS: Record<DocKey, string> = { aadhar: 'Aadhaar Card', pan: 'PAN Card', cheque: 'Cancelled Cheque' }
@@ -73,6 +84,7 @@ interface Associate {
   coordinator_id: string | null
   coordinator_name: string | null
   temp_password: string | null
+  activity_status?: ActivityStatus | null
   created_at: string
 }
 
@@ -97,6 +109,13 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [coordFilter, setCoordFilter] = useState('all') // 'all' | coordinator name | 'unassigned'
+  // Approved-tab performance filters
+  const [filterActivity, setFilterActivity] = useState('')        // '' | active | inactive | hold
+  const [filterAdmissions, setFilterAdmissions] = useState('')    // '' | none | 1 | 5 | 10
+  const [filterActiveStudents, setFilterActiveStudents] = useState('') // '' | none | some
+  const [filterRevenue, setFilterRevenue] = useState('')          // '' | none | 10000 | 50000 | 100000
+  const [sortBy, setSortBy] = useState('')                        // '' | admissions | active | revenue
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [pageSize, setPageSize] = useState(20)
   // Page is remembered per filter combination, so changing any filter lands back on page 1
   const [pageState, setPageState] = useState({ key: '', page: 1 })
@@ -216,14 +235,45 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
     } finally { setDeleting(false) }
   }
 
+  async function setActivityStatus(a: Associate, value: ActivityStatus) {
+    setStatusSavingId(a.id)
+    const { error } = await db.from('associates')
+      .update({ activity_status: value, updated_at: new Date().toISOString() }).eq('id', a.id)
+    setStatusSavingId(null)
+    if (error) { toast.error(error.message); return }
+    setAssociates(prev => prev.map(x => x.id === a.id ? { ...x, activity_status: value } : x))
+    toast.success(`${a.name} marked ${ACTIVITY_LABELS[value]}`)
+  }
+
   const base = lockedStatus ? associates.filter(a => a.status === lockedStatus) : associates
+  const showStats = lockedStatus === 'approved'
+
+  // Per-associate admissions / active students / revenue.
+  // students.referred_by_associate holds either the associate's id or its code.
+  const statsByAssoc = new Map<string, typeof EMPTY_STATS>()
+  {
+    const keyToId = new Map<string, string>()
+    associates.forEach(a => { keyToId.set(a.id, a.id); if (a.associate_code) keyToId.set(a.associate_code, a.id) })
+    for (const s of aggStudents) {
+      const id = keyToId.get(s.referred_by_associate)
+      if (!id) continue
+      const st = statsByAssoc.get(id) ?? { ...EMPTY_STATS }
+      st.admissions += 1
+      if (s.status === 'active') st.active += 1
+      st.revenue += s.total_fee ?? 0
+      st.received += s.amount_paid ?? 0
+      statsByAssoc.set(id, st)
+    }
+  }
+  const statsOf = (a: Associate) => statsByAssoc.get(a.id) ?? EMPTY_STATS
+  const activityOf = (a: Associate): ActivityStatus => a.activity_status ?? 'active'
 
   const allStates = [...new Set(base.map(a => a.state).filter(Boolean))].sort() as string[]
   const allDistricts = [...new Set(
     base.filter(a => !filterState || a.state === filterState).map(a => a.district).filter(Boolean)
   )].sort() as string[]
 
-  const filtered = base.filter(a => {
+  const matched = base.filter(a => {
     const q = search.toLowerCase()
     const matchSearch = !q ||
       a.name.toLowerCase().includes(q) ||
@@ -238,11 +288,35 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
     return matchSearch && matchCoord &&
       (!filterState || a.state === filterState) &&
       (!filterDistrict || a.district === filterDistrict) &&
-      (!filterStatus || a.status === filterStatus)
+      (!filterStatus || a.status === filterStatus) &&
+      matchStats(a)
   })
 
+  function matchStats(a: Associate) {
+    const st = statsOf(a)
+    return (!filterActivity || activityOf(a) === filterActivity) &&
+      (!filterAdmissions || (filterAdmissions === 'none' ? st.admissions === 0 : st.admissions >= Number(filterAdmissions))) &&
+      (!filterActiveStudents || (filterActiveStudents === 'none' ? st.active === 0 : st.active > 0)) &&
+      (!filterRevenue || (filterRevenue === 'none' ? st.revenue === 0 : st.revenue >= Number(filterRevenue)))
+  }
+
+  // Highest first; ties keep the newest-first server order
+  const filtered = sortBy
+    ? [...matched].sort((x, y) => {
+        const key = sortBy as 'admissions' | 'active' | 'revenue'
+        return statsOf(y)[key] - statsOf(x)[key]
+      })
+    : matched
+
+  const statsFiltersOn = !!(filterActivity || filterAdmissions || filterActiveStudents || filterRevenue || sortBy)
+  function clearFilters() {
+    setSearch(''); setFilterState(''); setFilterDistrict(''); setFilterStatus('')
+    setFilterActivity(''); setFilterAdmissions(''); setFilterActiveStudents(''); setFilterRevenue(''); setSortBy('')
+  }
+
   // ── Pagination ──
-  const filterKey = [search, filterState, filterDistrict, filterStatus, coordFilter, pageSize].join('|')
+  const filterKey = [search, filterState, filterDistrict, filterStatus, coordFilter, pageSize,
+    filterActivity, filterAdmissions, filterActiveStudents, filterRevenue, sortBy].join('|')
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(pageState.key === filterKey ? pageState.page : 1, totalPages)
   const pageStart = (safePage - 1) * pageSize
@@ -266,6 +340,13 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
       City: a.city ?? '',
       Institution: a.institution_name ?? '',
       Status: a.status.charAt(0).toUpperCase() + a.status.slice(1),
+      ...(showStats ? {
+        'Associate Status': ACTIVITY_LABELS[activityOf(a)],
+        'Total Admissions': statsOf(a).admissions,
+        'Active Students': statsOf(a).active,
+        'Total Revenue': statsOf(a).revenue,
+        'Received': statsOf(a).received,
+      } : {}),
       'Wallet Balance': a.wallet_balance ?? 0,
       'Joined On': new Date(a.created_at).toLocaleDateString('en-IN'),
     }))
@@ -401,9 +482,48 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
           <option value="">All Districts</option>
           {allDistricts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        {(search || filterState || filterDistrict || filterStatus) && (
-          <button onClick={() => { setSearch(''); setFilterState(''); setFilterDistrict(''); setFilterStatus('') }}
-            className="text-xs text-blue-600 hover:underline px-1">Clear</button>
+        {showStats && (
+          <>
+            <select value={filterActivity} onChange={e => setFilterActivity(e.target.value)}
+              className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32" title="Associate status">
+              <option value="">All Assoc. Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Non Active</option>
+              <option value="hold">Hold</option>
+            </select>
+            <select value={filterAdmissions} onChange={e => setFilterAdmissions(e.target.value)}
+              className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32" title="Total admissions">
+              <option value="">All Admissions</option>
+              <option value="none">No admissions</option>
+              <option value="1">1+ admissions</option>
+              <option value="5">5+ admissions</option>
+              <option value="10">10+ admissions</option>
+            </select>
+            <select value={filterActiveStudents} onChange={e => setFilterActiveStudents(e.target.value)}
+              className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32" title="Active students">
+              <option value="">All Active Students</option>
+              <option value="some">Has active students</option>
+              <option value="none">No active students</option>
+            </select>
+            <select value={filterRevenue} onChange={e => setFilterRevenue(e.target.value)}
+              className="border rounded-lg px-2 h-8 text-xs bg-white min-w-32" title="Total revenue">
+              <option value="">All Revenue</option>
+              <option value="none">No revenue</option>
+              <option value="10000">₹10,000+</option>
+              <option value="50000">₹50,000+</option>
+              <option value="100000">₹1,00,000+</option>
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="border rounded-lg px-2 h-8 text-xs bg-white min-w-36" title="Sort">
+              <option value="">Sort: Newest</option>
+              <option value="admissions">Sort: Most Admissions</option>
+              <option value="active">Sort: Most Active Students</option>
+              <option value="revenue">Sort: Highest Revenue</option>
+            </select>
+          </>
+        )}
+        {(search || filterState || filterDistrict || filterStatus || statsFiltersOn) && (
+          <button onClick={clearFilters} className="text-xs text-blue-600 hover:underline px-1">Clear</button>
         )}
       </div>
 
@@ -417,6 +537,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
         </div>
       ) : (
         <div className="rounded-xl border overflow-hidden bg-white">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b">
               <tr>
@@ -426,7 +547,16 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Coordinator</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">State / District</th>
-                <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
+                {showStats ? (
+                  <>
+                    <th className="text-center px-3 py-3 font-semibold text-slate-600 whitespace-nowrap">Total Admissions</th>
+                    <th className="text-center px-3 py-3 font-semibold text-slate-600 whitespace-nowrap">Active Students</th>
+                    <th className="text-right px-3 py-3 font-semibold text-slate-600 whitespace-nowrap">Total Revenue</th>
+                    <th className="text-center px-3 py-3 font-semibold text-slate-600 whitespace-nowrap">Associate Status</th>
+                  </>
+                ) : (
+                  <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
+                )}
                 <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
               </tr>
             </thead>
@@ -451,7 +581,37 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                     {a.district ? <p className="text-[11px] text-slate-400">{a.district}</p> : null}
                     {!a.state && !a.district && <span className="text-slate-400 text-xs">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
+                  {showStats ? (() => {
+                    const st = statsOf(a)
+                    const act = activityOf(a)
+                    return (
+                      <>
+                        <td className="px-3 py-3 text-center font-semibold tabular-nums text-gray-900">{st.admissions}</td>
+                        <td className="px-3 py-3 text-center tabular-nums">
+                          <span className={st.active > 0 ? 'font-semibold text-green-700' : 'text-slate-400'}>{st.active}</span>
+                        </td>
+                        <td className="px-3 py-3 text-right whitespace-nowrap">
+                          <p className="font-semibold tabular-nums text-gray-900">{inr(st.revenue)}</p>
+                          {st.revenue > 0 && <p className="text-[10px] text-slate-400 tabular-nums">Rcvd {inr(st.received)}</p>}
+                        </td>
+                        <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          {canSeeAllAssociates ? (
+                            <select value={act} disabled={statusSavingId === a.id}
+                              onChange={e => setActivityStatus(a, e.target.value as ActivityStatus)}
+                              className={`border rounded-full px-2 h-7 text-xs font-semibold cursor-pointer disabled:opacity-50 ${ACTIVITY_STYLES[act]}`}>
+                              <option value="active">Active</option>
+                              <option value="inactive">Non Active</option>
+                              <option value="hold">Hold</option>
+                            </select>
+                          ) : (
+                            <span className={`inline-block border rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTIVITY_STYLES[act]}`}>{ACTIVITY_LABELS[act]}</span>
+                          )}
+                        </td>
+                      </>
+                    )
+                  })() : (
+                    <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
+                  )}
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       {a.status === 'approved' && (
@@ -482,6 +642,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
               ))}
             </tbody>
           </table>
+          </div>
           {filtered.length === 0 && (
             <div className="text-center py-10 text-sm text-slate-400">No associates match these filters</div>
           )}

@@ -298,7 +298,7 @@ export default function TaskManager() {
                         <p className={`font-semibold text-sm ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
                           {task.title}
                         </p>
-                        {task.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>}
+                        {task.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-3 whitespace-pre-line">{task.description}</p>}
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <Badge variant="outline" className={`text-[10px] gap-1 ${urg.color}`}>

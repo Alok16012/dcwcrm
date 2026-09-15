@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { toast } from 'sonner'
 import {
   Plus, CheckCircle2, Clock, AlertTriangle, Zap, Star,
-  User, Calendar, SlidersHorizontal, ClipboardList,
+  User, Calendar, SlidersHorizontal, ClipboardList, Pencil, Trash2,
 } from 'lucide-react'
 
 type Urgency = 'low' | 'medium' | 'high' | 'urgent'
@@ -23,7 +23,7 @@ interface Task {
   urgency: Urgency; assigned_to: string; assigned_to_name: string
   assigned_to_associate_id: string | null
   created_by: string; created_by_name: string
-  due_date: string; status: Status; rating: number | null
+  due_date: string; reminder_date: string | null; status: Status; rating: number | null
   completion_note: string | null; created_at: string
 }
 
@@ -46,6 +46,51 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
     </div>
   )
 }
+
+// Description is a numbered checklist: Enter continues "1. 2. 3.", Enter on an
+// empty item ends the list. Consecutive numbered lines are kept in sequence.
+const NUM_LINE = /^(\s*)(\d+)\.\s?/
+
+function renumber(text: string) {
+  let n = 0
+  return text.split('\n').map(line => {
+    const m = line.match(NUM_LINE)
+    if (!m) { n = 0; return line }
+    n += 1
+    return `${m[1]}${n}. ${line.slice(m[0].length)}`
+  }).join('\n')
+}
+
+function handleListKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>, setValue: (v: string) => void) {
+  if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+  const el = e.currentTarget
+  const { value, selectionStart, selectionEnd } = el
+  const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
+  const line = value.slice(lineStart, selectionStart)
+  const m = line.match(NUM_LINE)
+  if (!m) return
+  e.preventDefault()
+
+  let next: string
+  let caret: number
+  if (line.slice(m[0].length).trim() === '' && value.slice(selectionEnd).split('\n')[0].trim() === '') {
+    // Empty item: drop the number and stop the list
+    next = value.slice(0, lineStart) + value.slice(selectionEnd)
+    caret = lineStart
+  } else {
+    const insert = `\n${m[1]}${Number(m[2]) + 1}. `
+    next = value.slice(0, selectionStart) + insert + value.slice(selectionEnd)
+    caret = selectionStart + insert.length
+  }
+  const renumbered = renumber(next)
+  caret += renumbered.slice(0, caret).length - next.slice(0, caret).length
+  setValue(renumbered)
+  requestAnimationFrame(() => el.setSelectionRange(caret, caret))
+}
+
+// Strip trailing empty list items like "3. " before saving
+const cleanDescription = (text: string) =>
+  text.split('\n').filter(l => !/^\s*\d+\.\s*$/.test(l)).join('\n').trim() || null
 
 const today = () => new Date().toISOString().slice(0, 10)
 function isToday(d: string) { return d === today() }
@@ -71,6 +116,11 @@ export default function TasksPage() {
   const [createOpen, setCreateOpen]   = useState(false)
   const [form, setForm]               = useState({ title: '', description: '', urgency: 'medium' as Urgency, assigned_to: '', due_date: '', reminder_date: '' })
   const [saving, setSaving]           = useState(false)
+  // New tasks can go to several people at once — one task row per person
+  const [assignTo, setAssignTo]       = useState<string[]>([])
+  // When set, the create dialog edits this task instead of creating a new one
+  const [editTask, setEditTask]       = useState<Task | null>(null)
+  const [deletingId, setDeletingId]   = useState<string | null>(null)
 
   // Done dialog
   const [doneTask, setDoneTask]       = useState<Task | null>(null)
@@ -104,37 +154,101 @@ export default function TasksPage() {
   useEffect(() => { load() }, [load])
 
   async function createTask() {
-    if (!form.title.trim() || !form.assigned_to || !form.due_date) {
-      toast.error('Title, assignee and due date are required'); return
+    const chosen = assignees.filter(a => assignTo.includes(a.id))
+    if (!form.title.trim() || chosen.length === 0 || !form.due_date) {
+      toast.error('Title, at least one person and due date are required'); return
     }
     setSaving(true)
-    const assignee = assignees.find(a => a.id === form.assigned_to)!
-    const payload: any = {
-      title: form.title.trim(), description: form.description.trim() || null,
+    const payloads = chosen.map(assignee => ({
+      title: form.title.trim(), description: cleanDescription(form.description),
       urgency: form.urgency,
       assigned_to: assignee.user_id, assigned_to_name: assignee.name,
       assigned_to_associate_id: assignee.type === 'associate' ? assignee.associate_id : null,
       created_by: meId, created_by_name: meName,
       due_date: form.due_date, reminder_date: form.reminder_date || null, status: 'pending',
-    }
-    const { data, error } = await db.from('tasks').insert(payload).select().single()
+    }))
+    const { data, error } = await db.from('tasks').insert(payloads).select()
     if (error) { toast.error('Failed to create task'); setSaving(false); return }
 
-    // Notify associate if task assigned to one
-    if (assignee.type === 'associate' && assignee.associate_id) {
-      await db.from('associate_notifications').insert({
-        associate_id: assignee.associate_id,
+    // Notify every associate the task went to
+    const notifications = chosen
+      .filter(a => a.type === 'associate' && a.associate_id)
+      .map(a => ({
+        associate_id: a.associate_id,
         title: `New Task: ${form.title.trim()}`,
         message: `Due: ${fmtDate(form.due_date)}. Assigned by ${meName}.`,
-      })
-    }
+      }))
+    if (notifications.length) await db.from('associate_notifications').insert(notifications)
 
-    toast.success('Task created!')
-    if (assignee.user_id === meId) setMyTasks(prev => [data as Task, ...prev])
-    else setCreatedTasks(prev => [data as Task, ...prev])
-    setForm({ title: '', description: '', urgency: 'medium', assigned_to: '', due_date: '', reminder_date: '' })
+    const created = (data ?? []) as Task[]
+    toast.success(created.length > 1 ? `Task assigned to ${created.length} people` : 'Task created!')
+    setMyTasks(prev => [...created.filter(t => t.assigned_to === meId), ...prev])
+    setCreatedTasks(prev => [...created.filter(t => t.assigned_to !== meId), ...prev])
+    setForm(EMPTY_FORM)
+    setAssignTo([])
     setCreateOpen(false)
     setSaving(false)
+  }
+
+  const EMPTY_FORM = { title: '', description: '', urgency: 'medium' as Urgency, assigned_to: '', due_date: '', reminder_date: '' }
+
+  function openCreate() {
+    setEditTask(null)
+    setForm(EMPTY_FORM)
+    setAssignTo([])
+    setCreateOpen(true)
+  }
+
+  function openEdit(task: Task) {
+    const assignee = assignees.find(a =>
+      task.assigned_to_associate_id ? a.associate_id === task.assigned_to_associate_id : a.type === 'staff' && a.user_id === task.assigned_to)
+    setEditTask(task)
+    setForm({
+      title: task.title, description: task.description ?? '', urgency: task.urgency,
+      assigned_to: assignee?.id ?? '', due_date: task.due_date, reminder_date: task.reminder_date ?? '',
+    })
+    setCreateOpen(true)
+  }
+
+  async function updateTask() {
+    if (!editTask) return
+    if (!form.title.trim() || !form.assigned_to || !form.due_date) {
+      toast.error('Title, assignee and due date are required'); return
+    }
+    const assignee = assignees.find(a => a.id === form.assigned_to)
+    if (!assignee) { toast.error('Select who this task is assigned to'); return }
+    setSaving(true)
+    const patch = {
+      title: form.title.trim(), description: cleanDescription(form.description),
+      urgency: form.urgency,
+      assigned_to: assignee.user_id, assigned_to_name: assignee.name,
+      assigned_to_associate_id: assignee.type === 'associate' ? assignee.associate_id : null,
+      due_date: form.due_date, reminder_date: form.reminder_date || null,
+    }
+    const { data, error } = await db.from('tasks').update(patch).eq('id', editTask.id).select().single()
+    setSaving(false)
+    if (error || !data) { toast.error('Failed to update task'); return }
+    const updated = data as Task
+    // The assignee may have changed, so re-bucket the task between the two tabs
+    setMyTasks(prev => updated.assigned_to === meId
+      ? (prev.some(t => t.id === updated.id) ? prev.map(t => t.id === updated.id ? updated : t) : [updated, ...prev])
+      : prev.filter(t => t.id !== updated.id))
+    setCreatedTasks(prev => updated.assigned_to !== meId
+      ? (prev.some(t => t.id === updated.id) ? prev.map(t => t.id === updated.id ? updated : t) : [updated, ...prev])
+      : prev.filter(t => t.id !== updated.id))
+    toast.success('Task updated')
+    setEditTask(null); setForm(EMPTY_FORM); setCreateOpen(false)
+  }
+
+  async function deleteTask(task: Task) {
+    if (!window.confirm(`Delete this task?\n\n${task.title}`)) return
+    setDeletingId(task.id)
+    const { error } = await db.from('tasks').delete().eq('id', task.id)
+    setDeletingId(null)
+    if (error) { toast.error('Failed to delete task'); return }
+    setMyTasks(prev => prev.filter(t => t.id !== task.id))
+    setCreatedTasks(prev => prev.filter(t => t.id !== task.id))
+    toast.success('Task deleted')
   }
 
   async function startTask(id: string) {
@@ -164,7 +278,7 @@ export default function TasksPage() {
           title="My Tasks"
           description={`${pendingMine.length} pending${todayCount ? ` · ${todayCount} due today` : ''}${overdueCount ? ` · ${overdueCount} overdue` : ''}`}
         />
-        <Button onClick={() => setCreateOpen(true)} className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-9 text-sm">
+        <Button onClick={openCreate} className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-9 text-sm">
           <Plus className="w-4 h-4" /> New Task
         </Button>
       </div>
@@ -216,13 +330,25 @@ export default function TasksPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <p className={`font-semibold text-sm ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
-                      <div className="flex gap-1.5 flex-shrink-0">
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {task.created_by === meId && (
+                          <>
+                            <button onClick={() => openEdit(task)} title="Edit task"
+                              className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => deleteTask(task)} disabled={deletingId === task.id} title="Delete task"
+                              className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
                         <Badge variant="outline" className={`text-[10px] gap-1 ${urg.color}`}>{urg.icon}{urg.label}</Badge>
                         {task.status === 'done' && <Badge variant="outline" className="text-[10px] bg-green-100 text-green-700 border-green-200">Done</Badge>}
                         {task.status === 'in_progress' && <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-200">In Progress</Badge>}
                       </div>
                     </div>
-                    {task.description && <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>}
+                    {task.description && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{task.description}</p>}
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap text-xs">
                       {tab === 'created' && <span className="flex items-center gap-1 text-slate-500"><User className="w-3 h-3" />{task.assigned_to_name}</span>}
                       {tab === 'mine' && <span className="text-muted-foreground">by {task.created_by_name}</span>}
@@ -256,12 +382,23 @@ export default function TasksPage() {
       )}
 
       {/* Create Dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={open => { setCreateOpen(open); if (!open) setEditTask(null) }}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Plus className="w-5 h-5 text-blue-600" /> New Task</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {editTask ? <><Pencil className="w-5 h-5 text-blue-600" /> Edit Task</> : <><Plus className="w-5 h-5 text-blue-600" /> New Task</>}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 mt-1">
             <div><Label className="text-xs mb-1.5">Title *</Label><Input placeholder="e.g. Follow up with student…" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></div>
-            <div><Label className="text-xs mb-1.5">Description</Label><Textarea placeholder="Details…" rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="resize-none" /></div>
+            <div>
+              <Label className="text-xs mb-1.5">Description <span className="text-slate-400 font-normal">(press Enter for next point)</span></Label>
+              <Textarea placeholder="1. 100 calls" rows={4} value={form.description}
+                onFocus={() => { if (!form.description) setForm(p => ({ ...p, description: '1. ' })) }}
+                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                onKeyDown={e => handleListKeyDown(e, v => setForm(p => ({ ...p, description: v })))}
+                className="resize-y min-h-24" />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs mb-1.5">Urgency *</Label>
                 <select value={form.urgency} onChange={e => setForm(p => ({ ...p, urgency: e.target.value as Urgency }))}
@@ -269,22 +406,59 @@ export default function TasksPage() {
                   <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
                 </select>
               </div>
-              <div><Label className="text-xs mb-1.5">Assign To *</Label>
-                <select value={form.assigned_to} onChange={e => setForm(p => ({ ...p, assigned_to: e.target.value }))}
-                  className="w-full h-9 rounded-md border border-input px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Select person…</option>
-                  <optgroup label="Staff">{assignees.filter(a => a.type === 'staff').map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>
-                  <optgroup label="Associates">{assignees.filter(a => a.type === 'associate').map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>
-                </select>
-              </div>
+              {editTask && (
+                <div><Label className="text-xs mb-1.5">Assign To *</Label>
+                  <select value={form.assigned_to} onChange={e => setForm(p => ({ ...p, assigned_to: e.target.value }))}
+                    className="w-full h-9 rounded-md border border-input px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select person…</option>
+                    <optgroup label="Staff">{assignees.filter(a => a.type === 'staff').map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>
+                    <optgroup label="Associates">{assignees.filter(a => a.type === 'associate').map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>
+                  </select>
+                </div>
+              )}
             </div>
+            {!editTask && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="text-xs">Assign To * <span className="text-slate-400 font-normal">(tick one or more)</span></Label>
+                  {assignTo.length > 0 && (
+                    <button type="button" onClick={() => setAssignTo([])} className="text-[11px] text-blue-600 hover:underline">
+                      {assignTo.length} selected · Clear
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-44 overflow-y-auto rounded-md border border-input p-2 space-y-2">
+                  {(['staff', 'associate'] as const).map(type => {
+                    const group = assignees.filter(a => a.type === type)
+                    if (group.length === 0) return null
+                    return (
+                      <div key={type}>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 px-1 mb-1">{type === 'staff' ? 'Staff' : 'Associates'}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2">
+                          {group.map(a => (
+                            <label key={a.id} className={`flex items-center gap-2 px-1.5 py-1 rounded text-sm cursor-pointer ${assignTo.includes(a.id) ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50'}`}>
+                              <input type="checkbox" className="h-4 w-4 accent-blue-600"
+                                checked={assignTo.includes(a.id)}
+                                onChange={() => setAssignTo(prev => prev.includes(a.id) ? prev.filter(x => x !== a.id) : [...prev, a.id])} />
+                              <span className="truncate">{a.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs mb-1.5">Due Date *</Label><Input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} /></div>
               <div><Label className="text-xs mb-1.5">Reminder Date</Label><Input type="date" value={form.reminder_date} onChange={e => setForm(p => ({ ...p, reminder_date: e.target.value }))} /></div>
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={createTask} disabled={saving}>{saving ? 'Creating…' : 'Create Task'}</Button>
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={editTask ? updateTask : createTask} disabled={saving}>
+                {editTask ? (saving ? 'Saving…' : 'Save Changes') : (saving ? 'Creating…' : 'Create Task')}
+              </Button>
             </div>
           </div>
         </DialogContent>

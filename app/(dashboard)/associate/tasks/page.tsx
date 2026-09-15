@@ -172,7 +172,7 @@ export default function AssociateTasksPage() {
                       </Badge>
                     </div>
                     {task.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{task.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 flex-wrap text-xs">
                       <span className={`flex items-center gap-1 font-medium ${

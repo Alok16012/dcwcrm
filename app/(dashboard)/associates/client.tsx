@@ -17,6 +17,15 @@ import { CreateAssociateDialog } from '@/components/associates/CreateAssociateDi
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
+/** Display-only: a bare 10-digit number gets the +91 country code; anything else is shown as stored. */
+const fmtPhone = (raw: string | null | undefined) => {
+  if (!raw) return '—'
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) return `+91 ${digits}`
+  if (digits.length === 12 && digits.startsWith('91')) return `+91 ${digits.slice(2)}`
+  return raw
+}
+
 type AStatus = 'pending' | 'approved' | 'rejected'
 
 interface Associate {
@@ -371,6 +380,7 @@ export default function AssociatesClient() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b">
                   <tr>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 w-14">S.No</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Email</th>
@@ -380,10 +390,11 @@ export default function AssociatesClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {associates.map(a => (
+                  {associates.map((a, idx) => (
                     <tr key={a.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{idx + 1}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{a.name}</td>
-                      <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{a.phone}</td>
+                      <td className="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">{fmtPhone(a.phone)}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{a.email}</td>
                       <td className="px-4 py-3 text-slate-400 text-xs hidden lg:table-cell">
                         {new Date(a.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -484,7 +495,7 @@ export default function AssociatesClient() {
           {selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <D label="Full Name" value={selected.name} /><D label="Phone" value={selected.phone} />
+                <D label="Full Name" value={selected.name} /><D label="Phone" value={fmtPhone(selected.phone)} />
                 <D label="Father's Name" value={selected.father_name ?? selected.father_phone} /><D label="Email" value={selected.email} />
                 <D label="Aadhaar" value={selected.aadhar_number} /><D label="PAN" value={selected.pan_number} />
                 <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Location</div>

@@ -2,6 +2,9 @@
   "name": "crmrahul",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -50,6 +53,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "railway": "^3.11.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -56,3 +56,9 @@ next-env.d.ts
 /android/dcw-release.keystore
 *.keystore
 *.aab
+
+# Biometric bridge agent: ship the template, never the filled-in secrets or the
+# on-disk retry queue.
+!agent/.env.example
+agent/.env
+agent/queue.jsonl

@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, CalendarCheck, Banknote, Wallet } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Wallet, Fingerprint } from 'lucide-react'
 
 const TABS = [
   { href: '/hrms',            label: 'Employees',  icon: Users,         exact: true },
   { href: '/hrms/attendance', label: 'Attendance', icon: CalendarCheck, exact: false },
   { href: '/hrms/payroll',    label: 'Payroll',    icon: Banknote,      exact: false },
   { href: '/hrms/advances',   label: 'Advances',   icon: Wallet,        exact: false },
+  { href: '/hrms/biometric',  label: 'Biometric',  icon: Fingerprint,   exact: false },
 ]
 
 export default function HrmsNav() {

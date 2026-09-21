@@ -82,6 +82,7 @@ function SourceBadge({ lead }: { lead: Lead }) {
   const meta = lead.metadata as { ivr_agent?: string; associate_name?: string; associate_code?: string } | undefined
   const via = lead.source === 'ivr' ? meta?.ivr_agent
     : lead.source === 'associate' ? meta?.associate_name
+    : lead.source === 'referral' ? lead.referred_by ?? undefined
     : undefined
   const code = lead.source === 'associate' ? meta?.associate_code : undefined
 
@@ -89,10 +90,10 @@ function SourceBadge({ lead }: { lead: Lead }) {
     <div className="flex flex-col gap-0.5 items-start">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${LEAD_SOURCE_COLORS[lead.source] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
         {lead.source === 'ivr' && <PhoneIncoming className="w-2.5 h-2.5 flex-shrink-0" />}
-        {lead.source === 'associate' && <UserCheck className="w-2.5 h-2.5 flex-shrink-0" />}
+        {(lead.source === 'associate' || lead.source === 'referral') && <UserCheck className="w-2.5 h-2.5 flex-shrink-0" />}
         {label}
       </span>
-      {via && <span className="text-[10px] text-gray-400 pl-1">via {via}{code ? ` (${code})` : ''}</span>}
+      {via && <span className="text-[10px] text-gray-400 pl-1">{lead.source === 'referral' ? 'by' : 'via'} {via}{code ? ` (${code})` : ''}</span>}
     </div>
   )
 }
@@ -258,7 +259,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
     if (rows.length === 0) { setExporting(false); return }
 
     const headers = [
-      'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source',
+      'Full Name', 'Phone', 'Email', 'City', 'Status', 'Source', 'Referred By', 'Referrer Phone',
       'Mode', 'Department', 'University/Board', 'Course', 'Sub-Course', 'Assigned To', 'Date Added'
     ]
 
@@ -269,6 +270,8 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
       l.city ?? '',
       statusLabel(l),
       LEAD_SOURCE_LABELS[l.source] ?? l.source,
+      l.referred_by ?? '',
+      l.referred_by_phone ?? '',
       l.mode ?? '',
       l.department?.name ?? '',
       l.sub_section?.name ?? '',

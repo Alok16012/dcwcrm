@@ -261,6 +261,13 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                 <div><p className="text-gray-500">Course</p><p className="font-medium">{lead.course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Sub-course</p><p className="font-medium">{lead.sub_course?.name ?? '-'}</p></div>
                 <div><p className="text-gray-500">Source</p><p className="font-medium">{LEAD_SOURCE_LABELS[lead.source]}</p></div>
+                {(lead.referred_by || lead.referred_by_phone) && (
+                  <div>
+                    <p className="text-gray-500">Referred By</p>
+                    <p className="font-medium">{lead.referred_by ?? '-'}</p>
+                    {lead.referred_by_phone && <p className="text-xs text-gray-500">{lead.referred_by_phone}</p>}
+                  </div>
+                )}
                 <div><p className="text-gray-500">Assigned To</p><p className="font-medium">{lead.assigned_user?.full_name ?? 'Unassigned'}</p></div>
                 <div>
                   <p className="text-gray-500 mb-1">Assign to Associate</p>

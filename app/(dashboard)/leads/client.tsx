@@ -110,9 +110,9 @@ export function LeadsClient() {
     if (filters.followup_from) query = query.gte('next_followup_date', filters.followup_from)
     if (filters.followup_to) query = query.lte('next_followup_date', filters.followup_to)
 
-    // Server-side text search across name / phone / email
+    // Server-side text search across name / phone / email / referrer
     const term = searchTerm.trim().replace(/[,()*]/g, ' ').trim()
-    if (term) query = query.or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`)
+    if (term) query = query.or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%`)
 
     return query
   }, [filters, currentProfile, sortDir, searchTerm])

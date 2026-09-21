@@ -4,7 +4,7 @@ import { ingestLead } from '@/lib/leads/ingest'
 import { sendLeadToMeta } from '@/lib/meta/capi'
 
 // Keys that map directly onto lead columns; everything else -> metadata.
-const RESERVED = new Set(['full_name', 'phone', 'email', 'city', 'state'])
+const RESERVED = new Set(['full_name', 'phone', 'email', 'city', 'state', 'referred_by', 'referred_by_phone'])
 
 interface FormField {
   key: string
@@ -57,6 +57,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Referral forms (alumni sharing a student) are not ad traffic: the source
+    // is fixed by the form, and neither ad platform may claim the lead.
+    const isReferral = (form as { source: string }).source === 'referral'
+
     // Which ad platform sent this visitor.
     //
     // Google auto-tagging appends ?gclid= to every paid click, and Meta
@@ -65,10 +69,10 @@ export async function POST(req: NextRequest) {
     // submission was stored as Meta, including the Google ones, which
     // made the channel column useless.
     const url = typeof page_url === 'string' ? page_url : ''
-    const isGoogle = /[?&](gclid|gbraid|wbraid)=/.test(url)
-      || /[?&]utm_source=google/i.test(url)
-    const channel = isGoogle ? 'google_ads' : 'meta_ads'
-    const channelLabel = isGoogle ? 'Google Ads' : 'Meta Ads'
+    const isGoogle = !isReferral && (/[?&](gclid|gbraid|wbraid)=/.test(url)
+      || /[?&]utm_source=google/i.test(url))
+    const channel = isReferral ? 'referral' : isGoogle ? 'google_ads' : 'meta_ads'
+    const channelLabel = isReferral ? 'Alumni Referral' : isGoogle ? 'Google Ads' : 'Meta Ads'
 
     // Map values to lead columns / metadata
     const lead: Record<string, string> = {}
@@ -92,14 +96,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
     }
 
+    if (isReferral) {
+      if (!lead.referred_by) {
+        return NextResponse.json({ error: 'Referred by is required' }, { status: 400 })
+      }
+      if (lead.referred_by_phone && lead.referred_by_phone.replace(/\D/g, '').length < 10) {
+        return NextResponse.json({ error: 'Please enter a valid 10-digit mobile number for the referrer' }, { status: 400 })
+      }
+      // Also kept in metadata: a repeat enquiry for an existing lead logs its
+      // metadata under last_enquiry, and must not lose who referred it.
+      metadata.referred_by = lead.referred_by
+      if (lead.referred_by_phone) metadata.referred_by_phone = lead.referred_by_phone
+    }
+
     await ingestLead(supabase, {
       full_name: fullName,
       phone,
       email: lead.email ?? null,
       city: lead.city ?? null,
       state: lead.state ?? null,
-      // Channel detected from the URL wins over the form's default:
-      // one form is used by both Google and Meta campaigns.
+      referred_by: lead.referred_by ?? null,
+      referred_by_phone: lead.referred_by_phone ?? null,
+      // For ad forms the channel detected from the URL wins over the form's
+      // default: one form is used by both Google and Meta campaigns.
       source: channel,
       metadata,
     })
@@ -109,8 +128,9 @@ export async function POST(req: NextRequest) {
     //
     // Google-sourced leads are deliberately not reported. Feeding Meta
     // conversions it never delivered teaches its bidding to chase traffic
-    // that came from somewhere else entirely.
-    if (!isGoogle) await sendLeadToMeta({
+    // that came from somewhere else entirely. Referrals are not ad traffic
+    // either.
+    if (!isGoogle && !isReferral) await sendLeadToMeta({
       eventId: event_id || crypto.randomUUID(),
       email: lead.email ?? null,
       phone,

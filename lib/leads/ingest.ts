@@ -7,6 +7,9 @@ export interface IngestLeadInput {
   city?: string | null
   state?: string | null
   source?: string
+  /** Who referred this lead (alumni referral form) — kept for incentives. */
+  referred_by?: string | null
+  referred_by_phone?: string | null
   metadata?: Record<string, unknown>
   /**
    * Skip round-robin and hand the lead to this profile. Used by the IVR
@@ -34,7 +37,7 @@ type ExistingLead = {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  google_ads: 'Google Ads', meta_ads: 'Meta Ads', walk_in: 'Walk-in', ivr: 'IVR call',
+  google_ads: 'Google Ads', meta_ads: 'Meta Ads', walk_in: 'Walk-in', ivr: 'IVR call', referral: 'Alumni referral',
 }
 
 /** The counsellor with the fewest leads from this source today (IST). */
@@ -202,6 +205,9 @@ export async function ingestLead(
     city: input.city ?? null,
     state: input.state ?? null,
     source,
+    // Only sent when present, so ordinary leads never touch the new columns.
+    ...(input.referred_by ? { referred_by: input.referred_by } : {}),
+    ...(input.referred_by_phone ? { referred_by_phone: input.referred_by_phone } : {}),
     status: 'new',
     metadata: input.metadata ?? {},
     assigned_to: assignedTo,

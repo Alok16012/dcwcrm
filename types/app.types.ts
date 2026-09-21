@@ -157,6 +157,8 @@ export interface Lead {
   status: LeadStatus
   custom_status?: string | null
   source: LeadSource
+  referred_by?: string | null
+  referred_by_phone?: string | null
   assigned_to?: string
   assigned_at?: string
   next_followup_date?: string

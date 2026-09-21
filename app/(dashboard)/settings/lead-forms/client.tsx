@@ -48,9 +48,16 @@ const SAVE_TARGETS = [
   { value: 'email', label: 'Email' },
   { value: 'city', label: 'City' },
   { value: 'state', label: 'State' },
+  { value: 'referred_by', label: 'Referred by (name)' },
+  { value: 'referred_by_phone', label: 'Referred by (phone)' },
   { value: 'extra', label: 'Extra info (notes)' },
 ]
-const RESERVED = new Set(['full_name', 'phone', 'email', 'city', 'state'])
+const RESERVED = new Set(['full_name', 'phone', 'email', 'city', 'state', 'referred_by', 'referred_by_phone'])
+
+const FORM_SOURCES = [
+  { value: 'meta_ads', label: 'Ads (Meta / Google — detected from link)' },
+  { value: 'referral', label: 'Alumni Referral' },
+]
 
 const INPUT_TYPES = [
   { value: 'text', label: 'Text' },
@@ -230,6 +237,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
   const [subtitle, setSubtitle] = useState(form.subtitle ?? '')
   const [successMsg, setSuccessMsg] = useState(form.success_message ?? '')
   const [fields, setFields] = useState<FormField[]>(form.fields ?? [])
+  const [source, setSource] = useState(form.source || 'meta_ads')
   const [saving, setSaving] = useState(false)
   const [view, setView] = useState<'edit' | 'preview'>('edit') // small-screen toggle
   const supabase = createClient()
@@ -324,6 +332,11 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
       return
     }
 
+    if (source === 'referral' && !cleanFields.some((f) => f.key === 'referred_by' && f.required)) {
+      toast.error('A required "Referred by (name)" field is needed on a referral form')
+      return
+    }
+
     setSaving(true)
     const payload = {
       slug: finalSlug,
@@ -331,7 +344,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
       subtitle: subtitle.trim() || null,
       fields: cleanFields,
       success_message: successMsg.trim() || DEFAULT_SUCCESS,
-      source: 'meta_ads',
+      source,
       is_active: form.is_active,
     }
 
@@ -369,6 +382,7 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
         options: f.type === 'select' ? (f.options ?? []).map((o) => o.trim()).filter(Boolean) : undefined,
       })) as PublicForm['fields'],
     success_message: successMsg || DEFAULT_SUCCESS,
+    source,
   }
 
   return (
@@ -401,6 +415,23 @@ function FormBuilder({ form, existingSlugs, onClose, onSaved }: {
               <div>
                 <Label>Subtitle (optional)</Label>
                 <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Fill this and we'll call you back" />
+              </div>
+              <div>
+                <Label>Lead Source</Label>
+                <Select value={source} onValueChange={(v) => setSource(v || 'meta_ads')}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue>{FORM_SOURCES.find((o) => o.value === source)?.label ?? source}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORM_SOURCES.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {!FORM_SOURCES.some((o) => o.value === source) && <SelectItem value={source}>{source}</SelectItem>}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {source === 'referral'
+                    ? 'Leads are saved as Referral with the referrer\'s name and phone. No ad tracking runs on this form.'
+                    : 'Leads are labelled Meta Ads or Google Ads based on the ad click.'}
+                </p>
               </div>
               <div>
                 <Label>Public Link (slug)</Label>

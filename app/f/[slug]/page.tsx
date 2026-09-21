@@ -14,7 +14,7 @@ function getForm(slug: string) {
   )
   return supabase
     .from('lead_capture_forms')
-    .select('slug, title, subtitle, fields, success_message, terms, is_active')
+    .select('slug, title, subtitle, fields, success_message, terms, source, is_active')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle()
@@ -35,10 +35,12 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
   const { slug } = await params
   const { data: form } = await getForm(slug)
   if (!form) notFound()
+  // Referral forms are not ad landing pages — no ad pixels.
+  const isReferral = (form as { source?: string }).source === 'referral'
   return (
     <>
-      <MetaPixel />
-      <GoogleAds />
+      {!isReferral && <MetaPixel />}
+      {!isReferral && <GoogleAds />}
       <PublicLeadForm form={form as unknown as PublicForm} />
     </>
   )

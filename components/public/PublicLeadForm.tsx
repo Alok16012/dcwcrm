@@ -20,6 +20,8 @@ export interface PublicForm {
   success_message?: string | null
   /** Offer conditions, one per line. Required when the offer promises a refund. */
   terms?: string | null
+  /** 'referral' forms are not ad traffic, so no ad pixels or conversions fire. */
+  source?: string | null
 }
 
 const COMPANY = {
@@ -58,10 +60,16 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
         return
       }
     }
-    const phoneField = form.fields.find((f) => f.type === 'phone' || f.key === 'phone')
-    if (phoneField) {
-      const digits = String(values[phoneField.key] ?? '').replace(/\D/g, '')
-      if (digits.length < 10) { setError('Please enter a valid 10-digit mobile number'); return }
+    const phoneFields = form.fields.filter((f) => f.type === 'phone' || f.key === 'phone')
+    for (const pf of phoneFields) {
+      const raw = String(values[pf.key] ?? '')
+      // The first phone field is the lead's own number and always checked;
+      // any further one (e.g. the referrer's) only when filled in.
+      if (pf !== phoneFields[0] && !raw.trim()) continue
+      if (raw.replace(/\D/g, '').length < 10) {
+        setError(phoneFields.length > 1 ? `Please enter a valid 10-digit number for ${pf.label}` : 'Please enter a valid 10-digit mobile number')
+        return
+      }
     }
 
     setSubmitting(true)
@@ -86,15 +94,18 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
       // so only Google hears about it. Reporting it to both would have each
       // platform claiming the same lead.
       const fromGoogle = /[?&](gclid|gbraid|wbraid)=/.test(window.location.search)
-      if (!fromGoogle) {
-        // Browser-side Meta Pixel Lead event (if the pixel is configured)
-        try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
+      // Alumni referrals are not ad traffic: nothing is reported to either platform.
+      if (form.source !== 'referral') {
+        if (!fromGoogle) {
+          // Browser-side Meta Pixel Lead event (if the pixel is configured)
+          try { window.fbq?.('track', 'Lead', {}, { eventID: eventId }) } catch { /* non-critical */ }
+        }
+        // Google Ads, same place and for the same reason: only after a 2xx.
+        // Firing on submit would count every rejected and rate-limited
+        // attempt as a lead, and the campaign would learn to chase whatever
+        // produces broken submissions.
+        try { reportConversion('formSubmit', { value: 200, currency: 'INR' }) } catch { /* non-critical */ }
       }
-      // Google Ads, same place and for the same reason: only after a 2xx.
-      // Firing on submit would count every rejected and rate-limited
-      // attempt as a lead, and the campaign would learn to chase whatever
-      // produces broken submissions.
-      try { reportConversion('formSubmit', { value: 200, currency: 'INR' }) } catch { /* non-critical */ }
       setDone(data.message ?? form.success_message ?? 'Thank you! Our team will contact you shortly.')
     } catch {
       setError('Network error — please try again')

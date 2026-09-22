@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { methodLabel } from './dahua'
+import { evaluateDay, loadHrmsSettings, type HrmsSettings } from '@/lib/hrms/attendance-rules'
 
 /** Service-role client; these writes bypass RLS by design. */
 type Db = SupabaseClient<any, any, any>
@@ -17,12 +18,6 @@ type Db = SupabaseClient<any, any, any>
 /** A punch shorter than this after the previous one is the same person being
  *  recognised twice while standing at the door, not a real second event. */
 const MIN_SPAN_SECONDS = Number(process.env.BIOMETRIC_MIN_SPAN_SECONDS ?? 120)
-
-/** Minutes of presence that count as a full day — matches the self-punch UI. */
-const FULL_DAY_MINUTES = Number(process.env.BIOMETRIC_FULL_DAY_MINUTES ?? 360)
-
-/** Clock-in after this IST time marks the day 'late' (still fully paid). */
-const LATE_AFTER = process.env.BIOMETRIC_LATE_AFTER ?? ''
 
 export interface RawPunchInput {
   /** UserID as configured on the controller. */
@@ -91,12 +86,6 @@ function toDate(ts: string | number): Date | null {
   if (Number.isFinite(numeric) && /^\d+$/.test(ts.trim())) return toDate(numeric)
   const d = new Date(ts)
   return Number.isNaN(d.getTime()) ? null : d
-}
-
-function minutesBetween(from: string, to: string): number {
-  const [fh, fm] = from.split(':').map(Number)
-  const [th, tm] = to.split(':').map(Number)
-  return th * 60 + tm - (fh * 60 + fm)
 }
 
 // ---------------------------------------------------------------- devices ---
@@ -266,8 +255,9 @@ export async function ingestPunches(
       .eq('id', device.id)
   }
 
+  const settings = await loadHrmsSettings(db)
   for (const { employeeId, date } of affected.values()) {
-    const ok = await recomputeAttendance(db, employeeId, date, device?.id ?? null)
+    const ok = await recomputeAttendance(db, employeeId, date, device?.id ?? null, settings)
     if (ok) result.attendanceUpdated++
   }
 
@@ -287,8 +277,10 @@ export async function recomputeAttendance(
   db: Db,
   employeeId: string,
   date: string,
-  deviceId: string | null = null
+  deviceId: string | null = null,
+  settings?: HrmsSettings
 ): Promise<boolean> {
+  const rules = settings ?? await loadHrmsSettings(db)
   const { data: punches, error } = await db
     .from('biometric_punches')
     .select('punch_time, punched_at')
@@ -317,30 +309,43 @@ export async function recomputeAttendance(
     .eq('date', date)
     .maybeSingle()
 
-  const locked = existing && ['leave', 'holiday'].includes((existing as { status: string }).status)
+  // A day a human marked as leave/holiday keeps that verdict; the punch times
+  // are still recorded underneath it.
+  const HUMAN_SET = ['leave', 'holiday', 'cl', 'sl', 'lwp']
+  const locked = existing && HUMAN_SET.includes((existing as { status: string }).status)
 
-  let status = 'present'
-  if (clockOut) {
-    const worked = minutesBetween(clockIn.slice(0, 5), clockOut.slice(0, 5))
-    status = worked >= FULL_DAY_MINUTES ? 'present' : worked > 0 ? 'half_day' : 'absent'
-  }
-  if (status === 'present' && LATE_AFTER && clockIn.slice(0, 5) > LATE_AFTER.slice(0, 5)) {
-    status = 'late'
-  }
+  const verdict = evaluateDay(
+    { date, clockIn: clockIn.slice(0, 5), clockOut: clockOut ? clockOut.slice(0, 5) : null },
+    rules,
+  )
 
   const payload: Record<string, unknown> = {
     employee_id: employeeId,
     date,
     clock_in: clockIn,
     clock_out: clockOut,
-    status: locked ? (existing as { status: string }).status : status,
+    status: locked ? (existing as { status: string }).status : verdict.status,
+    auto_status: verdict.status,
+    work_minutes: verdict.workMinutes,
+    late_minutes: verdict.lateMinutes,
+    early_minutes: verdict.earlyMinutes,
+    computed_at: new Date().toISOString(),
     source: 'biometric',
     biometric_device_id: deviceId,
   }
 
-  const { error: upsertErr } = await db
+  let { error: upsertErr } = await db
     .from('attendance')
     .upsert(payload as never, { onConflict: 'employee_id,date' })
+
+  // Before migration 107 the engine columns don't exist yet — save the day
+  // without them rather than losing the punch rollup entirely.
+  if (upsertErr && /auto_status|work_minutes|late_minutes|early_minutes|computed_at/.test(upsertErr.message ?? '')) {
+    const { auto_status, work_minutes, late_minutes, early_minutes, computed_at, ...legacy } = payload
+    ;({ error: upsertErr } = await db
+      .from('attendance')
+      .upsert(legacy as never, { onConflict: 'employee_id,date' }))
+  }
 
   return !upsertErr
 }

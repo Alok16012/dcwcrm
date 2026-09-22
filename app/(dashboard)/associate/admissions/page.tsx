@@ -235,7 +235,8 @@ export default function AssociateAdmissionsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(l => {
+          <p className="text-xs text-gray-400">Showing {filtered.length} of {leads.length}</p>
+          {filtered.map((l, idx) => {
             const st = STATUS_CFG[l.status] ?? STATUS_CFG['new']!
             const Icon = st.icon
             const isExpanded = expanded === l.id
@@ -245,6 +246,7 @@ export default function AssociateAdmissionsPage() {
                   className="w-full flex items-center gap-4 px-5 py-4 text-left"
                   onClick={() => setExpanded(isExpanded ? null : l.id)}
                 >
+                  <span className="w-6 shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{idx + 1}</span>
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${st.color.split(' ')[0]}`}>
                     <Icon className={`w-4 h-4 ${st.color.split(' ')[1]}`} />
                   </div>

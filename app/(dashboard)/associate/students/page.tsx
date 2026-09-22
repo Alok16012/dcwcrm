@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import {
   Search, GraduationCap, ChevronDown, ChevronUp,
-  FileText, Award,
+  FileText, Award, Phone, X,
 } from 'lucide-react'
 import { STUDENT_LIFECYCLE, getLifecycleStage, StudentLifecycle } from '@/components/shared/StudentLifecycle'
 
@@ -35,6 +35,10 @@ export default function AssociateStudentsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [filterCourse, setFilterCourse] = useState('')
+  const [filterBoard, setFilterBoard] = useState('')
+  const [filterVerification, setFilterVerification] = useState('')
+  const [filterFee, setFilterFee] = useState('')   // '' | due | clear
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,12 +98,34 @@ export default function AssociateStudentsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = students.filter(s =>
-    !search ||
-    s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.enrollment_number?.toLowerCase().includes(search.toLowerCase()) ||
-    s.phone?.includes(search)
-  )
+  const dueOf = (s: Student) => (s.total_fee ?? 0) - (s.amount_paid ?? 0)
+  const boardOf = (s: Student) => s.board_name || s.university_name || ''
+
+  const courseOptions = [...new Set(students.map(s => s.course?.name).filter(Boolean))].sort() as string[]
+  const boardOptions = [...new Set(students.map(boardOf).filter(Boolean))].sort()
+  const verificationOptions = [...new Set(students.map(s => s.verification_status).filter(Boolean))].sort()
+
+  const filtered = students.filter(s => {
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      s.full_name.toLowerCase().includes(q) ||
+      s.enrollment_number?.toLowerCase().includes(q) ||
+      s.phone?.includes(search)
+    return matchSearch &&
+      (!filterCourse || s.course?.name === filterCourse) &&
+      (!filterBoard || boardOf(s) === filterBoard) &&
+      (!filterVerification || s.verification_status === filterVerification) &&
+      (!filterFee || (filterFee === 'due' ? dueOf(s) > 0 : dueOf(s) <= 0))
+  })
+
+  const filtersOn = !!(search || filterCourse || filterBoard || filterVerification || filterFee)
+  const clearFilters = () => {
+    setSearch(''); setFilterCourse(''); setFilterBoard(''); setFilterVerification(''); setFilterFee('')
+  }
+
+  const sumFee = filtered.reduce((a, s) => a + (s.total_fee ?? 0), 0)
+  const sumPaid = filtered.reduce((a, s) => a + (s.amount_paid ?? 0), 0)
+  const sumDue = filtered.reduce((a, s) => a + Math.max(0, dueOf(s)), 0)
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -131,10 +157,51 @@ export default function AssociateStudentsPage() {
         <p className="text-sm text-gray-400 mt-0.5">{students.length} admitted students with lifecycle tracking</p>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input placeholder="Search name, enrollment, phone…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+      {/* Filters */}
+      <div className="bg-white border rounded-2xl p-3 flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Search name, enrollment, phone…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+        </div>
+        {courseOptions.length > 0 && (
+          <select value={filterCourse} onChange={e => setFilterCourse(e.target.value)} className={selectCls}>
+            <option value="">All Courses</option>
+            {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        {boardOptions.length > 0 && (
+          <select value={filterBoard} onChange={e => setFilterBoard(e.target.value)} className={selectCls}>
+            <option value="">All Boards / Universities</option>
+            {boardOptions.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        )}
+        {verificationOptions.length > 0 && (
+          <select value={filterVerification} onChange={e => setFilterVerification(e.target.value)} className={selectCls}>
+            <option value="">All Verification</option>
+            {verificationOptions.map(v => <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>)}
+          </select>
+        )}
+        <select value={filterFee} onChange={e => setFilterFee(e.target.value)} className={selectCls}>
+          <option value="">All Fees</option>
+          <option value="due">Fee due</option>
+          <option value="clear">Fee clear</option>
+        </select>
+        {filtersOn && (
+          <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-blue-600 hover:underline px-1">
+            <X className="w-3 h-3" /> Clear
+          </button>
+        )}
       </div>
+
+      {/* Totals for whatever is filtered */}
+      {!loading && students.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <MiniStat label="Students" value={String(filtered.length)} tone="indigo" />
+          <MiniStat label="Total Fee" value={fmt(sumFee)} tone="blue" />
+          <MiniStat label="Received" value={fmt(sumPaid)} tone="emerald" />
+          <MiniStat label="Pending" value={fmt(sumDue)} tone={sumDue > 0 ? 'red' : 'emerald'} />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -148,7 +215,7 @@ export default function AssociateStudentsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(s => {
+          {filtered.map((s, idx) => {
             const isExpanded = expanded === s.id
             const pending = (s.total_fee ?? 0) - s.amount_paid
             const done = getLifecycleStage(s)
@@ -161,6 +228,7 @@ export default function AssociateStudentsPage() {
                   className="w-full flex items-center gap-4 px-5 py-4 text-left"
                   onClick={() => setExpanded(isExpanded ? null : s.id)}
                 >
+                  <span className="w-6 shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{idx + 1}</span>
                   <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center shrink-0">
                     <GraduationCap className="w-4 h-4 text-indigo-600" />
                   </div>
@@ -169,6 +237,15 @@ export default function AssociateStudentsPage() {
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-xs font-mono text-gray-400">{s.enrollment_number}</span>
                       {s.course && <span className="text-xs text-gray-400">· {s.course.name}</span>}
+                      {boardOf(s) && <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">{boardOf(s)}</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-gray-500">
+                      {s.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-gray-300" />{s.phone}</span>}
+                      {!!s.total_fee && <span className="tabular-nums">Fee {fmt(s.amount_paid ?? 0)} / {fmt(s.total_fee)}</span>}
+                      <span className={`font-semibold ${s.verification_status === 'verified' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {s.verification_status.replace(/_/g, ' ')}
+                      </span>
+                      {s.dispatched && <span className="text-emerald-600 font-semibold">· dispatched</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -259,6 +336,24 @@ export default function AssociateStudentsPage() {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+const selectCls = 'border rounded-lg px-2 h-9 text-xs bg-white text-gray-700 min-w-36'
+
+const MINI_TONES: Record<string, string> = {
+  indigo: 'bg-indigo-50 border-indigo-100 text-indigo-700',
+  blue: 'bg-blue-50 border-blue-100 text-blue-700',
+  emerald: 'bg-emerald-50 border-emerald-100 text-emerald-700',
+  red: 'bg-red-50 border-red-100 text-red-700',
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className={`border rounded-xl px-3 py-2 ${MINI_TONES[tone] ?? MINI_TONES.blue}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{label}</p>
+      <p className="text-sm font-bold mt-0.5 tabular-nums">{value}</p>
     </div>
   )
 }

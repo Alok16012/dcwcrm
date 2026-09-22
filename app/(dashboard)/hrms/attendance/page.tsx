@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getMonth, getYear, format, addDays } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import AttendanceGrid from '@/components/hrms/AttendanceGrid'
+import RecalculateAttendanceButton from '@/components/hrms/RecalculateAttendanceButton'
 import type { AttendanceStatus } from '@/types/app.types'
 
 export const dynamic = 'force-dynamic'
@@ -96,9 +97,12 @@ export default async function AttendancePage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Attendance</h1>
-        <p className="text-sm text-muted-foreground">Cycle-wise attendance for all employees</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Attendance</h1>
+          <p className="text-sm text-muted-foreground">Cycle-wise attendance for all employees</p>
+        </div>
+        <RecalculateAttendanceButton from={fromStr} to={toStr} />
       </div>
       <AttendanceGrid
         data={data}

@@ -32,9 +32,18 @@ const STATUS_META: Record<AttendanceStatus, { label: string; full: string; cell:
   late:     { label: 'L',  full: 'Late',     cell: 'bg-orange-100 text-orange-800', chip: 'bg-orange-500 text-white' },
   leave:    { label: 'LV', full: 'Leave',    cell: 'bg-blue-100 text-blue-800',     chip: 'bg-blue-600 text-white' },
   holiday:  { label: 'HD', full: 'Holiday',  cell: 'bg-gray-200 text-gray-600',     chip: 'bg-gray-500 text-white' },
+  weekly_off:        { label: 'WO', full: 'Weekly Off',        cell: 'bg-slate-200 text-slate-600',   chip: 'bg-slate-500 text-white' },
+  weekly_off_worked: { label: 'W+', full: 'Weekly Off Worked', cell: 'bg-teal-100 text-teal-800',     chip: 'bg-teal-600 text-white' },
+  holiday_worked:    { label: 'H+', full: 'Holiday Worked',    cell: 'bg-teal-100 text-teal-800',     chip: 'bg-teal-600 text-white' },
+  missing:           { label: '!',  full: 'Attendance Missing',cell: 'bg-amber-100 text-amber-800',   chip: 'bg-amber-600 text-white' },
+  cl:                { label: 'CL', full: 'Casual Leave',      cell: 'bg-blue-100 text-blue-800',     chip: 'bg-blue-600 text-white' },
+  sl:                { label: 'SL', full: 'Sick Leave',        cell: 'bg-violet-100 text-violet-800', chip: 'bg-violet-600 text-white' },
+  lwp:               { label: 'LW', full: 'Leave Without Pay', cell: 'bg-rose-100 text-rose-800',     chip: 'bg-rose-600 text-white' },
 }
 
-const ALL_STATUSES: AttendanceStatus[] = ['present', 'absent', 'half_day', 'late', 'leave', 'holiday']
+const ALL_STATUSES: AttendanceStatus[] = [
+  'present', 'absent', 'half_day', 'late', 'cl', 'sl', 'lwp', 'leave', 'holiday', 'weekly_off',
+]
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function getDatesInRange(start: string, end: string): string[] {

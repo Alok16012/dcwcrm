@@ -43,6 +43,9 @@ export type ExamType =
 
 export type AttendanceStatus =
   | 'present' | 'absent' | 'half_day' | 'late' | 'leave' | 'holiday'
+  // Decided by the HRMS attendance engine (see lib/hrms/attendance-rules.ts)
+  | 'weekly_off' | 'weekly_off_worked' | 'holiday_worked' | 'missing'
+  | 'cl' | 'sl' | 'lwp'
 
 export type ExpenseCategory =
   | 'rent' | 'utilities' | 'marketing' | 'travel' | 'salary' | 'vendor' | 'misc' | 'other'
@@ -429,6 +432,13 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   late: 'Late',
   leave: 'Leave',
   holiday: 'Holiday',
+  weekly_off: 'Weekly Off',
+  weekly_off_worked: 'Weekly Off Worked',
+  holiday_worked: 'Holiday Worked',
+  missing: 'Attendance Missing',
+  cl: 'Casual Leave',
+  sl: 'Sick Leave',
+  lwp: 'Leave Without Pay',
 }
 
 export function formatCurrency(amount: number): string {

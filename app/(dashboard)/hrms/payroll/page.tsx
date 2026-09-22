@@ -3,6 +3,7 @@ import { format, getMonth, getYear } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
 import PayrollTable from '@/components/hrms/PayrollTable'
 import PayrollMonthSelector from '@/components/hrms/PayrollMonthSelector'
+import PayrollGenerateButton from '@/components/hrms/PayrollGenerateButton'
 
 // Roles that draw a salary from HRMS payroll (students/associates are separate)
 const INTERNAL_ROLES = ['admin', 'lead', 'telecaller', 'counselor', 'backend', 'housekeeping']
@@ -181,7 +182,10 @@ export default async function PayrollPage({
             {' · '}{rows.length} employee{rows.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <PayrollMonthSelector month={month} year={year} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <PayrollMonthSelector month={month} year={year} />
+          <PayrollGenerateButton month={month} year={year} />
+        </div>
       </div>
       <PayrollTable data={rows} isAdmin={profile.role === 'admin'} />
     </div>

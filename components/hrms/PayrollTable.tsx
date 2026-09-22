@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { Download, Mail, Trash2, Loader2, RefreshCw } from 'lucide-react'
+import { Download, Mail, Trash2, Loader2, RefreshCw, Lock, Unlock } from 'lucide-react'
 import { toast } from 'sonner'
 import { pdf } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/client'
@@ -78,6 +79,7 @@ export default function PayrollTable({
   const [year, setYear] = useState(new Date().getFullYear())
 
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const supabase = createClient()
 
   const updatePayrollField = (id: string, field: 'hra' | 'allowances' | 'incentive', value: number) => {
@@ -352,6 +354,29 @@ export default function PayrollTable({
   const selProcessed = selectedRows.filter((r) => r.status === 'processed')
   const selDeletable = selectedRows.filter((r) => r.status !== 'paid')
 
+  /**
+   * Lock / unlock go through the API so they are audited; unlocking always
+   * needs a reason (requirement doc §20, §29).
+   */
+  async function runWorkflow(action: 'lock' | 'unlock') {
+    const ids = selectedRows.map(r => r.id)
+    if (ids.length === 0) return
+    let reason = ''
+    if (action === 'unlock') {
+      reason = window.prompt('Unlock ka reason likho (audit log me jayega):') ?? ''
+      if (!reason.trim()) { toast.error('Reason ke bina unlock nahi hoga'); return }
+    }
+    const res = await fetch('/api/hrms/payroll/workflow', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, action, reason }),
+    })
+    const json = await res.json()
+    if (!res.ok) { toast.error(json.error ?? 'Failed'); return }
+    toast.success(action === 'lock' ? `${ids.length} payroll rows locked` : `${ids.length} rows unlocked`)
+    clearSelection()
+    startTransition(() => router.refresh())
+  }
+
   // Bulk status change on the selected rows only
   const updateSelectedStatus = (from: 'draft' | 'processed', to: 'processed' | 'paid') => {
     const ids = selectedRows.filter((r) => r.status === from).map((r) => r.id)
@@ -445,6 +470,14 @@ export default function PayrollTable({
               disabled={isPending || selDeletable.length === 0}
               onClick={() => setConfirmDeleteSelected(true)}>
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete{selDeletable.length ? ` (${selDeletable.length})` : ''}
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPending}
+              onClick={() => runWorkflow('lock')}>
+              <Lock className="mr-1 h-3.5 w-3.5" /> Lock
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPending}
+              onClick={() => runWorkflow('unlock')}>
+              <Unlock className="mr-1 h-3.5 w-3.5" /> Unlock
             </Button>
             <Button size="sm" variant="ghost" disabled={isPending} onClick={clearSelection}>Clear</Button>
           </div>

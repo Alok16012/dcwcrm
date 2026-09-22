@@ -1,209 +1,125 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
-import { cycleWindow, cycleIncentive } from '@/lib/payroll/cycle'
+import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'
+import { computePayroll, countAttendance } from '@/lib/hrms/payroll'
+import { writeAudit } from '@/lib/hrms/audit'
 
-type ExistingPayroll = {
-    id: string
-    incentive: number | null
-    status: string | null
-}
+/**
+ * Generate (or refresh) payroll for a month from the attendance that is
+ * already on the calendar — requirement doc §18 and §32 step 7.
+ *
+ * Locked rows are left alone: once payroll is locked it only changes through
+ * an explicit unlock, which is itself audited.
+ */
+export const runtime = 'nodejs'
 
-type ProfileRole = {
-    role: string | null
-}
-
-type EmployeeSalary = {
-    basic_salary: number | null
-    hra: number | null
-    allowances: number | null
-    pf_deduction: number | null
-    tds_deduction: number | null
-    other_deductions: number | null
-    salary_cycle_start_day: number | null
-    profile_id: string
-}
-
-type AttendanceRow = {
-    status: string | null
-}
-
-type AdvanceRow = {
-    id: string
-    amount: number | null
-}
-
-type GeneratePayrollBody = {
-    employee_id?: string
-    month?: number
-    year?: number
-    incentive?: number | string | null
-}
+type Db = { from: (t: string) => any }
 
 export async function POST(req: NextRequest) {
-    try {
-        const supabase = await createServerClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: ProfileRole | null }
-        if (!['admin', 'backend'].includes(profile?.role ?? '')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = (await supabase
+    .from('profiles').select('role, full_name').eq('id', user.id).single()) as
+    { data: { role: string; full_name: string } | null }
+  if (!profile || !['admin', 'backend'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
-        const body = await req.json() as GeneratePayrollBody
-        const { employee_id, month, year, incentive } = body
+  let body: { month?: number; year?: number }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const month = Number(body.month), year = Number(body.year)
+  if (!(month >= 1 && month <= 12) || !(year >= 2000 && year <= 2100)) {
+    return NextResponse.json({ error: 'Valid month (1-12) and year are required' }, { status: 400 })
+  }
 
-        if (!employee_id || !month || !year) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-        }
+  const db = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  ) as unknown as Db
 
-        // Fetch employee structured salary and cycle preference
-        const empRes = await supabase
-            .from('employees')
-            .select('basic_salary, hra, allowances, pf_deduction, tds_deduction, other_deductions, salary_cycle_start_day, profile_id')
-            .eq('id', employee_id)
-            .single()
-        const emp = empRes.data as EmployeeSalary | null
-        const empErr = empRes.error
+  const settings = await loadHrmsSettings(db as never)
+  const from = `${year}-${String(month).padStart(2, '0')}-01`
+  const to = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 
-        if (empErr || !emp) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+  const [{ data: employees }, { data: attendance }, { data: existing }, { data: advances }] = await Promise.all([
+    db.from('employees')
+      .select('id, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions')
+      .eq('is_active', true),
+    db.from('attendance').select('employee_id, status').gte('date', from).lte('date', to),
+    db.from('payroll').select('id, employee_id, is_locked').eq('month', month).eq('year', year),
+    db.from('advance_salaries').select('employee_id, monthly_deduction, status').eq('status', 'active'),
+  ])
 
-        const basic = emp.basic_salary || 0
-        const hra = emp.hra || 0
-        const allow = emp.allowances || 0
-        const pf = emp.pf_deduction || 0
-        const tds = emp.tds_deduction || 0
-        const od = emp.other_deductions || 0
-        const startDay = emp.salary_cycle_start_day || 1
-        const { start: startStr, end: endStr } = cycleWindow(month, year, startDay)
+  const byEmp = new Map<string, { status: string }[]>()
+  for (const a of (attendance ?? []) as { employee_id: string; status: string }[]) {
+    if (!byEmp.has(a.employee_id)) byEmp.set(a.employee_id, [])
+    byEmp.get(a.employee_id)!.push({ status: a.status })
+  }
+  const lockedBy = new Map<string, boolean>()
+  const idByEmp = new Map<string, string>()
+  for (const p of (existing ?? []) as { id: string; employee_id: string; is_locked: boolean }[]) {
+    lockedBy.set(p.employee_id, p.is_locked)
+    idByEmp.set(p.employee_id, p.id)
+  }
+  const advanceByEmp = new Map<string, number>()
+  for (const a of (advances ?? []) as { employee_id: string; monthly_deduction: number | null }[]) {
+    advanceByEmp.set(a.employee_id, Number(a.monthly_deduction ?? 0))
+  }
 
-        // Fetch attendance for this range
-        const { data: attendance } = await supabase
-            .from('attendance')
-            .select('status')
-            .eq('employee_id', employee_id)
-            .gte('date', startStr)
-            .lte('date', endStr)
+  let generated = 0, skippedLocked = 0
+  const now = new Date().toISOString()
 
-        const attendanceRows = (attendance ?? []) as AttendanceRow[]
-        const attCounts = attendanceRows.reduce(
-            (acc, a) => {
-                const s = a.status ?? ''
-                if (s === 'present') acc.present++
-                else if (s === 'late') acc.late++
-                else if (s === 'absent') acc.absent++
-                else if (s === 'half_day') acc.half_day++
-                else if (s === 'leave') acc.leave++
-                else if (s === 'holiday') acc.holiday++
-                return acc
-            },
-            { present: 0, late: 0, absent: 0, half_day: 0, leave: 0, holiday: 0 }
-        )
-        // Loss-of-pay days: absent = full day, leave = full day, half-day = 0.5 day.
-        // present / late / holiday are fully paid.
-        const lopDays = attCounts.absent + attCounts.leave + attCounts.half_day * 0.5
-        // Per-day rate = full monthly salary (basic + HRA + allowances) over 26 working days.
-        const perDayRate = (basic + hra + allow) / 26
-        const leaveDeduction = Math.round(perDayRate * lopDays)
+  for (const e of (employees ?? []) as Record<string, any>[]) {
+    if (lockedBy.get(e.id)) { skippedLocked++; continue }
 
-        // Incentive for this cycle: admissions + approved mentorship payments.
-        const {
-            admission: admissionIncentive,
-            mentorship: mentorshipIncentive,
-            total: earnedIncentive,
-        } = await cycleIncentive(supabase, emp.profile_id, { start: startStr, end: endStr })
+    const counts = countAttendance(byEmp.get(e.id) ?? [])
+    const monthlySalary = Number(e.basic_salary ?? 0)
+    const advanceRecovery = advanceByEmp.get(e.id) ?? 0
 
-        const inc = earnedIncentive || Number(incentive) || 0
+    const b = computePayroll({
+      monthlySalary,
+      counts,
+      additions: { hra: Number(e.hra ?? 0), allowances: Number(e.allowances ?? 0), incentive: Number(e.incentive ?? 0) },
+      statutory: { pf: Number(e.pf_deduction ?? 0), tds: Number(e.tds_deduction ?? 0), other: Number(e.other_deductions ?? 0) },
+      advanceRecovery,
+      settings,
+    })
 
-        const { data: existing } = await supabase
-            .from('payroll')
-            .select('id, incentive, status')
-            .eq('employee_id', employee_id)
-            .eq('month', month)
-            .eq('year', year)
-            .maybeSingle() as { data: ExistingPayroll | null }
-
-        // Salary advances recovered in this payroll: pending ones GIVEN ON OR
-        // BEFORE this cycle's end date (so an advance taken in a later month is
-        // not swept into an earlier cycle's payroll), plus (on regenerate) those
-        // already settled against this same payroll row.
-        let advQuery = supabase
-            .from('advance_salaries')
-            .select('id, amount')
-            .eq('employee_id', employee_id)
-        advQuery = existing
-            ? advQuery.or(`and(status.eq.pending,given_on.lte.${endStr}),settled_in.eq.${existing.id}`)
-            : advQuery.eq('status', 'pending').lte('given_on', endStr)
-        const { data: advRaw } = await advQuery
-        const advances = (advRaw ?? []) as AdvanceRow[]
-        const advanceDeduction = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
-
-        const gross = basic + hra + allow + inc
-        const net = gross - pf - tds - od - leaveDeduction - advanceDeduction
-
-        const payload = {
-            basic,
-            hra,
-            allowances: allow,
-            incentive: inc,
-            gross,
-            pf,
-            tds,
-            other_deductions: od,
-            leave_deduction: leaveDeduction,
-            advance_deduction: advanceDeduction,
-            net,
-        }
-
-        let payroll: Record<string, unknown> | null = null
-
-        if (existing) {
-            if (existing.status === 'paid') {
-                return NextResponse.json({ error: 'Payroll already paid for this month' }, { status: 400 })
-            }
-
-            // Regenerating recalculates everything fresh for this cycle. The old
-            // "merge" (keep-or-add) rule stacked stale incentives across
-            // regenerations and never corrected downwards.
-            const { data: updated, error: updateErr } = await supabase
-                .from('payroll')
-                .update({ ...payload, status: existing.status || 'draft' } as never)
-                .eq('id', existing.id)
-                .select('*')
-                .single()
-
-            if (updateErr) {
-                return NextResponse.json({ error: updateErr.message }, { status: 400 })
-            }
-            payroll = updated as Record<string, unknown>
-        } else {
-            const { data: inserted, error: insertErr } = await supabase
-                .from('payroll')
-                .insert({ employee_id, month, year, ...payload, status: 'draft' } as never)
-                .select('*')
-                .single()
-
-            if (insertErr) {
-                if (insertErr.code === '23505') {
-                    return NextResponse.json({ error: 'Payroll already generated for this month' }, { status: 400 })
-                }
-                return NextResponse.json({ error: insertErr.message }, { status: 400 })
-            }
-            payroll = inserted as Record<string, unknown>
-        }
-
-        // Link recovered advances to this payroll so deleting it releases them
-        if (advances.length && payroll) {
-            await supabase
-                .from('advance_salaries')
-                .update({ status: 'settled', settled_in: payroll.id } as never)
-                .in('id', advances.map(a => a.id))
-        }
-
-        return NextResponse.json({
-            payroll,
-            attendance: attCounts,
-            incentive_breakup: { admission: admissionIncentive, mentorship: mentorshipIncentive },
-        })
-    } catch {
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const row = {
+      employee_id: e.id, month, year,
+      basic: monthlySalary, hra: Number(e.hra ?? 0), allowances: Number(e.allowances ?? 0),
+      incentive: Number(e.incentive ?? 0),
+      gross: b.gross,
+      pf: Number(e.pf_deduction ?? 0), tds: Number(e.tds_deduction ?? 0),
+      other_deductions: Number(e.other_deductions ?? 0),
+      leave_deduction: b.lopDeduction,
+      late_deduction: b.lateDeduction,
+      advance_deduction: advanceRecovery,
+      net: b.net,
+      working_days: settings.working_days,
+      present_days: counts.present, late_days: counts.late, half_days: counts.half_day,
+      absent_days: counts.absent, cl_days: counts.cl, sl_days: counts.sl, lwp_days: counts.lwp,
+      weekly_offs: counts.weekly_off, holidays_count: counts.holiday,
+      per_day_salary: b.perDaySalary,
+      status: 'draft',
+      generated_at: now,
     }
+
+    const id = idByEmp.get(e.id)
+    const { error } = id
+      ? await db.from('payroll').update(row).eq('id', id)
+      : await db.from('payroll').insert(row)
+    if (!error) generated++
+  }
+
+  await writeAudit(db as never, {
+    entity: 'payroll', entityId: `${year}-${month}`, action: 'generated',
+    newValue: { generated, skippedLocked },
+    changedBy: user.id, changedByName: profile.full_name,
+  })
+
+  return NextResponse.json({ ok: true, month, year, generated, skippedLocked })
 }

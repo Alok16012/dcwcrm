@@ -104,6 +104,21 @@ DAHUA_PASSWORD=...
 BIOMETRIC_SYNC_LOOKBACK_HOURS=24
 ```
 
+## Failover between Railway and Vercel
+
+Both deployments run the same code against the same Supabase, and both hold
+`BIOMETRIC_WEBHOOK_SECRET`, so either can accept punches. Railway is where the
+agent points; Vercel is the URL staff use *and* a working standby.
+
+If Railway is down, change one line in `agent/.env` and restart the agent:
+
+```
+CRM_BASE_URL=https://crmrahul.vercel.app
+```
+
+Nothing is lost in the meantime — the agent queues to disk while the CRM is
+unreachable, and the device keeps its own log regardless.
+
 ## Deploying with the Railway CLI
 
 ```bash

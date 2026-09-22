@@ -3,13 +3,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileText, Download, Search, BookOpen, GraduationCap,
-  Image, Video, FileImage, Folder, ExternalLink, Filter,
+  Image, Video, FileImage, Folder, ExternalLink, Filter, Eye, Loader2,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
-type ResourceType = 'brochure' | 'fee_structure' | 'admission_form' | 'marketing' | 'poster' | 'reel' | 'training' | 'other'
+type ResourceType = 'prospectus' | 'pamphlet' | 'brochure' | 'fee_structure' | 'admission_form' | 'marketing' | 'poster' | 'reel' | 'training' | 'other'
 
 const RESOURCE_TYPE_CFG: Record<ResourceType | string, { label: string; icon: any; color: string; bg: string }> = {
+  prospectus:     { label: 'College Prospectus', icon: BookOpen,    color: 'text-blue-600',    bg: 'bg-blue-50' },
+  pamphlet:       { label: 'Pamphlet',         icon: FileImage,     color: 'text-violet-600',  bg: 'bg-violet-50' },
   brochure:       { label: 'Brochure',         icon: BookOpen,      color: 'text-blue-600',    bg: 'bg-blue-50' },
   fee_structure:  { label: 'Fee Structure',    icon: FileText,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
   admission_form: { label: 'Admission Form',   icon: GraduationCap, color: 'text-indigo-600',  bg: 'bg-indigo-50' },
@@ -27,6 +29,7 @@ interface Resource {
   type: string
   url: string
   file_size: string | null
+  department: string | null
   created_at: string
 }
 
@@ -37,11 +40,12 @@ export default function AssociateResourcesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
+  const [filterDept, setFilterDept] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await db.from('associate_resources')
-      .select('id, title, description, type, url, file_size, created_at')
+      .select('id, title, description, type, url, file_size, department, created_at')
       .eq('is_active', true)
       .order('type')
       .order('title')
@@ -54,7 +58,8 @@ export default function AssociateResourcesPage() {
   const filtered = resources.filter(r => {
     const matchSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.description?.toLowerCase().includes(search.toLowerCase())
     const matchType = !filterType || r.type === filterType
-    return matchSearch && matchType
+    const matchDept = !filterDept || (r.department ?? '') === filterDept
+    return matchSearch && matchType && matchDept
   })
 
   // Group by type
@@ -66,6 +71,7 @@ export default function AssociateResourcesPage() {
   }, {} as Record<string, Resource[]>)
 
   const availableTypes = [...new Set(resources.map(r => r.type))].filter(Boolean)
+  const availableDepts = [...new Set(resources.map(r => r.department).filter(Boolean))].sort() as string[]
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -80,6 +86,13 @@ export default function AssociateResourcesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input placeholder="Search resources…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
         </div>
+        {availableDepts.length > 0 && (
+          <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
+            className="border rounded-lg px-2 h-9 text-xs bg-white text-gray-700 min-w-40">
+            <option value="">All Departments</option>
+            {availableDepts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
         <div className="flex items-center gap-1.5 flex-wrap">
           <Filter className="w-3.5 h-3.5 text-gray-400" />
           <button
@@ -143,6 +156,28 @@ export default function AssociateResourcesPage() {
 
 function ResourceCard({ resource: r, cfg }: { resource: Resource; cfg: { icon: any; color: string; bg: string; label: string } }) {
   const Icon = cfg.icon
+  const [busy, setBusy] = useState(false)
+
+  // The file lives on another origin, so <a download> would just open it —
+  // fetch the bytes and save them under the resource's own name instead.
+  async function download() {
+    setBusy(true)
+    try {
+      const res = await fetch(r.url)
+      const blob = await res.blob()
+      const ext = (r.url.split('?')[0].split('.').pop() ?? 'pdf').slice(0, 5)
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = `${r.title.replace(/[^\w-]+/g, '_')}.${ext}`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(href), 1000)
+    } catch {
+      window.open(r.url, '_blank', 'noopener')
+    } finally {
+      setBusy(false)
+    }
+  }
   const isPdf = r.url?.toLowerCase().includes('.pdf') || r.url?.toLowerCase().includes('pdf')
   const isImage = /\.(jpg|jpeg|png|webp|gif)/.test(r.url?.toLowerCase() ?? '')
   const isVideo = /\.(mp4|mov|avi|webm)/.test(r.url?.toLowerCase() ?? '') || r.url?.includes('youtube') || r.url?.includes('vimeo')
@@ -156,21 +191,39 @@ function ResourceCard({ resource: r, cfg }: { resource: Resource; cfg: { icon: a
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{r.title}</p>
           {r.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">{r.description}</p>}
-          {r.file_size && <p className="text-[10px] text-gray-400 mt-1 font-medium">{r.file_size}</p>}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {r.department && (
+              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">{r.department}</span>
+            )}
+            {r.file_size && <span className="text-[10px] text-gray-400 font-medium">{r.file_size}</span>}
+          </div>
         </div>
-        <a
-          href={r.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-            isVideo
-              ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
-              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-          }`}
-        >
-          {isVideo ? <ExternalLink className="w-3 h-3" /> : <Download className="w-3 h-3" />}
-          {isVideo ? 'View' : 'Download'}
-        </a>
+        <div className="shrink-0 flex items-center gap-1.5">
+          <a
+            href={r.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={isVideo ? 'Open' : 'Preview'}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+              isVideo ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            {isVideo ? <ExternalLink className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            {isVideo ? 'Open' : 'Preview'}
+          </a>
+          {!isVideo && (
+            <button
+              type="button"
+              onClick={download}
+              disabled={busy}
+              title="Download"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-60"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              Download
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

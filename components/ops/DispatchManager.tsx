@@ -102,6 +102,9 @@ interface Dispatch {
   receiver_name: string | null
   receiver_relation: string | null
   receiver_phone: string | null
+  /** Courier/post counterparty: who it was sent to (outbound) or came from (inbound) */
+  party_name: string | null
+  party_address: string | null
   created_at: string
 }
 
@@ -143,6 +146,8 @@ const EMPTY_FORM = {
   receiver_name: '',
   receiver_relation: '',
   receiver_phone: '',
+  party_name: '',
+  party_address: '',
   documents: [newDocRow()] as DocRow[],
 }
 
@@ -325,6 +330,8 @@ export function DispatchManager() {
       tracking_number: d.tracking_number ?? '',
       dispatch_date: d.dispatch_date ?? '',
       expected_delivery: d.expected_delivery ?? '',
+      party_name: d.party_name ?? '',
+      party_address: d.party_address ?? '',
       received_by: d.received_by ?? '',
       receiver_name: d.receiver_name ?? '',
       receiver_relation: d.receiver_relation ?? '',
@@ -380,16 +387,19 @@ export function DispatchManager() {
       receiver_name: isPickup ? form.receiver_name.trim() || null : null,
       receiver_relation: form.received_by === 'guardian' ? form.receiver_relation || null : null,
       receiver_phone: isPickup ? form.receiver_phone.trim() || null : null,
+      // Only meaningful for courier / post
+      party_name: isPickup ? null : form.party_name.trim() || null,
+      party_address: isPickup ? null : form.party_address.trim() || null,
       dispatched_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     }
     // If the DB hasn't got the newer columns yet, drop them and retry once so
     // saving still works before the migration is applied.
     const stripNewCols = (obj: any) => {
-      const { father_name, received_by, receiver_name, receiver_relation, receiver_phone, ...rest } = obj
+      const { father_name, received_by, receiver_name, receiver_relation, receiver_phone, party_name, party_address, ...rest } = obj
       return rest
     }
-    const isMissingColErr = (e: any) => /father_name|received_by|receiver_/.test(e?.message ?? '') && /column|schema/.test(e?.message ?? '')
+    const isMissingColErr = (e: any) => /father_name|received_by|receiver_|party_/.test(e?.message ?? '') && /column|schema/.test(e?.message ?? '')
     try {
       if (editItem) {
         // Grouped edit: update kept docs, insert new ones, delete removed ones.
@@ -451,7 +461,9 @@ export function DispatchManager() {
 
     const isInbound = d.dispatch_type === 'inbound'
     const fmtDate = (v: string | null) => v ? format(new Date(v + 'T00:00:00'), 'dd MMM yyyy') : null
-    const docList = g.rows.map(r => `- ${docLabelOf(r.document_type)}`).join('\n')
+    const docList = g.rows
+      .map(r => `- ${docLabelOf(r.document_type)}${r.remarks ? ` (${r.remarks})` : ''}`)
+      .join('\n')
     const lines: string[] = []
     lines.push(`Dear ${d.student_name},`)
     lines.push('')
@@ -462,12 +474,15 @@ export function DispatchManager() {
     lines.push('')
     if (d.received_by === 'self') lines.push('Handed over to: Self (collected from office)')
     if (d.received_by === 'guardian') lines.push(`Handed over to: ${d.receiver_name ?? 'Guardian'}${d.receiver_relation ? ` (${d.receiver_relation})` : ''}${d.receiver_phone ? `, ${d.receiver_phone}` : ''}`)
+    if (d.party_name) lines.push(`${isInbound ? 'From' : 'To'}: ${d.party_name}`)
+    if (d.party_address) lines.push(`Address: ${d.party_address}`)
     if (d.courier) lines.push(`Courier: ${d.courier}`)
     if (d.tracking_number) lines.push(`Tracking No: ${d.tracking_number}`)
     const dd = fmtDate(d.dispatch_date)
     if (dd) lines.push(`${isInbound ? 'Received' : 'Dispatch'} Date: ${dd}`)
     const ed = fmtDate(d.expected_delivery)
-    if (ed) lines.push(`Expected Delivery: ${ed}`)
+    // A received document has already arrived — no delivery estimate to give
+    if (ed && !isInbound) lines.push(`Expected Delivery: ${ed}`)
     lines.push('')
     lines.push('- Team Distance Courses Wala')
 
@@ -527,6 +542,8 @@ export function DispatchManager() {
             ${d.enrollment_number ? `<div><label>Enrollment No.</label>${esc(d.enrollment_number)}</div>` : ''}
             ${d.student_phone ? `<div><label>Phone</label>${esc(d.student_phone)}</div>` : ''}
             ${receiverMeta}
+            ${d.party_name ? `<div><label>${isInbound ? 'From' : 'To'}</label>${esc(d.party_name)}</div>` : ''}
+            ${d.party_address ? `<div style="flex-basis:100%"><label>Address</label>${esc(d.party_address)}</div>` : ''}
             ${d.courier ? `<div><label>Courier</label>${esc(d.courier)}</div>` : ''}
             ${d.tracking_number ? `<div><label>Tracking No.</label>${esc(d.tracking_number)}</div>` : ''}
           </div>
@@ -1104,6 +1121,29 @@ export function DispatchManager() {
                   </button>
                 ))}
               </div>
+              {form.received_by === '' && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-2.5 space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-500 uppercase">
+                      {form.dispatch_type === 'inbound' ? 'From' : 'To'}
+                    </Label>
+                    <input type="text" value={form.party_name}
+                      onChange={e => setForm(p => ({ ...p, party_name: e.target.value }))}
+                      placeholder={form.dispatch_type === 'inbound' ? 'e.g. NIOS Office / Rahul' : 'e.g. Rahul / NIOS Office'}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-500 uppercase">
+                      {form.dispatch_type === 'inbound' ? 'Sender Address' : 'Delivery Address'}
+                    </Label>
+                    <textarea value={form.party_address} rows={2}
+                      onChange={e => setForm(p => ({ ...p, party_address: e.target.value }))}
+                      placeholder="Full address with city and pincode"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+              )}
+
               {(form.received_by === 'self' || form.received_by === 'guardian') && (
                 <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-2.5 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
@@ -1189,6 +1229,7 @@ export function DispatchManager() {
                     />
                   </div>
                 </div>
+                {form.dispatch_type === 'outbound' && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-700">Expected Delivery</Label>
                   <input
@@ -1198,6 +1239,7 @@ export function DispatchManager() {
                     className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                )}
               </div>
             )}
 

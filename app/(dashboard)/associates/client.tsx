@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, Clock, Eye, RefreshCw,
-  Copy, UserCheck, Wallet, Users, UserPlus,
+  Copy, UserCheck, Wallet, Users, UserPlus, Award,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AssociateManager } from '@/app/(dashboard)/admin/tabs/AssociateManager'
@@ -42,6 +42,7 @@ interface Associate {
   aadhar_doc_url: string | null; pan_doc_url: string | null; cheque_doc_url: string | null
   state: string | null; district: string | null; city: string | null; pincode: string | null
   institution_name: string | null; institution_address: string | null; photo_url: string | null
+  coordinator_name: string | null
 }
 
 interface RechargeRequest {
@@ -131,6 +132,7 @@ export default function AssociatesClient() {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [credOpen, setCredOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
+  const [downloadingCert, setDownloadingCert] = useState(false)
 
   // ── Wallet Recharges state ──
   const [recharges, setRecharges] = useState<RechargeRequest[]>([])
@@ -194,6 +196,30 @@ export default function AssociatesClient() {
       setPendingApprovalCount(p => Math.max(0, p - 1))
       loadAssociates()
     } finally { setApproving(false) }
+  }
+
+  async function downloadCertificate(assoc: Associate, code?: string | null) {
+    setDownloadingCert(true)
+    try {
+      // react-pdf is browser-only and heavy, so load it on demand
+      const { downloadAssociateCertificatePdf } = await import('@/components/associates/AssociateCertificatePDF')
+      await downloadAssociateCertificatePdf({
+        name: assoc.name,
+        associate_code: code ?? assoc.associate_code,
+        father_name: assoc.father_name ?? assoc.father_phone,
+        phone: assoc.phone,
+        email: assoc.email,
+        city: assoc.city ?? assoc.current_city,
+        district: assoc.district,
+        state: assoc.state ?? assoc.current_state,
+        institution_name: assoc.institution_name,
+        coordinator_name: assoc.coordinator_name,
+      })
+    } catch {
+      toast.error('Could not generate the certificate')
+    } finally {
+      setDownloadingCert(false)
+    }
   }
 
   async function handleRejectAssoc() {
@@ -649,6 +675,16 @@ export default function AssociatesClient() {
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 Save this password now — it cannot be retrieved later.
               </p>
+              {selected && (
+                <Button variant="outline" className="w-full gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  disabled={downloadingCert}
+                  onClick={() => downloadCertificate(selected, credentials.associate_code)}>
+                  {downloadingCert
+                    ? <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />
+                    : <Award className="w-4 h-4" />}
+                  Download Certificate
+                </Button>
+              )}
               <Button className="w-full" onClick={() => setCredOpen(false)}>Done</Button>
             </div>
           )}

@@ -292,12 +292,12 @@ export default function AssociateClient() {
           <Link
             key={href}
             href={href}
-            className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1.5 hover:shadow-md hover:border-gray-200 transition-all text-center"
+            className="bg-white border border-gray-100 rounded-xl p-3.5 flex flex-col items-center gap-2 hover:shadow-md hover:border-gray-200 transition-all text-center"
           >
-            <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
-              <Icon className={`h-4 w-4 ${color}`} />
+            <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center`}>
+              <Icon className={`h-6 w-6 ${color}`} strokeWidth={2.4} />
             </div>
-            <span className="text-[10px] font-semibold text-gray-600 leading-tight">{label}</span>
+            <span className="text-xs font-bold text-gray-700 leading-tight">{label}</span>
           </Link>
         ))}
       </div>
@@ -512,13 +512,13 @@ function StatCard({ label, value, sub, icon: Icon, color, href }: {
   return (
     <Link href={href} className={`${c.bg} ${c.border} border rounded-2xl p-4 hover:shadow-md transition-all group`}>
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</p>
-        <div className={`w-8 h-8 bg-white rounded-xl flex items-center justify-center border ${c.border}`}>
-          <Icon className={`h-4 w-4 ${c.icon}`} />
+        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-600">{label}</p>
+        <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center border ${c.border}`}>
+          <Icon className={`h-5 w-5 ${c.icon}`} strokeWidth={2.4} />
         </div>
       </div>
-      <p className={`text-xl font-extrabold ${c.val} leading-tight`}>{value}</p>
-      <p className="text-[10px] text-gray-400 mt-1 font-medium">{sub}</p>
+      <p className={`text-2xl font-extrabold ${c.val} leading-tight`}>{value}</p>
+      <p className="text-[11px] text-gray-500 mt-1 font-medium">{sub}</p>
     </Link>
   )
 }

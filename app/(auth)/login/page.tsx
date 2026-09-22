@@ -62,35 +62,9 @@ export default function LoginPage() {
         <div className="w-full md:w-5/12 bg-blue-600 p-12 text-white flex flex-col justify-between relative overflow-hidden hidden md:flex">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-indigo-900 opacity-90 z-0"></div>
 
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex items-center gap-4 mb-12">
-              <Image src="/brand-logo.png" alt="Distance Courses Wala Logo" width={64} height={64} className="w-16 h-16 object-contain" priority />
-              <h1 className="text-3xl font-bold tracking-tight">Distance Courses Wala</h1>
-            </div>
-
-            <div className="flex-grow flex flex-col justify-center">
-              <h2 className="text-4xl font-extrabold mb-6 leading-tight">
-                Manage your <br /> institution <br /> with ease.
-              </h2>
-              <p className="text-blue-100 text-lg max-w-md">
-                The all-in-one education consultancy management system designed to streamline admissions and boost productivity.
-              </p>
-            </div>
-          </div>
-
-          <div className="relative z-10 mt-12 bg-white/10 p-6 rounded-2xl backdrop-blur-md border border-white/20 shadow-lg">
-            <p className="italic text-blue-50 text-sm">
-              "Distance Courses Wala has transformed how we handle our student management. Highly recommended platform!"
-            </p>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-tr from-blue-400 to-blue-300 rounded-full flex items-center justify-center font-bold text-white shadow-sm border border-white/10">
-                SR
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Sarah Richards</p>
-                <p className="text-blue-200 text-xs text-opacity-90">Director of Admissions</p>
-              </div>
-            </div>
+          <div className="relative z-10 flex flex-col items-center justify-center h-full text-center">
+            <Image src="/brand-logo.png" alt="Distance Courses Wala Logo" width={96} height={96} className="w-24 h-24 object-contain" priority />
+            <h1 className="text-3xl font-bold tracking-tight mt-5">Distance Courses Wala</h1>
           </div>
 
           {/* Decorative Elements */}

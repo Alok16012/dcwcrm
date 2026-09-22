@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'
 import { balanceFor, expandLeaveDays, leaveKindOf, splitPaidAndLwp } from '@/lib/hrms/leave'
+import { writeAudit } from '@/lib/hrms/audit'
 
 /**
  * Approve or reject a leave request (requirement doc §12, §13).
@@ -21,7 +22,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = (await supabase
-    .from('profiles').select('role').eq('id', user.id).single()) as { data: { role: string } | null }
+    .from('profiles').select('role, full_name').eq('id', user.id).single()) as
+    { data: { role: string; full_name: string } | null }
   if (!profile || !['admin', 'backend'].includes(profile.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -58,6 +60,10 @@ export async function POST(req: NextRequest) {
       updated_at: now,
     }).eq('id', reqRow.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await writeAudit(db as never, {
+      entity: 'leave_request', entityId: reqRow.id, action: 'rejected',
+      reason: body.reason ?? null, changedBy: user.id, changedByName: profile.full_name,
+    })
     return NextResponse.json({ ok: true, status: 'rejected' })
   }
 
@@ -114,6 +120,13 @@ export async function POST(req: NextRequest) {
     updated_at: now,
   }).eq('id', reqRow.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await writeAudit(db as never, {
+    entity: 'leave_request', entityId: reqRow.id, action: 'approved',
+    oldValue: { status: 'pending' },
+    newValue: { status: 'approved', days: days.length, paid: paid.length, lwp: lwp.length },
+    changedBy: user.id, changedByName: profile.full_name,
+  })
 
   return NextResponse.json({
     ok: true,

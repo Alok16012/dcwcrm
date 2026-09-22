@@ -72,6 +72,11 @@ export interface DayInput {
   isHoliday?: boolean
   /** An approved leave wins over the punch verdict (Phase 2 fills this) */
   leaveStatus?: 'leave' | 'cl' | 'sl' | 'lwp' | null
+  /**
+   * One-off permission to arrive late on this date (§16). It stretches the
+   * grace for this day only — it never becomes a standing grace period.
+   */
+  allowedTill?: string | null
 }
 
 export interface DayVerdict {
@@ -125,9 +130,12 @@ export function evaluateDay(input: DayInput, settings: HrmsSettings = DEFAULT_SE
   // Punched in but never out (or vice versa) — a human has to fix this (§30)
   if (outMin === null) return { ...base, status: 'missing' }
 
-  const graceTill = toMinutes(settings.grace_till) ?? startMin
-  const lateTill = toMinutes(settings.late_till) ?? graceTill
-  const halfDayTill = toMinutes(settings.half_day_till) ?? lateTill
+  // A date-specific permission can only ever extend the grace, never shrink it
+  const permissionTill = toMinutes(input.allowedTill ?? null)
+  const settingsGrace = toMinutes(settings.grace_till) ?? startMin
+  const graceTill = permissionTill !== null ? Math.max(settingsGrace, permissionTill) : settingsGrace
+  const lateTill = Math.max(graceTill, toMinutes(settings.late_till) ?? graceTill)
+  const halfDayTill = Math.max(lateTill, toMinutes(settings.half_day_till) ?? lateTill)
 
   if (inMin! <= graceTill) return { ...base, status: 'present' }
   if (inMin! <= lateTill) return { ...base, status: 'late' }

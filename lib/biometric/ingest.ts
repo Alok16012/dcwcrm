@@ -314,8 +314,21 @@ export async function recomputeAttendance(
   const HUMAN_SET = ['leave', 'holiday', 'cl', 'sl', 'lwp']
   const locked = existing && HUMAN_SET.includes((existing as { status: string }).status)
 
+  // A one-off late permission for this exact date stretches the grace (§16)
+  const { data: permission } = await db
+    .from('special_late_permissions')
+    .select('allowed_till')
+    .eq('employee_id', employeeId)
+    .eq('work_date', date)
+    .maybeSingle()
+
   const verdict = evaluateDay(
-    { date, clockIn: clockIn.slice(0, 5), clockOut: clockOut ? clockOut.slice(0, 5) : null },
+    {
+      date,
+      clockIn: clockIn.slice(0, 5),
+      clockOut: clockOut ? clockOut.slice(0, 5) : null,
+      allowedTill: (permission as { allowed_till: string } | null)?.allowed_till?.slice(0, 5) ?? null,
+    },
     rules,
   )
 

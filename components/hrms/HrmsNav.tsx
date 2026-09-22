@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, CalendarCheck, CalendarDays, ClipboardCheck, Banknote, Wallet, Fingerprint, Settings } from 'lucide-react'
+import { Users, CalendarCheck, CalendarDays, ClipboardCheck, Banknote, Wallet, Fingerprint, Settings, LayoutDashboard, BarChart3 } from 'lucide-react'
 
 const TABS = [
+  { href: '/hrms/overview',   label: 'Overview',   icon: LayoutDashboard, exact: false },
   { href: '/hrms',            label: 'Employees',  icon: Users,         exact: true },
   { href: '/hrms/attendance', label: 'Attendance', icon: CalendarCheck, exact: false },
   { href: '/hrms/leave',      label: 'Leave',      icon: CalendarDays,  exact: false },
@@ -12,6 +13,7 @@ const TABS = [
   { href: '/hrms/payroll',    label: 'Payroll',    icon: Banknote,      exact: false },
   { href: '/hrms/advances',   label: 'Advances',   icon: Wallet,        exact: false },
   { href: '/hrms/biometric',  label: 'Biometric',  icon: Fingerprint,   exact: false },
+  { href: '/hrms/reports',    label: 'Reports',    icon: BarChart3,     exact: false },
   { href: '/hrms/settings',   label: 'Settings',   icon: Settings,      exact: false },
 ]
 

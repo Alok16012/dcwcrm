@@ -123,11 +123,11 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
             try {
                 const [{ data: c }, { data: p }, { data: d }, { data: s }, { data: assocs }, { data: leadsData }] = await Promise.all([
                     supabase.from('courses').select('*').order('name'),
-                    supabase.from('profiles').select('*').in('role', ['counselor', 'lead', 'admin']).eq('is_active', true).order('full_name'),
+                    supabase.from('profiles').select('*').not('role', 'in', '("associate","student")').eq('is_active', true).order('full_name'),
                     supabase.from('departments').select('*').order('name'),
                     supabase.from('sessions').select('*').order('name', { ascending: false }),
                     (supabase as any).from('associates').select('id, name, associate_code').eq('status', 'approved').order('name'),
-                    supabase.from('profiles').select('id, full_name').in('role', ['lead', 'counselor']).eq('is_active', true).order('full_name'),
+                    supabase.from('profiles').select('id, full_name').not('role', 'in', '("associate","student")').eq('is_active', true).order('full_name'),
                 ])
 
                 if (!isMounted) return

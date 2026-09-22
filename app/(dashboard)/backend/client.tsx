@@ -163,10 +163,10 @@ export function BackendListClient() {
       const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes, counselorRes] = await Promise.all([
         supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
         supabase.from('sessions').select('id, name').order('name'),
-        supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).order('full_name'),
+        supabase.from('profiles').select('id, full_name').not('role', 'in', '("associate","student")').order('full_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
-        supabase.from('profiles').select('id, full_name').in('role', ['counselor', 'lead']).eq('is_active', true).order('full_name'),
+        supabase.from('profiles').select('id, full_name').not('role', 'in', '("associate","student")').eq('is_active', true).order('full_name'),
       ])
       setCourses((coursesRes.data ?? []) as FilterOption[])
       setSessions((sessionsRes.data ?? []) as FilterOption[])

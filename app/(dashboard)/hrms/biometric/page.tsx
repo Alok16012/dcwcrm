@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
-import HrmsNav from '@/components/hrms/HrmsNav'
 import BiometricClient from '@/components/hrms/BiometricClient'
 import type { BiometricDevice, BiometricPunch, MappableEmployee } from '@/components/hrms/BiometricClient'
 
@@ -119,8 +118,6 @@ export default async function BiometricPage({
           Live punches from the Dahua face recognition controller
         </p>
       </div>
-
-      <HrmsNav />
 
       <BiometricClient
         date={date}

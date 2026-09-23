@@ -42,12 +42,14 @@ export async function proxy(request: NextRequest) {
   // forms (Meta ads landing pages at /f/{slug}) + walk-in registration page
   const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/')
   const isWalkinRoute    = pathname === '/walkin'
+  // Public associate registration link shared on WhatsApp
+  const isJoinRoute      = pathname === '/join'
   // PWA install assets. These were being redirected to /login, so "Add to Home
   // Screen" never picked up the app name or icons.
   const isPwaAsset       = pathname === '/manifest.webmanifest' || pathname === '/sw.js'
-  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute && !isJoinRoute
 
-  if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute) return response
+  if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
 
   if (user) {
     const { data: profile } = await supabase

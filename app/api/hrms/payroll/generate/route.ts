@@ -16,6 +16,8 @@ export const runtime = 'nodejs'
 
 type Db = { from: (t: string) => any }
 
+const EMPLOYEE_COLS = 'id, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions'
+
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,9 +30,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  let body: { month?: number; year?: number }
+  // employee_id scopes the run to one person — the employee page's "Generate
+  // Month" button sends it, along with the incentive verified for them.
+  let body: { month?: number; year?: number; employee_id?: string; incentive?: number }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const month = Number(body.month), year = Number(body.year)
+  const onlyEmployeeId = typeof body.employee_id === 'string' && body.employee_id ? body.employee_id : null
+  const verifiedIncentive = Number(body.incentive)
   if (!(month >= 1 && month <= 12) || !(year >= 2000 && year <= 2100)) {
     return NextResponse.json({ error: 'Valid month (1-12) and year are required' }, { status: 400 })
   }
@@ -45,9 +51,9 @@ export async function POST(req: NextRequest) {
   const to = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 
   const [{ data: employees }, { data: attendance }, { data: existing }, { data: advances }, { data: holidayRows }] = await Promise.all([
-    db.from('employees')
-      .select('id, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions')
-      .eq('is_active', true),
+    onlyEmployeeId
+      ? db.from('employees').select(EMPLOYEE_COLS).eq('id', onlyEmployeeId)
+      : db.from('employees').select(EMPLOYEE_COLS).eq('is_active', true),
     db.from('attendance').select('employee_id, status').gte('date', from).lte('date', to),
     db.from('payroll').select('id, employee_id, is_locked, incentive').eq('month', month).eq('year', year),
     db.from('advance_salaries').select('id, employee_id, amount, status, settled_in').in('status', ['pending', 'settled']).lte('given_on', to),
@@ -96,6 +102,7 @@ export async function POST(req: NextRequest) {
   }
 
   let generated = 0, skippedLocked = 0, unmarkedDays = 0, employeesWithGaps = 0
+  const countsByEmp = new Map<string, ReturnType<typeof countAttendance>>()
   const now = new Date().toISOString()
 
   for (const e of (employees ?? []) as Record<string, any>[]) {
@@ -103,13 +110,17 @@ export async function POST(req: NextRequest) {
 
     const marked = byEmp.get(e.id) ?? []
     const counts = countAttendance(marked)
+    countsByEmp.set(e.id, counts)
     const gap = Math.max(0, expectedWorkingDays - marked.filter(r => r.status !== 'weekly_off' && r.status !== 'holiday').length)
     if (gap > 0) { unmarkedDays += gap; employeesWithGaps++ }
     const monthlySalary = Number(e.basic_salary ?? 0)
     const advanceRecovery = advanceByEmp.get(e.id) ?? 0
     // Incentive already credited for this month wins over the employee's fixed amount
     const existingIncentive = incentiveByEmp.get(e.id) ?? 0
-    const incentive = existingIncentive > 0 ? existingIncentive : Number(e.incentive ?? 0)
+    const sentIncentive = onlyEmployeeId && Number.isFinite(verifiedIncentive) ? verifiedIncentive : 0
+    const incentive = Math.max(existingIncentive, sentIncentive) > 0
+      ? Math.max(existingIncentive, sentIncentive)
+      : Number(e.incentive ?? 0)
 
     const b = computePayroll({
       monthlySalary,
@@ -161,6 +172,25 @@ export async function POST(req: NextRequest) {
     newValue: { generated, skippedLocked, unmarkedDays, employeesWithGaps },
     changedBy: user.id, changedByName: profile.full_name,
   })
+
+  if (onlyEmployeeId) {
+    if (skippedLocked > 0) {
+      return NextResponse.json({ error: 'Is mahine ka payroll locked hai — pehle unlock karo' }, { status: 409 })
+    }
+    const { data: payroll } = await db.from('payroll').select('*')
+      .eq('employee_id', onlyEmployeeId).eq('month', month).eq('year', year).maybeSingle()
+    if (!payroll) return NextResponse.json({ error: 'Payroll could not be generated for this employee' }, { status: 404 })
+    const c = countsByEmp.get(onlyEmployeeId)
+    // countAttendance counts a late day as present too; the table adds them back
+    const attendance = c
+      ? { present: c.present - c.late, late: c.late, absent: c.absent, half_day: c.half_day, leave: c.lwp, holiday: c.holiday }
+      : null
+    return NextResponse.json({
+      ok: true, month, year, generated, skippedLocked,
+      expectedWorkingDays, unmarkedDays, employeesWithGaps,
+      payroll, attendance,
+    })
+  }
 
   return NextResponse.json({
     ok: true, month, year, generated, skippedLocked,

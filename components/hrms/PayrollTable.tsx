@@ -248,6 +248,14 @@ export default function PayrollTable({
           throw new Error(err.error || 'Failed to generate payroll')
         }
         const { payroll, attendance } = await res.json()
+        // Never let a response without a row reach the state updater — it
+        // runs during render, where a crash takes the whole page down.
+        if (!payroll?.id) {
+          router.refresh()
+          toast.success(`Payroll generated for ${format(new Date(year, month - 1), 'MMM yyyy')}`)
+          setShowGenerate(false)
+          return
+        }
         const newRow = {
           ...payroll,
           employee_name: employeeName,
@@ -285,6 +293,7 @@ export default function PayrollTable({
           throw new Error(err.error || 'Failed to recalculate')
         }
         const { payroll, attendance } = await res.json()
+        if (!payroll?.id) { router.refresh(); toast.success('Recalculated'); return }
         setData((prev) => prev.map((r) => r.id === row.id ? { ...r, ...payroll, attendance } : r))
         toast.success(`Recalculated — incentive ${fmt(Number(payroll.incentive) || 0)}`)
       } catch (err: any) {
@@ -312,6 +321,7 @@ export default function PayrollTable({
             throw new Error(err.error || 'Failed to generate')
           }
           const { payroll, attendance } = await res.json()
+          if (!payroll?.id) { router.refresh(); resolve(true); return }
           setData((prev) => prev.map((r) => r.id === row.id
             ? { ...r, ...payroll, generated: true, attendance }
             : r))

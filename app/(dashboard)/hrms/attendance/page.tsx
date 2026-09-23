@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import AttendanceGrid from '@/components/hrms/AttendanceGrid'
 import RecalculateAttendanceButton from '@/components/hrms/RecalculateAttendanceButton'
 import type { AttendanceStatus } from '@/types/app.types'
+import { onlyStaff } from '@/lib/hrms/staff'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,14 +50,17 @@ export default async function AttendancePage({
     .select('id, profile_id, salary_cycle_start_day')
     .eq('is_active', true)
 
-  const empList = (employees ?? []) as { id: string; profile_id: string; salary_cycle_start_day: number }[]
+  const empListRaw = (employees ?? []) as { id: string; profile_id: string; salary_cycle_start_day: number }[]
 
-  // Get profile names
-  const profileIds = empList.map((e) => e.profile_id)
+  // Get profile names (and roles — associates/students are not employees)
+  const profileIds = empListRaw.map((e) => e.profile_id)
   const { data: profiles } = profileIds.length > 0
-    ? await supabase.from('profiles').select('id, full_name').in('id', profileIds)
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', profileIds)
     : { data: [] }
-  const profileMap = Object.fromEntries(((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name]))
+  const profileRows = (profiles ?? []) as { id: string; full_name: string; role: string }[]
+  const profileMap = Object.fromEntries(profileRows.map((p) => [p.id, p.full_name]))
+  const roleMap = Object.fromEntries(profileRows.map((p) => [p.id, p.role]))
+  const empList = onlyStaff(empListRaw, roleMap)
 
   // Calculate cycle dates per employee & find full date range
   const empCycles = empList.map((e) => {

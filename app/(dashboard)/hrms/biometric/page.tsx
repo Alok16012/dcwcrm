@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import BiometricClient from '@/components/hrms/BiometricClient'
 import type { BiometricDevice, BiometricPunch, MappableEmployee } from '@/components/hrms/BiometricClient'
+import { onlyStaff } from '@/lib/hrms/staff'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,7 @@ export default async function BiometricPage({
   const devices = (devicesRes.data ?? []) as BiometricDevice[]
   const punches = (punchesRes.data ?? []) as BiometricPunch[]
 
-  const employeeRows = (employeesRes.data ?? []) as {
+  const employeeRowsRaw = (employeesRes.data ?? []) as {
     id: string
     profile_id: string
     employee_code: string
@@ -69,13 +70,13 @@ export default async function BiometricPage({
   }[]
 
   // Names live on profiles, as everywhere else in HRMS.
-  const profileIds = employeeRows.map(e => e.profile_id)
+  const profileIds = employeeRowsRaw.map(e => e.profile_id)
   const { data: profiles } = profileIds.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', profileIds)
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', profileIds)
     : { data: [] }
-  const nameById = Object.fromEntries(
-    ((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name])
-  )
+  const profileRows = (profiles ?? []) as { id: string; full_name: string; role: string }[]
+  const nameById = Object.fromEntries(profileRows.map(p => [p.id, p.full_name]))
+  const employeeRows = onlyStaff(employeeRowsRaw, Object.fromEntries(profileRows.map(p => [p.id, p.role])))
 
   const employees: MappableEmployee[] = employeeRows
     .map(e => ({

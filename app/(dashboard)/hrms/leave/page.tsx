@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import LeaveClient from '@/components/hrms/LeaveClient'
 import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'
 import { balanceFor } from '@/lib/hrms/leave'
+import { onlyStaff } from '@/lib/hrms/staff'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,11 +28,14 @@ export default async function HrmsLeavePage() {
     db.from('attendance').select('employee_id, date, status').in('status', ['cl', 'sl', 'lwp']),
   ])
 
-  const empRows = (employees ?? []) as { id: string; profile_id: string; employee_code: string | null; joining_date: string | null }[]
-  const { data: profiles } = empRows.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', empRows.map(e => e.profile_id))
+  const empRowsRaw = (employees ?? []) as { id: string; profile_id: string; employee_code: string | null; joining_date: string | null }[]
+  const { data: profiles } = empRowsRaw.length
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', empRowsRaw.map(e => e.profile_id))
     : { data: [] }
-  const nameById = Object.fromEntries(((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name]))
+  const profileRows = (profiles ?? []) as { id: string; full_name: string; role: string }[]
+  const nameById = Object.fromEntries(profileRows.map(p => [p.id, p.full_name]))
+  // Associates and students are not employees, even if a stray employees row exists
+  const empRows = onlyStaff(empRowsRaw, Object.fromEntries(profileRows.map(p => [p.id, p.role])))
 
   // Every CL/SL/LWP day already on the calendar, per employee
   const usedByEmp: Record<string, { cl: string[]; sl: string[]; lwp: string[] }> = {}

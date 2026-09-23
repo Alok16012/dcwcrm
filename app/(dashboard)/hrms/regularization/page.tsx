@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import RegularizationClient from '@/components/hrms/RegularizationClient'
+import { onlyStaff } from '@/lib/hrms/staff'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,11 +29,13 @@ export default async function RegularizationPage() {
       .order('created_at', { ascending: false }).limit(50),
   ])
 
-  const empRows = (employees ?? []) as { id: string; profile_id: string; employee_code: string | null }[]
-  const { data: profiles } = empRows.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', empRows.map(e => e.profile_id))
+  const empRowsRaw = (employees ?? []) as { id: string; profile_id: string; employee_code: string | null }[]
+  const { data: profiles } = empRowsRaw.length
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', empRowsRaw.map(e => e.profile_id))
     : { data: [] }
-  const nameByProfile = Object.fromEntries(((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name]))
+  const profileRows = (profiles ?? []) as { id: string; full_name: string; role: string }[]
+  const nameByProfile = Object.fromEntries(profileRows.map(p => [p.id, p.full_name]))
+  const empRows = onlyStaff(empRowsRaw, Object.fromEntries(profileRows.map(p => [p.id, p.role])))
   const nameByEmp = Object.fromEntries(empRows.map(e => [e.id, nameByProfile[e.profile_id] ?? '—']))
 
   const withNames = <T extends { employee_id: string }>(rows: T[]) =>

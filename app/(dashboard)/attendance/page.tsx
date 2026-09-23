@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { AttendancePunchClient } from '@/components/attendance/AttendancePunchClient'
 import { SelfPunchClient } from '@/components/attendance/SelfPunchClient'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { onlyStaff } from '@/lib/hrms/staff'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,16 +63,17 @@ export default async function AttendancePage({
     .select('id, profile_id')
     .eq('is_active', true)
 
-  const empList = (employees ?? []) as { id: string; profile_id: string }[]
-  const profileIds = empList.map(e => e.profile_id)
+  const empListRaw = (employees ?? []) as { id: string; profile_id: string }[]
+  const profileIds = empListRaw.map(e => e.profile_id)
 
   const { data: profiles } = profileIds.length > 0
-    ? await supabase.from('profiles').select('id, full_name').in('id', profileIds).order('full_name')
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', profileIds).order('full_name')
     : { data: [] }
 
-  const profileMap = Object.fromEntries(
-    ((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name])
-  )
+  const profileRows = (profiles ?? []) as { id: string; full_name: string; role: string }[]
+  const profileMap = Object.fromEntries(profileRows.map(p => [p.id, p.full_name]))
+  // Associates and students are not employees
+  const empList = onlyStaff(empListRaw, Object.fromEntries(profileRows.map(p => [p.id, p.role])))
 
   const { data: attData } = await supabase
     .from('attendance')

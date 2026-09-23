@@ -93,6 +93,13 @@ export default function MentorshipDashboardPage() {
   const [adminRemarks, setAdminRemarks] = useState<Record<string, string>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+  // Pending groups start collapsed; the arrow opens a student's subjects
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = (id: string) => setOpenGroups(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
   const [previewImg, setPreviewImg] = useState<string | null>(null)
   const [expandedApproved, setExpandedApproved] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -723,12 +730,22 @@ export default function MentorshipDashboardPage() {
                   </Button>
                 </div>
               ) : (
-                <span className="text-xs text-blue-600 ml-auto">{mentorships.length} pending</span>
+                <div className="flex items-center gap-3 ml-auto">
+                  <button type="button" className="text-xs font-semibold text-blue-700 hover:underline"
+                    onClick={() => setOpenGroups(prev => prev.size === approvalGroups.length
+                      ? new Set()
+                      : new Set(approvalGroups.map((g: any) => g.id)))}>
+                    {openGroups.size === approvalGroups.length && approvalGroups.length > 0 ? 'Collapse all' : 'Expand all'}
+                  </button>
+                  <span className="text-xs text-blue-600">{mentorships.length} pending</span>
+                </div>
               )}
             </div>
             <div className="divide-y">
-              {approvalGroups.map((group: any) => {
+              {approvalGroups.map((group: any, idx: number) => {
                 const stu = group.student
+                const isOpen = openGroups.has(group.id)
+                const subjects = Array.from(new Set(group.payments.map((p: any) => p.note ?? 'Payment'))) as string[]
                 const groupIds = group.payments.map((p: any) => p.id)
                 const selectedCount = groupIds.filter((id: string) => selectedIds.has(id)).length
                 const allSelected = selectedCount === groupIds.length
@@ -749,9 +766,25 @@ export default function MentorshipDashboardPage() {
                           })
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.id)}
+                        aria-expanded={isOpen}
+                        title={isOpen ? 'Hide subjects' : 'Show subjects'}
+                        className="flex items-center gap-1 flex-shrink-0 -mt-0.5 rounded-md px-1 py-0.5 hover:bg-gray-100"
+                      >
+                        <span className="w-6 h-6 rounded-md bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center tabular-nums">
+                          {idx + 1}
+                        </span>
+                        {isOpen
+                          ? <ChevronDown className="w-4 h-4 text-gray-500" />
+                          : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                      </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-bold text-gray-800">{stu?.full_name ?? '—'}</span>
+                          <button type="button" onClick={() => toggleGroup(group.id)} className="text-sm font-bold text-gray-800 hover:text-blue-700 text-left">
+                            {stu?.full_name ?? '—'}
+                          </button>
                           {stu?.enrollment_number && <span className="text-xs text-gray-400 font-mono">{fmtEnroll(stu.enrollment_number)}</span>}
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 flex items-center gap-0.5">
                             <IndianRupee className="w-2.5 h-2.5" />{Number(group.pendingAmount).toLocaleString('en-IN')} received
@@ -765,6 +798,14 @@ export default function MentorshipDashboardPage() {
                           {group.totalAmount != null && <> · Case total ₹{group.totalAmount}</>}
                           <> · Latest {format(new Date(group.latestCreatedAt), 'dd MMM yyyy')}</>
                         </p>
+                        {!isOpen && (
+                          <button type="button" onClick={() => toggleGroup(group.id)}
+                            className="mt-1.5 text-left text-[11px] text-gray-500 hover:text-blue-700">
+                            <span className="font-semibold text-gray-600">Subjects:</span> {subjects.join(', ')}
+                            <span className="ml-1 text-blue-600 font-semibold">· Open to approve</span>
+                          </button>
+                        )}
+                        {isOpen && (<>
                         <div className="mt-3 rounded-lg border border-gray-100 overflow-hidden">
                           {group.payments.map((m: any) => (
                             <div key={m.id} className="px-3 py-2 bg-gray-50/60 border-b last:border-b-0">
@@ -816,6 +857,7 @@ export default function MentorshipDashboardPage() {
                             Selected: <span className="font-semibold text-gray-700">{selectedCount}/{groupIds.length}</span>
                           </div>
                         </div>
+                        </>)}
                       </div>
                       <div className="flex sm:flex-col gap-2 flex-shrink-0">
                         <Button size="sm" className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 flex-1 disabled:opacity-50" disabled={bulkBusy || missingIncentiveCount(groupIds) > 0} onClick={() => approveIds(groupIds)}>

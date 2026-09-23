@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react'
 import {
   Plus, Trash2, Pencil, Copy, ArrowUp, ArrowDown,
-  Link2, FileText, Check, X, Eye
+  Link2, FileText, Check, X, Eye, Download, Loader2
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -104,6 +105,80 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
     toast.success('Link copied! Paste it in your Meta ad')
   }
 
+  const [exportingId, setExportingId] = useState<string | null>(null)
+
+  // Every submission of a form lands in `leads`, with the form's own questions in metadata.
+  async function exportSubmissions(f: LeadForm) {
+    setExportingId(f.id)
+    try {
+      const COLS = 'full_name, phone, email, city, state, source, status, assigned_to, created_at, metadata'
+      // Match on the form title, and also on the landing page slug so renamed forms keep their history
+      const [byTitle, byLanding] = await Promise.all([
+        supabase.from('leads').select(COLS).eq('metadata->>form', f.title),
+        supabase.from('leads').select(COLS).ilike('metadata->>landing_page', `%/f/${f.slug}%`),
+      ])
+      type SubmissionRow = {
+        full_name: string | null; phone: string | null; email: string | null
+        city: string | null; state: string | null; source: string | null
+        status: string | null; assigned_to: string | null; created_at: string
+        metadata: Record<string, unknown> | null
+      }
+      const seen = new Set<string>()
+      const rows = ([...(byTitle.data ?? []), ...(byLanding.data ?? [])] as unknown as SubmissionRow[])
+        .filter(r => {
+          const key = `${r.phone}|${r.created_at}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+
+      if (rows.length === 0) { toast.error('No submissions to export yet'); return }
+      rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+
+      // Counsellor names for the assigned leads
+      const ownerIds = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))] as string[]
+      const { data: owners } = ownerIds.length
+        ? await supabase.from('profiles').select('id, full_name').in('id', ownerIds)
+        : { data: [] }
+      const ownerName = Object.fromEntries(((owners ?? []) as { id: string; full_name: string }[]).map(o => [o.id, o.full_name]))
+
+      // Columns come from the form's own questions — not from whatever else
+      // later landed in metadata (IVR call details, repeat-enquiry bookkeeping).
+      const OWN_COLUMN_KEYS = new Set(['full_name', 'phone', 'email', 'city', 'state'])
+      const questionKeys = f.fields.filter(x => !OWN_COLUMN_KEYS.has(x.key)).map(x => x.label)
+
+      const sheet = rows.map((r, i) => {
+        const meta = r.metadata ?? {}
+        const row: Record<string, string | number> = {
+          'S.No': i + 1,
+          Name: r.full_name ?? '',
+          Phone: r.phone ?? '',
+          Email: r.email ?? '',
+          City: r.city ?? '',
+          State: r.state ?? '',
+          Source: (meta.lead_source as string) ?? r.source ?? '',
+          Status: r.status ?? '',
+          'Assigned To': (r.assigned_to && ownerName[r.assigned_to]) || '',
+          'Submitted On': new Date(r.created_at).toLocaleString('en-IN'),
+        }
+        for (const k of questionKeys) row[k] = (meta[k] as string) ?? ''
+        row['Landing Page'] = (meta.landing_page as string) ?? ''
+        return row
+      })
+
+      const ws = XLSX.utils.json_to_sheet(sheet)
+      ws['!cols'] = Object.keys(sheet[0]).map(k => ({ wch: k === 'Landing Page' ? 45 : Math.max(12, k.length + 4) }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Submissions')
+      XLSX.writeFile(wb, `LeadForm_${f.slug}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+      toast.success(`${rows.length} submissions exported`)
+    } catch (e) {
+      toast.error((e as { message?: string })?.message ?? 'Export failed')
+    } finally {
+      setExportingId(null)
+    }
+  }
+
   async function toggleActive(f: LeadForm) {
     const { error } = await supabase.from('lead_capture_forms')
       .update({ is_active: !f.is_active } as never).eq('id', f.id)
@@ -190,6 +265,14 @@ export function LeadFormsClient({ forms: initial }: { forms: LeadForm[] }) {
                 </Button>
                 <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => window.open(publicUrl(f.slug), '_blank')}>
                   <Eye className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs text-green-700 border-green-200 hover:bg-green-50"
+                  title="Export submissions to Excel"
+                  disabled={exportingId === f.id}
+                  onClick={() => exportSubmissions(f)}>
+                  {exportingId === f.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Download className="w-3.5 h-3.5" />}
                 </Button>
                 <Button size="sm" variant="ghost" className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteTarget(f)}>
                   <Trash2 className="w-3.5 h-3.5" />

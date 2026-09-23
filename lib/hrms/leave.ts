@@ -11,6 +11,13 @@ import { DEFAULT_SETTINGS, type HrmsSettings } from './attendance-rules'
 
 export type LeaveKind = 'cl' | 'sl' | 'lwp'
 
+/**
+ * CL/SL accrual starts here, not at the employee's joining date: HRMS went
+ * live with September 2026, so nothing is credited or charged before it.
+ * Staff who joined earlier start from this month like everyone else.
+ */
+export const LEAVE_ACCRUAL_START = '2026-09-01'
+
 /** Stored leave_type values map onto the three kinds payroll cares about. */
 export function leaveKindOf(leaveType: string): LeaveKind {
   const t = (leaveType ?? '').toLowerCase()
@@ -46,10 +53,13 @@ export function expandLeaveDays(
   return days
 }
 
-/** Whole months from the joining month to the given month, inclusive. */
+/**
+ * Whole months credited up to the given month, inclusive — counted from the
+ * later of the joining month and LEAVE_ACCRUAL_START.
+ */
 export function monthsCredited(joiningDate: string | null, year: number, month: number): number {
-  if (!joiningDate) return 0
-  const j = new Date(`${joiningDate}T12:00:00`)
+  const start = !joiningDate || joiningDate < LEAVE_ACCRUAL_START ? LEAVE_ACCRUAL_START : joiningDate
+  const j = new Date(`${start}T12:00:00`)
   const months = (year - j.getFullYear()) * 12 + (month - (j.getMonth() + 1)) + 1
   return Math.max(0, months)
 }
@@ -85,8 +95,10 @@ export function balanceFor(
   const perMonth = kind === 'cl' ? s.cl_per_month : s.sl_per_month
   const monthKey = `${opts.year}-${String(opts.month).padStart(2, '0')}`
 
-  const used = opts.usedDates.filter(d => d.startsWith(monthKey)).length
-  const usedEarlier = opts.usedDates.filter(d => d < monthKey).length
+  // Leave taken before accrual started never counted against a balance
+  const usedDates = opts.usedDates.filter(d => d >= LEAVE_ACCRUAL_START)
+  const used = usedDates.filter(d => d.startsWith(monthKey)).length
+  const usedEarlier = usedDates.filter(d => d < monthKey).length
 
   const monthsTillNow = monthsCredited(opts.joiningDate, opts.year, opts.month)
   const creditedEarlier = Math.max(0, (monthsTillNow - 1)) * perMonth

@@ -462,7 +462,7 @@ export function DispatchManager() {
     const isInbound = d.dispatch_type === 'inbound'
     const fmtDate = (v: string | null) => v ? format(new Date(v + 'T00:00:00'), 'dd MMM yyyy') : null
     const docList = g.rows
-      .map(r => `- ${docLabelOf(r.document_type)}${r.remarks ? ` (${r.remarks})` : ''}`)
+      .map(r => `- ${docLabelOf(r.document_type)}${r.remarks ? ` — ${r.remarks}` : ''}`)
       .join('\n')
     const lines: string[] = []
     lines.push(`Dear ${d.student_name},`)
@@ -1069,11 +1069,14 @@ export function DispatchManager() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-500 uppercase">Remarks / Details</Label>
+                    <Label className="text-[10px] font-semibold text-slate-500 uppercase">
+                      Description / Remarks
+                      <span className="ml-1 normal-case font-normal text-slate-400">— sent to the student on WhatsApp &amp; printed on the receipt</span>
+                    </Label>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        placeholder="Enter details for this document…"
+                        placeholder="e.g. S.No. SSCE/2026/1257686 — goes to the student"
                         value={doc.remarks}
                         onChange={e => setForm(p => ({ ...p, documents: p.documents.map((d, i) => i === idx ? { ...d, remarks: e.target.value } : d) }))}
                         className="flex-1 border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"

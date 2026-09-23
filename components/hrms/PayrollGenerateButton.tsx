@@ -23,6 +23,15 @@ export default function PayrollGenerateButton({ month, year }: { month: number; 
         `${json.generated} employees ka payroll attendance se bana` +
         (json.skippedLocked ? ` · ${json.skippedLocked} locked rows chhode gaye` : ''),
       )
+      // No attendance row means no deduction, so an empty calendar quietly pays
+      // in full — say so loudly before anyone approves the month.
+      if (json.employeesWithGaps > 0) {
+        toast.warning(
+          `${json.employeesWithGaps} employees ke ${json.unmarkedDays} working days bina attendance ke hain — ` +
+          'un dino ka koi deduction nahi laga. Approve karne se pehle attendance check karo.',
+          { duration: 10000 },
+        )
+      }
       router.refresh()
     } catch {
       toast.error('Generate failed')

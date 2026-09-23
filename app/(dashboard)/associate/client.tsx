@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   CheckCircle2, Clock, XCircle, RefreshCw, GraduationCap, IndianRupee,
-  TrendingUp, Bell, Users, Wallet, ArrowRight, AlertCircle, Copy,
+  TrendingUp, Bell, Users, ArrowRight, AlertCircle, Copy,
   UserCheck, BarChart2, ChevronRight, Package, Phone, PhoneCall,
   School, UserCog, FileText,
 } from 'lucide-react'
@@ -48,9 +48,8 @@ export default function AssociateClient() {
   const db = supabase as any
   const [associate, setAssociate] = useState<Associate | null>(null)
   const [coordinator, setCoordinator] = useState<{ name: string; phone: string | null } | null>(null)
-  const [stats, setStats] = useState({ totalLeads: 0, totalStudents: 0, commissionEarned: 0, totalRevenue: 0 })
+  const [stats, setStats] = useState({ totalLeads: 0, totalStudents: 0, totalRevenue: 0, totalPaid: 0, totalDue: 0 })
   const [recentLeads, setRecentLeads] = useState<any[]>([])
-  const [recentTxns, setRecentTxns] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,12 +86,11 @@ export default function AssociateClient() {
     `
 
     const [
-      leadRes, directRes, assocLeadsRes, txnRes, notifRes,
+      leadRes, directRes, assocLeadsRes, notifRes,
     ] = await Promise.all([
       supabase.from('leads').select('id, full_name, phone, status, created_at, course:courses(name)').eq('referred_by_associate', assoc.id).order('created_at', { ascending: false }),
       db.from('students').select(STUDENT_FIELDS).eq('referred_by_associate', assoc.id),
       supabase.from('leads').select('id').eq('referred_by_associate', assoc.id),
-      db.from('associate_wallet_txns').select('id, type, amount, reason, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
       db.from('associate_notifications').select('id, title, message, type, is_read, created_at').eq('associate_id', assoc.id).order('created_at', { ascending: false }).limit(5),
     ])
 
@@ -123,19 +121,19 @@ export default function AssociateClient() {
     const studentsWithDispatch = allStudents.map((s: any) => ({ ...s, dispatched: !!dispatchMap[s.id] }))
 
     const allLeads = (leadRes.data ?? []) as any[]
-    const allTxns = (txnRes.data ?? []) as any[]
-    const commissionEarned = allTxns.filter((t: any) => t.type === 'credit').reduce((s: number, t: any) => s + t.amount, 0)
     const totalRevenue = studentsWithDispatch.reduce((s: number, st: any) => s + (st.total_fee ?? 0), 0)
+    const totalPaid = studentsWithDispatch.reduce((s: number, st: any) => s + (st.amount_paid ?? 0), 0)
+    const totalDue = studentsWithDispatch.reduce((s: number, st: any) => s + Math.max(0, (st.total_fee ?? 0) - (st.amount_paid ?? 0)), 0)
 
     setStudents(studentsWithDispatch)
     setStats({
       totalLeads: allLeads.length,
       totalStudents: studentsWithDispatch.length,
-      commissionEarned,
       totalRevenue,
+      totalPaid,
+      totalDue,
     })
     setRecentLeads(allLeads.slice(0, 6))
-    setRecentTxns(allTxns)
     setNotifications((notifRes.data ?? []) as any[])
     setLoading(false)
   }, [supabase, db])
@@ -230,9 +228,9 @@ export default function AssociateClient() {
           href="/associate/students"
         />
         <StatCard
-          label="Commission Earned"
-          value={fmt(stats.commissionEarned)}
-          sub="Total credits received"
+          label="Fees Collected"
+          value={fmt(stats.totalPaid)}
+          sub="Paid by your students"
           icon={TrendingUp}
           color="emerald"
           href="/associate/account"
@@ -427,39 +425,34 @@ export default function AssociateClient() {
           </div>
         </div>
 
-        {/* Recent Transactions */}
+        {/* Fee Summary */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
             <div className="flex items-center gap-2">
               <IndianRupee className="h-4 w-4 text-emerald-500" />
-              <span className="font-semibold text-gray-900 text-sm">Recent Transactions</span>
+              <span className="font-semibold text-gray-900 text-sm">Fee Summary</span>
             </div>
             <Link href="/associate/account" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
               View all <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-          {recentTxns.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-200" />
-              <p className="text-sm font-medium text-gray-400">No transactions yet</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {recentTxns.map((t: any) => (
-                <div key={t.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{t.reason ?? 'Transaction'}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(t.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <span className={`font-bold text-sm font-mono ml-3 ${t.type === 'credit' ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {t.type === 'credit' ? '+' : '-'}{fmt(t.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="divide-y divide-gray-50">
+            {[
+              { label: 'Total Revenue', value: fmt(stats.totalRevenue), cls: 'text-gray-900' },
+              { label: 'Paid', value: fmt(stats.totalPaid), cls: 'text-emerald-600' },
+              { label: 'Due', value: stats.totalDue > 0 ? fmt(stats.totalDue) : 'Clear', cls: stats.totalDue > 0 ? 'text-red-500' : 'text-emerald-600' },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between px-5 py-3">
+                <p className="text-sm text-gray-500">{row.label}</p>
+                <p className={`font-bold text-sm font-mono ${row.cls}`}>{row.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="px-5 py-3 border-t border-gray-50">
+            <Link href="/associate/account" className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+              Student-wise fee details
+            </Link>
+          </div>
         </div>
       </div>
 

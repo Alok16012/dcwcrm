@@ -37,11 +37,11 @@ const PRIORITY_CFG = {
 
 const FAQS = [
   { q: 'How do I add a new lead?',              a: 'Go to the Leads section and click "Add New Lead". Fill in the student details and submit. Our counselors will follow up within 24 hours.' },
-  { q: 'When will I receive my commission?',     a: 'Commissions are credited to your wallet once the student\'s admission is confirmed and fee payment is received. You can check your wallet balance in the Accounts section.' },
+  { q: 'When will I receive my commission?',     a: 'Commission is settled by the office once the student\'s admission is confirmed and the fee is received. Your coordinator will confirm the payout — contact them from this page.' },
   { q: 'How do I track my student\'s dispatch?', a: 'Go to the Dispatch section to see real-time tracking for all document dispatches. You\'ll see the courier name and tracking ID once dispatched.' },
   { q: 'How do I download marketing materials?', a: 'Visit the Resources section where you\'ll find brochures, posters, fee structures, and other marketing materials available for download.' },
   { q: 'What is the Student Progress Lifecycle?',a: 'It tracks your student\'s journey from Lead Received → Documents Submitted → Admission Confirmed → Enrollment Generated → Exam Form Filled → Hall Ticket Released → Result Declared → Marksheet Dispatched.' },
-  { q: 'How do I recharge my wallet?',           a: 'Go to Accounts and click "Recharge Wallet". Upload your payment receipt and submit. OPS team will approve and credit your wallet within 1-2 working days.' },
+  { q: 'Where do I see my students\' fees?',      a: 'Open Accounts. It shows total revenue, paid and due for every student you referred, with filters for course, session and payment status. Payment details for UPI and bank transfer are on the same page.' },
 ]
 
 export default function AssociateSupportPage() {

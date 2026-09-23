@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Targets', href: '/targets', icon: TrendingUp, roles: ['admin', 'lead', 'counselor'] },
   { label: 'Appointments', href: '/appointments', icon: CalendarClock, roles: ['admin', 'lead', 'counselor'] },
   { label: 'HRMS', href: '/hrms', icon: UserCheck, roles: ['admin', 'backend'] },
-  { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend', 'lead', 'counselor', 'housekeeping'] },
+  { label: 'Attendance', href: '/attendance', icon: ClockIcon, roles: ['admin', 'backend'] },
   { label: 'My Attendance', href: '/my-attendance', icon: ClockIcon, roles: ['admin', 'backend', 'lead', 'counselor', 'housekeeping'] },
   { label: 'Departments', href: '/settings/departments', icon: Building2, roles: ['admin'] },
   { label: 'Courses', href: '/settings/courses', icon: BookOpen, roles: ['admin'], module: 'courses' },

@@ -5,6 +5,7 @@ import { balanceFor } from '@/lib/hrms/leave'
 import { countAttendance } from '@/lib/hrms/payroll'
 import { ATTENDANCE_STATUS_LABELS } from '@/types/app.types'
 import { Clock, CalendarDays, Banknote, LogIn, LogOut, Timer } from 'lucide-react'
+import MyLeaveRequests from '@/components/hrms/MyLeaveRequests'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,6 +129,9 @@ export default async function MyAttendancePage() {
           ))}
         </div>
       </div>
+
+      {/* Leave requests */}
+      <MyLeaveRequests employeeId={employee.id} />
 
       {/* Salary slips */}
       <div className="bg-white border rounded-2xl overflow-hidden">

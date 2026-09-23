@@ -44,14 +44,27 @@ export async function POST(req: NextRequest) {
   const from = `${year}-${String(month).padStart(2, '0')}-01`
   const to = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 
-  const [{ data: employees }, { data: attendance }, { data: existing }, { data: advances }] = await Promise.all([
+  const [{ data: employees }, { data: attendance }, { data: existing }, { data: advances }, { data: holidayRows }] = await Promise.all([
     db.from('employees')
       .select('id, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions')
       .eq('is_active', true),
     db.from('attendance').select('employee_id, status').gte('date', from).lte('date', to),
-    db.from('payroll').select('id, employee_id, is_locked').eq('month', month).eq('year', year),
-    db.from('advance_salaries').select('employee_id, monthly_deduction, status').eq('status', 'active'),
+    db.from('payroll').select('id, employee_id, is_locked, incentive').eq('month', month).eq('year', year),
+    db.from('advance_salaries').select('id, employee_id, amount, status, settled_in').in('status', ['pending', 'settled']).lte('given_on', to),
+    db.from('holidays').select('holiday_date').eq('is_active', true).gte('holiday_date', from).lte('holiday_date', to),
   ])
+
+  // Days the month actually expected work: not the weekly off, not a holiday.
+  // A day with no attendance row at all deducts nothing, so payroll would
+  // silently pay in full — the response reports it and the UI warns.
+  const holidays = new Set(((holidayRows ?? []) as { holiday_date: string }[]).map(h => h.holiday_date))
+  let expectedWorkingDays = 0
+  for (let d = 1; d <= new Date(year, month, 0).getDate(); d++) {
+    const iso = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    if (new Date(`${iso}T12:00:00`).getDay() === settings.weekly_off_day) continue
+    if (holidays.has(iso)) continue
+    expectedWorkingDays++
+  }
 
   const byEmp = new Map<string, { status: string }[]>()
   for (const a of (attendance ?? []) as { employee_id: string; status: string }[]) {
@@ -60,29 +73,48 @@ export async function POST(req: NextRequest) {
   }
   const lockedBy = new Map<string, boolean>()
   const idByEmp = new Map<string, string>()
-  for (const p of (existing ?? []) as { id: string; employee_id: string; is_locked: boolean }[]) {
+  const incentiveByEmp = new Map<string, number>()
+  for (const p of (existing ?? []) as { id: string; employee_id: string; is_locked: boolean; incentive: number | null }[]) {
     lockedBy.set(p.employee_id, p.is_locked)
     idByEmp.set(p.employee_id, p.id)
-  }
-  const advanceByEmp = new Map<string, number>()
-  for (const a of (advances ?? []) as { employee_id: string; monthly_deduction: number | null }[]) {
-    advanceByEmp.set(a.employee_id, Number(a.monthly_deduction ?? 0))
+    incentiveByEmp.set(p.employee_id, Number(p.incentive ?? 0))
   }
 
-  let generated = 0, skippedLocked = 0
+  // Advances recovered this month: everything still pending, plus whatever was
+  // already recovered in this month's row (so re-generating doesn't drop it).
+  const advanceRowsByEmp = new Map<string, { id: string; amount: number }[]>()
+  for (const a of (advances ?? []) as { id: string; employee_id: string; amount: number | null; status: string; settled_in: string | null }[]) {
+    const belongsHere = a.status === 'pending' || a.settled_in === idByEmp.get(a.employee_id)
+    if (!belongsHere) continue
+    const list = advanceRowsByEmp.get(a.employee_id) ?? []
+    list.push({ id: a.id, amount: Number(a.amount ?? 0) })
+    advanceRowsByEmp.set(a.employee_id, list)
+  }
+  const advanceByEmp = new Map<string, number>()
+  for (const [empId, rows] of advanceRowsByEmp) {
+    advanceByEmp.set(empId, rows.reduce((sum, r) => sum + r.amount, 0))
+  }
+
+  let generated = 0, skippedLocked = 0, unmarkedDays = 0, employeesWithGaps = 0
   const now = new Date().toISOString()
 
   for (const e of (employees ?? []) as Record<string, any>[]) {
     if (lockedBy.get(e.id)) { skippedLocked++; continue }
 
-    const counts = countAttendance(byEmp.get(e.id) ?? [])
+    const marked = byEmp.get(e.id) ?? []
+    const counts = countAttendance(marked)
+    const gap = Math.max(0, expectedWorkingDays - marked.filter(r => r.status !== 'weekly_off' && r.status !== 'holiday').length)
+    if (gap > 0) { unmarkedDays += gap; employeesWithGaps++ }
     const monthlySalary = Number(e.basic_salary ?? 0)
     const advanceRecovery = advanceByEmp.get(e.id) ?? 0
+    // Incentive already credited for this month wins over the employee's fixed amount
+    const existingIncentive = incentiveByEmp.get(e.id) ?? 0
+    const incentive = existingIncentive > 0 ? existingIncentive : Number(e.incentive ?? 0)
 
     const b = computePayroll({
       monthlySalary,
       counts,
-      additions: { hra: Number(e.hra ?? 0), allowances: Number(e.allowances ?? 0), incentive: Number(e.incentive ?? 0) },
+      additions: { hra: Number(e.hra ?? 0), allowances: Number(e.allowances ?? 0), incentive },
       statutory: { pf: Number(e.pf_deduction ?? 0), tds: Number(e.tds_deduction ?? 0), other: Number(e.other_deductions ?? 0) },
       advanceRecovery,
       settings,
@@ -91,7 +123,7 @@ export async function POST(req: NextRequest) {
     const row = {
       employee_id: e.id, month, year,
       basic: monthlySalary, hra: Number(e.hra ?? 0), allowances: Number(e.allowances ?? 0),
-      incentive: Number(e.incentive ?? 0),
+      incentive,
       gross: b.gross,
       pf: Number(e.pf_deduction ?? 0), tds: Number(e.tds_deduction ?? 0),
       other_deductions: Number(e.other_deductions ?? 0),
@@ -109,17 +141,29 @@ export async function POST(req: NextRequest) {
     }
 
     const id = idByEmp.get(e.id)
-    const { error } = id
-      ? await db.from('payroll').update(row).eq('id', id)
-      : await db.from('payroll').insert(row)
+    const { data: savedRow, error } = id
+      ? await db.from('payroll').update(row).eq('id', id).select('id').single()
+      : await db.from('payroll').insert(row).select('id').single()
+
+    // Tie the recovered advances to this payroll row so they aren't deducted again
+    const payrollId = (savedRow as { id: string } | null)?.id ?? id
+    const recovered = advanceRowsByEmp.get(e.id) ?? []
+    if (!error && payrollId && recovered.length > 0) {
+      await db.from('advance_salaries')
+        .update({ status: 'settled', settled_in: payrollId })
+        .in('id', recovered.map(r => r.id))
+    }
     if (!error) generated++
   }
 
   await writeAudit(db as never, {
     entity: 'payroll', entityId: `${year}-${month}`, action: 'generated',
-    newValue: { generated, skippedLocked },
+    newValue: { generated, skippedLocked, unmarkedDays, employeesWithGaps },
     changedBy: user.id, changedByName: profile.full_name,
   })
 
-  return NextResponse.json({ ok: true, month, year, generated, skippedLocked })
+  return NextResponse.json({
+    ok: true, month, year, generated, skippedLocked,
+    expectedWorkingDays, unmarkedDays, employeesWithGaps,
+  })
 }

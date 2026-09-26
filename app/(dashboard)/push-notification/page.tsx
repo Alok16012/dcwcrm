@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -43,7 +44,7 @@ export default function PushNotificationPage() {
     if (!notifTitle.trim() || !notifMessage.trim()) { toast.error('Title and message required'); return }
     setNotifSending(true)
     try {
-      const res = await fetch('/api/associates/notify-all', {
+      const res = await fetch(withBase('/api/associates/notify-all'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: notifTitle, message: notifMessage }),

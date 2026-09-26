@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { isBbRole } from '@/lib/bb/constants'
+import { withBase } from '@/lib/base-path'
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
@@ -78,46 +79,46 @@ export async function proxy(request: NextRequest) {
     // Berojgar Bharat staff live entirely inside /bb.
     if (isBbRole(role)) {
       if (!isBbRoute) {
-        return NextResponse.redirect(new URL('/bb/dashboard', request.url))
+        return NextResponse.redirect(new URL(withBase('/bb/dashboard'), request.url))
       }
       return response
     }
     // Everyone else is refused the BB area outright.
     if (isBbRoute) {
-      if (role === 'student')   return NextResponse.redirect(new URL('/student/dashboard', request.url))
-      if (role === 'associate') return NextResponse.redirect(new URL('/associate', request.url))
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (role === 'student')   return NextResponse.redirect(new URL(withBase('/student/dashboard'), request.url))
+      if (role === 'associate') return NextResponse.redirect(new URL(withBase('/associate'), request.url))
+      return NextResponse.redirect(new URL(withBase('/dashboard'), request.url))
     }
 
     // Student → always go to student portal
     if (role === 'student' && !isStudentRoute && !isStudentLogin) {
-      return NextResponse.redirect(new URL('/student/dashboard', request.url))
+      return NextResponse.redirect(new URL(withBase('/student/dashboard'), request.url))
     }
     if (role !== 'student' && isStudentRoute) {
-      return NextResponse.redirect(new URL(role === 'associate' ? '/associate' : '/dashboard', request.url))
+      return NextResponse.redirect(new URL(withBase(role === 'associate' ? '/associate' : '/dashboard'), request.url))
     }
 
     // Associate → always go to /associate, never admin area
     if (role === 'associate' && isAdminRoute) {
-      return NextResponse.redirect(new URL('/associate', request.url))
+      return NextResponse.redirect(new URL(withBase('/associate'), request.url))
     }
 
     // Bounce logged-in users off login pages
     if (isAdminLogin) {
-      if (role === 'student')   return NextResponse.redirect(new URL('/student/dashboard', request.url))
-      if (role === 'associate') return NextResponse.redirect(new URL('/associate', request.url))
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (role === 'student')   return NextResponse.redirect(new URL(withBase('/student/dashboard'), request.url))
+      if (role === 'associate') return NextResponse.redirect(new URL(withBase('/associate'), request.url))
+      return NextResponse.redirect(new URL(withBase('/dashboard'), request.url))
     }
     if (isStudentLogin && role === 'student') {
-      return NextResponse.redirect(new URL('/student/dashboard', request.url))
+      return NextResponse.redirect(new URL(withBase('/student/dashboard'), request.url))
     }
   } else {
     // Unauthenticated
     if (isStudentRoute) {
-      return NextResponse.redirect(new URL('/student/login', request.url))
+      return NextResponse.redirect(new URL(withBase('/student/login'), request.url))
     }
     if (!isAdminLogin && !isStudentLogin && !isAssociateRoute && !isWalkinRoute) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL(withBase('/login'), request.url))
     }
   }
 

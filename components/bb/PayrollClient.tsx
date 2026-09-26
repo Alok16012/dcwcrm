@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -62,7 +63,7 @@ export default function PayrollClient({
   async function ensureLogo(): Promise<string> {
     if (logo) return logo
     try {
-      const blob = await fetch('/bb-mark.png').then(r => r.blob())
+      const blob = await fetch(withBase('/bb-mark.png')).then(r => r.blob())
       const uri = await new Promise<string>(res => {
         const fr = new FileReader()
         fr.onloadend = () => res(fr.result as string)
@@ -78,7 +79,7 @@ export default function PayrollClient({
   async function generate(s: PayrollStaff) {
     setBusy(s.employee_id)
     try {
-      const res = await fetch('/api/bb/payroll/generate', {
+      const res = await fetch(withBase('/api/bb/payroll/generate'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ employee_id: s.employee_id, month, year }),
@@ -101,7 +102,7 @@ export default function PayrollClient({
     for (const s of staff) {
       if (s.payroll?.status === 'paid') continue
       try {
-        const res = await fetch('/api/bb/payroll/generate', {
+        const res = await fetch(withBase('/api/bb/payroll/generate'), {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ employee_id: s.employee_id, month, year }),

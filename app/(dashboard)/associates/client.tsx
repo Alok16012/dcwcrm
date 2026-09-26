@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -141,7 +142,7 @@ export default function AssociatesClient() {
   async function handleApproveAssoc(assoc: Associate) {
     setApproving(true)
     try {
-      const res = await fetch('/api/associates/approve', {
+      const res = await fetch(withBase('/api/associates/approve'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ associate_id: assoc.id }),

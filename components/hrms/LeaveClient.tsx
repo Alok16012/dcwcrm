@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -58,7 +59,7 @@ export default function LeaveClient({ requests, balances, holidays, employees, m
     const reason = action === 'reject' ? window.prompt('Reject kyun kar rahe ho? (optional)') ?? '' : ''
     setBusyId(id)
     try {
-      const res = await fetch('/api/hrms/leave/decision', {
+      const res = await fetch(withBase('/api/hrms/leave/decision'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, reason }),
       })

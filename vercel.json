@@ -2,7 +2,7 @@
   "regions": ["bom1"],
   "crons": [
     {
-      "path": "/api/cron/auto-punchout",
+      "path": "/crm/api/cron/auto-punchout",
       "schedule": "30 12 * * *"
     }
   ]

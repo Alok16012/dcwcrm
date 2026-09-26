@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -53,7 +54,7 @@ export default function BbShell({ fullName, email, role, children }: Props) {
   async function signOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.replace('/login')
+    window.location.replace(withBase('/login'))
   }
 
   const initials = fullName
@@ -89,7 +90,7 @@ export default function BbShell({ fullName, email, role, children }: Props) {
   const brandHeader = (
     <div className="flex items-center gap-2.5 px-5 h-16 shrink-0 border-b border-white/10">
       <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden p-1">
-        <Image src="/bb-mark.png" alt="" width={32} height={32} className="w-full h-full object-contain" />
+        <Image src={withBase("/bb-mark.png")} alt="" width={32} height={32} className="w-full h-full object-contain" />
       </div>
       <div className="min-w-0">
         <p className="font-bold text-white text-sm leading-tight truncate">Berojgar Bharat</p>

@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -54,7 +55,7 @@ export default function RegularizationClient({ requests, permissions, auditLog, 
     const reason = action === 'reject' ? window.prompt('Reject kyun? (optional)') ?? '' : ''
     setBusyId(id)
     try {
-      const res = await fetch('/api/hrms/regularization/decision', {
+      const res = await fetch(withBase('/api/hrms/regularization/decision'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, reason }),
       })

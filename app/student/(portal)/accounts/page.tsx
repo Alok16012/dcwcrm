@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Wallet, CheckCircle2, AlertCircle, Download, Receipt, Share2, Copy, Check, Building2, Smartphone } from 'lucide-react'
@@ -21,7 +22,7 @@ export default function AccountsPage() {
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/student/login'; return }
+      if (!user) { window.location.href = withBase('/student/login'); return }
 
       const { data: s } = await supabase
         .from('students')
@@ -29,7 +30,7 @@ export default function AccountsPage() {
         .eq('portal_user_id', user.id)
         .single()
 
-      if (!s) { window.location.href = '/student/login'; return }
+      if (!s) { window.location.href = withBase('/student/login'); return }
       setStudent(s)
 
       const { data: p } = await supabase

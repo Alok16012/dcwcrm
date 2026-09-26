@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -126,7 +127,7 @@ export default function FeesClient({
   async function ensureLogo(): Promise<string> {
     if (logo) return logo
     try {
-      const blob = await fetch('/bb-mark.png').then(r => r.blob())
+      const blob = await fetch(withBase('/bb-mark.png')).then(r => r.blob())
       const dataUri = await new Promise<string>(resolve => {
         const reader = new FileReader()
         reader.onloadend = () => resolve(reader.result as string)

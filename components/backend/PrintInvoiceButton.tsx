@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { FileText, Loader2 } from 'lucide-react'
@@ -24,7 +25,7 @@ export function PrintInvoiceButton({ student }: PrintInvoiceButtonProps) {
         try {
             const [paymentsRes, logoRes] = await Promise.all([
                 supabase.from('payments').select('*').eq('student_id', student.id).order('payment_date', { ascending: true }),
-                fetch('/brand-logo.png').then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
+                fetch(withBase('/brand-logo.png')).then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
                     const reader = new FileReader()
                     reader.onloadend = () => resolve(reader.result as string)
                     reader.readAsDataURL(blob)

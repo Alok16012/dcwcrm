@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -111,7 +112,7 @@ export function UsersSettingsClient({
   async function onCreateUser(data: CreateUserData) {
     startTransition(async () => {
       try {
-        const res = await fetch('/api/admin/create-user', {
+        const res = await fetch(withBase('/api/admin/create-user'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -142,7 +143,7 @@ export function UsersSettingsClient({
     if (!resetPasswordUser || newPassword.length < 8) { toast.error('Password must be at least 8 characters'); return }
     startTransition(async () => {
       try {
-        const res = await fetch('/api/admin/update-password', {
+        const res = await fetch(withBase('/api/admin/update-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: resetPasswordUser.id, newPassword }),
@@ -159,7 +160,7 @@ export function UsersSettingsClient({
   async function handleDeleteUser(user: Profile) {
     startTransition(async () => {
       try {
-        const res = await fetch('/api/admin/delete-user', {
+        const res = await fetch(withBase('/api/admin/delete-user'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id }),
@@ -200,7 +201,7 @@ export function UsersSettingsClient({
     if (!userId) { toast.error('No linked auth user found'); return }
     startTransition(async () => {
       try {
-        const res = await fetch('/api/admin/update-password', {
+        const res = await fetch(withBase('/api/admin/update-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, newPassword: assocNewPassword }),

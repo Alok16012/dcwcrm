@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { UserPlus, Loader2 } from 'lucide-react'
@@ -37,7 +38,7 @@ export default function AssociateJoinForm() {
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
-    fetch('/api/public/associate-apply')
+    fetch(withBase('/api/public/associate-apply'))
       .then(r => r.json())
       .then(d => setCoordinators(d.coordinators ?? []))
       .catch(() => { /* the field stays empty and the API re-validates anyway */ })
@@ -49,7 +50,7 @@ export default function AssociateJoinForm() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const res = await fetch('/api/public/associate-apply', {
+      const res = await fetch(withBase('/api/public/associate-apply'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, hp }),

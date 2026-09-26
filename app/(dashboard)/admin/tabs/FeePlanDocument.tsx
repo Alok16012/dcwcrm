@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileDown, Loader2 } from 'lucide-react'
@@ -216,7 +217,7 @@ export default function FeePlanDocument({ state, onDone }: { state: FeeState; on
     setLoading(true)
     try {
       // Convert logo to base64 so react-pdf doesn't need to fetch a URL
-      const imgRes = await fetch('/brand-logo.png')
+      const imgRes = await fetch(withBase('/brand-logo.png'))
       const imgBlob = await imgRes.blob()
       const logoUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader()

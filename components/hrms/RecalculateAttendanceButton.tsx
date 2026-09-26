@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,7 @@ export default function RecalculateAttendanceButton({ from, to }: { from: string
   async function run() {
     setBusy(true)
     try {
-      const res = await fetch('/api/hrms/attendance/recalculate', {
+      const res = await fetch(withBase('/api/hrms/attendance/recalculate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from, to }),

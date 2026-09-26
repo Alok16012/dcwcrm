@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
@@ -316,7 +317,7 @@ export function FeePlanBuilder() {
             {/* Header — dark navy band */}
             <div style={{ background: '#0f172a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <img src="/brand-logo.png" alt="DCW" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                <img src={withBase("/brand-logo.png")} alt="DCW" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
                 <div>
                   <div style={{ color: '#fff', fontWeight: 700, fontSize: 12, lineHeight: 1.3 }}>
                     <span style={{ color: '#60a5fa' }}>Distance</span> Courses Wala

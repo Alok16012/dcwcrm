@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -89,7 +90,7 @@ export default function PipelineClient({
 
     setSaving(true)
     try {
-      const res = await fetch('/api/bb/placements', {
+      const res = await fetch(withBase('/api/bb/placements'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

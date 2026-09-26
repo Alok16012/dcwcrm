@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { MessageCircle, Loader2 } from 'lucide-react'
@@ -47,7 +48,7 @@ export function SendInvoiceWhatsAppButton({ student }: SendInvoiceWhatsAppButton
         try {
             const [paymentsRes, logoBase64] = await Promise.all([
                 supabase.from('payments').select('*').eq('student_id', student.id).order('payment_date', { ascending: true }),
-                fetch('/brand-logo.png').then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
+                fetch(withBase('/brand-logo.png')).then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
                     const reader = new FileReader()
                     reader.onloadend = () => resolve(reader.result as string)
                     reader.readAsDataURL(blob)

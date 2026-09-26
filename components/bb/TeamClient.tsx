@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -89,7 +90,7 @@ export default function TeamClient({ members }: { members: TeamMember[] }) {
 
     setSaving(true)
     try {
-      const res = await fetch('/api/bb/team', {
+      const res = await fetch(withBase('/api/bb/team'), {
         method: editing ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(editing ? { profile_id: editing.profile_id, ...form } : form),
@@ -113,7 +114,7 @@ export default function TeamClient({ members }: { members: TeamMember[] }) {
 
   async function toggleActive(m: TeamMember) {
     try {
-      const res = await fetch('/api/bb/team', {
+      const res = await fetch(withBase('/api/bb/team'), {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ profile_id: m.profile_id, is_active: !m.is_active }),
@@ -129,7 +130,7 @@ export default function TeamClient({ members }: { members: TeamMember[] }) {
 
   async function resetPassword(m: TeamMember) {
     try {
-      const res = await fetch('/api/bb/team/password', {
+      const res = await fetch(withBase('/api/bb/team/password'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ profile_id: m.profile_id }),

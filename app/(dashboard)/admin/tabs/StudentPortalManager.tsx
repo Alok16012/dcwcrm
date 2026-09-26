@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -338,7 +339,7 @@ export function StudentPortalManager() {
     if (!selected || pass.length < 6) { toast.error('Min 6 characters'); return }
     setSavingCred(true)
     try {
-      const endpoint = selected.portal_active ? '/api/students/reset-password' : '/api/students/create-credentials'
+      const endpoint = withBase(selected.portal_active ? '/api/students/reset-password' : '/api/students/create-credentials')
       const body = selected.portal_active
         ? { student_id: selected.id, new_password: pass }
         : { student_id: selected.id, password: pass }
@@ -376,7 +377,7 @@ export function StudentPortalManager() {
     if (!confirm('Are you sure you want to delete portal access? This will permanently remove their credentials.')) return
     setDeletingAccess(true)
     try {
-      const res = await fetch('/api/students/delete-portal', {
+      const res = await fetch(withBase('/api/students/delete-portal'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_id: selected.id })

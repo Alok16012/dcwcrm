@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -408,7 +409,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
                   <button
                     type="button"
                     className="underline font-semibold text-blue-600 hover:text-blue-800"
-                    onClick={() => window.open(`/leads/${duplicateLead.id}`, '_blank')}
+                    onClick={() => window.open(withBase(`/leads/${duplicateLead.id}`), '_blank')}
                   >
                     View lead
                   </button>

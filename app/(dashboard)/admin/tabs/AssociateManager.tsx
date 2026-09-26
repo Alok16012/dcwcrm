@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -816,7 +817,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                   if (!confirm(`Reset password for ${credAssoc.name}? They will receive a notification with the new password.`)) return
                   setResettingPass(true)
                   try {
-                    const res = await fetch('/api/associates/reset-password', {
+                    const res = await fetch(withBase('/api/associates/reset-password'), {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ associate_id: credAssoc.id }),

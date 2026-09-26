@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,8 +34,8 @@ const BRANDS = {
     name: 'Distance Courses Wala',
     short: 'DCW',
     tagline: 'Admissions, fees and student lifecycle',
-    logo: '/brand-logo.png',
-    mark: '/brand-logo.png',
+    logo: withBase('/brand-logo.png'),
+    mark: withBase('/brand-logo.png'),
     /** A white glyph — reads correctly straight on the brand colour. */
     logoOnLight: false,
     icon: GraduationCap,
@@ -52,9 +53,9 @@ const BRANDS = {
     short: 'BB',
     tagline: 'Jobs, candidates and placements',
     /** Full lockup, emblem over wordmark — only legible at panel size. */
-    logo: '/bb-logo.png',
+    logo: withBase('/bb-logo.png'),
     /** Emblem alone, for tiles too small for the wordmark. */
-    mark: '/bb-mark.png',
+    mark: withBase('/bb-mark.png'),
     /** Full-colour artwork on transparency — needs a light tile behind it. */
     logoOnLight: true,
     icon: Briefcase,
@@ -74,12 +75,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
-  // Most people work for one company; remember which so they choose once.
+  // The website sends each business's staff here with ?brand= already set
+  // (distancecourseswala.com's Berojgar Bharat login opens ?brand=bb), so they
+  // never see the other company's door. Without it, fall back to the last
+  // workspace this browser used — most people work for one company.
   useEffect(() => {
     try {
+      const asked = new URLSearchParams(window.location.search).get('brand')
+      if (asked === 'dcw' || asked === 'bb') { choose(asked); return }
       const saved = localStorage.getItem('dcw.brand')
       if (saved === 'dcw' || saved === 'bb') setBrand(saved)
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function choose(next: Brand) {
@@ -131,9 +138,9 @@ export default function LoginPage() {
         return
       }
 
-      if (belongsToBb) { window.location.replace('/bb/dashboard'); return }
-      if (role === 'associate') { window.location.replace('/associate'); return }
-      window.location.replace('/dashboard')
+      if (belongsToBb) { window.location.replace(withBase('/bb/dashboard')); return }
+      if (role === 'associate') { window.location.replace(withBase('/associate')); return }
+      window.location.replace(withBase('/dashboard'))
     } catch {
       toast.error('Something went wrong')
     } finally {

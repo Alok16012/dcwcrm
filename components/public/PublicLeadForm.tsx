@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { Phone, MapPin, Mail, CheckCircle2, Loader2, GraduationCap } from 'lucide-react'
 import { reportConversion } from '@/lib/googleAds'
@@ -77,7 +78,7 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
       // Same event_id goes to the browser pixel AND the server (Conversions
       // API) so Meta dedupes the two into one Lead.
       const eventId = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      const res = await fetch('/api/public/lead-form', {
+      const res = await fetch(withBase('/api/public/lead-form'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +121,7 @@ export function PublicLeadForm({ form, preview = false }: { form: PublicForm; pr
         {/* Brand header */}
         <div className="flex flex-col items-center text-center mb-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand-logo.png" alt={COMPANY.name} className="w-16 h-16 rounded-2xl shadow-md mb-3" />
+          <img src={withBase("/brand-logo.png")} alt={COMPANY.name} className="w-16 h-16 rounded-2xl shadow-md mb-3" />
           <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">{COMPANY.name}</h1>
           <p className="text-xs text-slate-500 mt-0.5">Distance & Regular Education Experts</p>
         </div>

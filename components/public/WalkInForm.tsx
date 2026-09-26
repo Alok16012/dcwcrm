@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { APP_URL } from '@/lib/branding'
+import { withBase } from '@/lib/base-path'
 
 export default function WalkInForm() {
   const [fullName, setFullName] = useState('')
@@ -24,7 +24,8 @@ export default function WalkInForm() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const res = await fetch(`${APP_URL}/api/walkin`, {
+      // Same-origin: the form is served from whichever host the visitor is on.
+      const res = await fetch(withBase('/api/walkin'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: fullName, phone, email, city, course_interest: courseInterest, notes }),

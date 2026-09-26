@@ -1,3 +1,4 @@
+import { withBase } from '@/lib/base-path'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -229,21 +230,21 @@ export default async function StudentDashboardPage() {
           value={verCfg.label}
           icon={verDone ? CheckCircle2 : verActive ? Clock : AlertCircle}
           color={verCfg.color} bg={verCfg.bg} border={verCfg.border}
-          href="/student/admission"
+          href={withBase("/student/admission")}
         />
         <StatusCard
           label="Exam Status"
           value={examCfg.label}
           icon={examDone ? CheckCircle2 : Clock}
           color={examCfg.color} bg={examCfg.bg} border={examCfg.border}
-          href="/student/admission"
+          href={withBase("/student/admission")}
         />
         <StatusCard
           label="Result"
           value={resCfg.label}
           icon={resultDone ? CheckCircle2 : Clock}
           color={resCfg.color} bg={resCfg.bg} border={resCfg.border}
-          href="/student/admission"
+          href={withBase("/student/admission")}
         />
         <StatusCard
           label="Fee Dues"
@@ -252,7 +253,7 @@ export default async function StudentDashboardPage() {
           color={pending > 0 ? 'text-red-700' : 'text-emerald-700'}
           bg={pending > 0 ? 'bg-red-50' : 'bg-emerald-50'}
           border={pending > 0 ? 'border-red-200' : 'border-emerald-200'}
-          href="/student/accounts"
+          href={withBase("/student/accounts")}
         />
       </div>
 

@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -36,7 +37,7 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    window.location.replace('/student/login')
+    window.location.replace(withBase('/student/login'))
   }
 
   function fmtEnroll(n: string) {

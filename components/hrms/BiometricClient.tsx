@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -109,7 +110,7 @@ export default function BiometricClient({
     }
     setSaving(key)
     try {
-      const res = await fetch('/api/biometric/map', {
+      const res = await fetch(withBase('/api/biometric/map'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition, useEffect } from 'react'
 import { format } from 'date-fns'
@@ -91,7 +92,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
     if (!confirm(`${emp.full_name} ko ${makeActive ? 'ACTIVE' : 'INACTIVE'} karein?${makeActive ? '' : ' Wo attendance, payroll aur dropdowns se hat jayenge.'}`)) return
     startTransition(async () => {
       try {
-        const res = await fetch('/api/hrms/employees', {
+        const res = await fetch(withBase('/api/hrms/employees'), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: emp.id, is_active: makeActive }),
@@ -115,7 +116,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
         const method = editingEmployee ? 'PATCH' : 'POST'
         const payload = editingEmployee ? { ...values, id: editingEmployee.id } : values
 
-        const res = await fetch('/api/hrms/employees', {
+        const res = await fetch(withBase('/api/hrms/employees'), {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -151,7 +152,7 @@ export default function EmployeeTable({ data: initialData }: EmployeeTableProps)
     startTransition(async () => {
       try {
         // Fetch full detail via API (avoids RLS recursion issues on client)
-        const res = await fetch(`/api/hrms/employees?id=${id}`)
+        const res = await fetch(withBase(`/api/hrms/employees?id=${id}`))
         if (!res.ok) {
           const err = await res.json()
           throw new Error(err.error || 'Failed to fetch employee details')

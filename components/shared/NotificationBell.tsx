@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, CheckCircle2, Clock, AlertTriangle, Zap, Info, CheckCheck, X, PhoneCall } from 'lucide-react'
@@ -252,7 +253,7 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
                   </div>
                   <div className="divide-y divide-gray-50">
                     {followups.map(f => (
-                      <a key={f.id} href={`/leads/${f.id}`} onClick={() => setOpen(false)}
+                      <a key={f.id} href={withBase(`/leads/${f.id}`)} onClick={() => setOpen(false)}
                         className="px-4 py-3 hover:bg-orange-50/50 transition-colors flex items-start gap-2.5 block">
                         <div className="mt-1 w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -318,7 +319,7 @@ export function NotificationBell({ userId, role }: { userId: string; role: strin
             {/* Footer quick link */}
             {tasks.length > 0 && (
               <div className="border-t px-4 py-2.5 bg-gray-50">
-                <a href="/tasks" className="text-xs text-blue-600 hover:underline font-medium" onClick={() => setOpen(false)}>
+                <a href={withBase("/tasks")} className="text-xs text-blue-600 hover:underline font-medium" onClick={() => setOpen(false)}>
                   View all tasks →
                 </a>
               </div>

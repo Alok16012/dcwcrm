@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
@@ -217,7 +218,7 @@ export default function AssociateClient() {
           sub="Referred by you"
           icon={Users}
           color="blue"
-          href="/associate/admissions"
+          href={withBase("/associate/admissions")}
         />
         <StatCard
           label="Total Students"
@@ -225,7 +226,7 @@ export default function AssociateClient() {
           sub="Converted admissions"
           icon={GraduationCap}
           color="indigo"
-          href="/associate/students"
+          href={withBase("/associate/students")}
         />
         <StatCard
           label="Fees Collected"
@@ -233,7 +234,7 @@ export default function AssociateClient() {
           sub="Paid by your students"
           icon={TrendingUp}
           color="emerald"
-          href="/associate/account"
+          href={withBase("/associate/account")}
         />
         <StatCard
           label="Total Revenue"
@@ -241,7 +242,7 @@ export default function AssociateClient() {
           sub="From referred students"
           icon={TrendingUp}
           color="emerald"
-          href="/associate/students"
+          href={withBase("/associate/students")}
         />
       </div>
 

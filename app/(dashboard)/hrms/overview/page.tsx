@@ -1,3 +1,4 @@
+import { withBase } from '@/lib/base-path'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
@@ -95,9 +96,9 @@ export default async function HrmsOverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <PendingCard href="/hrms/leave" icon={CalendarDays} label="Leave requests" count={pendingLeave ?? 0} />
-        <PendingCard href="/hrms/regularization" icon={ClipboardCheck} label="Regularization requests" count={pendingRegularization ?? 0} />
-        <PendingCard href="/hrms/payroll" icon={Banknote} label="Payroll awaiting approval" count={pendingApproval} />
+        <PendingCard href={withBase("/hrms/leave")} icon={CalendarDays} label="Leave requests" count={pendingLeave ?? 0} />
+        <PendingCard href={withBase("/hrms/regularization")} icon={ClipboardCheck} label="Regularization requests" count={pendingRegularization ?? 0} />
+        <PendingCard href={withBase("/hrms/payroll")} icon={Banknote} label="Payroll awaiting approval" count={pendingApproval} />
       </div>
 
       <div className="bg-white border rounded-2xl p-4">

@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -369,7 +370,7 @@ export default function TargetsClient({
         notes: form.notes || null,
         created_by: currentUserId,
       }
-      const res = await fetch('/api/targets', {
+      const res = await fetch(withBase('/api/targets'), {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload),
@@ -392,7 +393,7 @@ export default function TargetsClient({
   function deleteTarget(id: string) {
     if (!isAdmin) return
     startTransition(async () => {
-      const res = await fetch('/api/targets', {
+      const res = await fetch(withBase('/api/targets'), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),

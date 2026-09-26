@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { Document, Page, Text, View, StyleSheet, Image, pdf } from '@react-pdf/renderer'
 
 // "Application Form" PDF shared with the associate after registration — styled
@@ -239,7 +240,7 @@ async function toDataUrl(src: Blob | string | null | undefined): Promise<string 
 
 /** Builds the application form and triggers a download. `photo` may be the just-picked File or a stored URL. */
 export async function downloadAssociateApplicationPdf(d: AssociateFormData, photo?: Blob | string | null) {
-  const [photoUrl, logo] = await Promise.all([toDataUrl(photo), toDataUrl('/brand-logo.png')])
+  const [photoUrl, logo] = await Promise.all([toDataUrl(photo), toDataUrl(withBase('/brand-logo.png'))])
   const blob = await pdf(<ApplicationDoc d={d} photo={photoUrl} logo={logo} />).toBlob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

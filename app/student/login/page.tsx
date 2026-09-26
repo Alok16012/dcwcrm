@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,7 +34,7 @@ export default function StudentLoginPage() {
       const rawUsername = data.username.trim()
 
       // Step 1: resolve the actual auth email for this enrollment number
-      const lookupRes = await fetch('/api/students/lookup-portal-email', {
+      const lookupRes = await fetch(withBase('/api/students/lookup-portal-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enrollment_number: rawUsername }),
@@ -60,9 +61,9 @@ export default function StudentLoginPage() {
       }
 
       // Ensure the profile row exists (it may have been missing for older accounts)
-      await fetch('/api/students/ensure-profile', { method: 'POST' }).catch(() => {})
+      await fetch(withBase('/api/students/ensure-profile'), { method: 'POST' }).catch(() => {})
 
-      window.location.replace('/student/dashboard')
+      window.location.replace(withBase('/student/dashboard'))
     } catch {
       toast.error('Something went wrong. Please try again.')
     } finally {

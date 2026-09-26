@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Package, Truck, CheckCircle2, Clock, MapPin, RefreshCw } from 'lucide-react'
@@ -31,14 +32,14 @@ export default function StudentDispatchPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { window.location.href = '/student/login'; return }
+    if (!user) { window.location.href = withBase('/student/login'); return }
 
     const { data: s } = await supabase
       .from('students')
       .select('enrollment_number')
       .eq('portal_user_id', user.id)
       .single()
-    if (!s) { window.location.href = '/student/login'; return }
+    if (!s) { window.location.href = withBase('/student/login'); return }
 
     const { data } = await supabase
       .from('student_dispatches')

@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 import { Document, Page, Text, View, StyleSheet, Image, pdf } from '@react-pdf/renderer'
 
 // Certificate of Association, issued when an associate is approved.
@@ -191,7 +192,7 @@ async function toDataUrl(src: string): Promise<string | null> {
 
 /** Builds the certificate and triggers a download. */
 export async function downloadAssociateCertificatePdf(d: AssociateCertificateData) {
-  const logo = await toDataUrl('/brand-logo.png')
+  const logo = await toDataUrl(withBase('/brand-logo.png'))
   const blob = await pdf(<CertificateDoc d={d} logo={logo} />).toBlob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

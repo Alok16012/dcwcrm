@@ -1,3 +1,4 @@
+import { withBase } from '@/lib/base-path'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { IndianRupee, CheckCircle } from 'lucide-react'
@@ -51,7 +52,7 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
       const fee = totalFee ? parseFloat(totalFee) : null
       const paid = amountPaid ? parseFloat(amountPaid) : 0
 
-      const res = await fetch('/api/leads/convert', {
+      const res = await fetch(withBase('/api/leads/convert'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

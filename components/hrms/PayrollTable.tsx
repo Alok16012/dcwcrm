@@ -1,4 +1,5 @@
 'use client'
+import { withBase } from '@/lib/base-path'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -141,7 +142,7 @@ export default function PayrollTable({
   }
 
   const buildSlipBlob = async (row: PayrollRow) => {
-    const logoBase64 = await fetch('/brand-logo.png')
+    const logoBase64 = await fetch(withBase('/brand-logo.png'))
       .then(r => r.blob())
       .then(blob => new Promise<string>((resolve) => {
         const reader = new FileReader()
@@ -204,7 +205,7 @@ export default function PayrollTable({
         reader.onerror = reject
         reader.readAsDataURL(blob)
       })
-      const res = await fetch('/api/hrms/payroll/send-slip', {
+      const res = await fetch(withBase('/api/hrms/payroll/send-slip'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payroll_id: row.id, pdf_base64: base64, file_name: slipFileName(row) }),
@@ -222,7 +223,7 @@ export default function PayrollTable({
   const handleDelete = (row: PayrollRow) => {
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/hrms/payroll/${row.id}`, { method: 'DELETE' })
+        const res = await fetch(withBase(`/api/hrms/payroll/${row.id}`), { method: 'DELETE' })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error || 'Failed to delete')
         setData(prev => prev.filter(r => r.id !== row.id))
@@ -238,7 +239,7 @@ export default function PayrollTable({
   const handleGenerate = () => {
     startTransition(async () => {
       try {
-        const res = await fetch('/api/hrms/payroll/generate', {
+        const res = await fetch(withBase('/api/hrms/payroll/generate'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ employee_id: employeeId, month, year, incentive: totalIncentives }),
@@ -283,7 +284,7 @@ export default function PayrollTable({
     setRecalcId(row.id)
     startTransition(async () => {
       try {
-        const res = await fetch('/api/hrms/payroll/generate', {
+        const res = await fetch(withBase('/api/hrms/payroll/generate'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ employee_id: row.employee_id, month: row.month, year: row.year }),
@@ -311,7 +312,7 @@ export default function PayrollTable({
     return new Promise<boolean>((resolve) => {
       startTransition(async () => {
         try {
-          const res = await fetch('/api/hrms/payroll/generate', {
+          const res = await fetch(withBase('/api/hrms/payroll/generate'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ employee_id: row.employee_id, month: row.month, year: row.year }),
@@ -376,7 +377,7 @@ export default function PayrollTable({
       reason = window.prompt('Unlock ka reason likho (audit log me jayega):') ?? ''
       if (!reason.trim()) { toast.error('Reason ke bina unlock nahi hoga'); return }
     }
-    const res = await fetch('/api/hrms/payroll/workflow', {
+    const res = await fetch(withBase('/api/hrms/payroll/workflow'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, action, reason }),
     })
@@ -415,7 +416,7 @@ export default function PayrollTable({
       let ok = 0
       for (const row of rows) {
         try {
-          const res = await fetch(`/api/hrms/payroll/${row.id}`, { method: 'DELETE' })
+          const res = await fetch(withBase(`/api/hrms/payroll/${row.id}`), { method: 'DELETE' })
           if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'failed') }
           ok++
         } catch (e: any) {

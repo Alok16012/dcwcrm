@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isBbRole } from '@/lib/bb/constants'
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
@@ -38,6 +39,10 @@ export async function proxy(request: NextRequest) {
   const isAdminLogin     = pathname === '/login'
   const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
+  // Berojgar Bharat — a separate business in the same app. Its staff never see
+  // the DCW side and DCW staff never see theirs; both directions are enforced
+  // here rather than trusted to the UI.
+  const isBbRoute        = pathname.startsWith('/bb')
   // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
   // forms (Meta ads landing pages at /f/{slug}) + walk-in registration page
   const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/')
@@ -47,7 +52,7 @@ export async function proxy(request: NextRequest) {
   // PWA install assets. These were being redirected to /login, so "Add to Home
   // Screen" never picked up the app name or icons.
   const isPwaAsset       = pathname === '/manifest.webmanifest' || pathname === '/sw.js'
-  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute && !isJoinRoute
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isBbRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute && !isJoinRoute
 
   if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
 
@@ -68,6 +73,20 @@ export async function proxy(request: NextRequest) {
         .eq('portal_user_id', user.id)
         .maybeSingle()
       if (studentRecord) role = 'student'
+    }
+
+    // Berojgar Bharat staff live entirely inside /bb.
+    if (isBbRole(role)) {
+      if (!isBbRoute) {
+        return NextResponse.redirect(new URL('/bb/dashboard', request.url))
+      }
+      return response
+    }
+    // Everyone else is refused the BB area outright.
+    if (isBbRoute) {
+      if (role === 'student')   return NextResponse.redirect(new URL('/student/dashboard', request.url))
+      if (role === 'associate') return NextResponse.redirect(new URL('/associate', request.url))
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
     // Student → always go to student portal

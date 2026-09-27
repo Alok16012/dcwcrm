@@ -136,7 +136,6 @@ export const school = {
       a.subjects,
       a.currentPercent && `Current ${a.currentPercent}`,
       a.targetPercent && `Target ${a.targetPercent}`,
-      a.situation === 'JEE/IIT 75%' && 'JEE/IIT',
       a.pcm && `PCM: ${a.pcm}`,
       a.documents && `Marksheet: ${a.documents}`,
       a.city && `City: ${a.city}`,

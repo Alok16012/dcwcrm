@@ -120,6 +120,21 @@ event stream connected
 
 ## Run it forever
 
+**macOS (launchd)** — one command, no sudo:
+
+```bash
+bash agent/install-service.sh
+```
+
+It starts at login, restarts on crash, and logs to
+`~/Library/Logs/dcw-biometric.log`. Check it with
+`tail -f ~/Library/Logs/dcw-biometric.log`, remove it with
+`bash agent/install-service.sh --uninstall`.
+
+A sleeping Mac still pauses the agent — nothing is lost, because the controller
+keeps its own log and the catch-up poll replays the window on wake (hence the
+36-hour default, which covers a weekend).
+
 **Linux / Raspberry Pi (systemd)** — `/etc/systemd/system/dcw-biometric.service`:
 
 ```ini

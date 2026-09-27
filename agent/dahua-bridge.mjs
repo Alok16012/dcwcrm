@@ -116,7 +116,15 @@ async function flushQueue() {
   let delivered = 0
   for (const line of lines) {
     try {
-      await postToCrm('/api/biometric/punch', JSON.parse(line), 90000)
+      const payload = JSON.parse(line)
+      // Queued before the serial was readable — fill it in now, or leave it
+      // queued rather than deliver it under no device at all.
+      if (!payload.device_serial) {
+        const serial = await ensureSerial()
+        if (!serial) break
+        payload.device_serial = serial
+      }
+      await postToCrm('/api/biometric/punch', payload, 90000)
       delivered++
     } catch (e) {
       logErr('queue flush failed, will retry:', e.message)
@@ -132,8 +140,16 @@ async function flushQueue() {
 
 async function sendPunches(punches, source) {
   if (punches.length === 0) return
+
+  const serial = await ensureSerial()
+  if (!serial) {
+    logErr(`device serial unknown — queuing ${punches.length} punch(es) until it is readable`)
+    enqueue({ device_name: CFG.deviceName, device_ip: CFG.deviceHost, source, punches })
+    return
+  }
+
   const payload = {
-    device_serial: STATE.serial,
+    device_serial: serial,
     device_name: CFG.deviceName,
     device_ip: CFG.deviceHost,
     source,
@@ -162,15 +178,32 @@ const STATE = {
   backoffMs: 2000,
 }
 
+/**
+ * The controller's serial is its identity in the CRM, so it has to be real.
+ *
+ * Falling back to the configured host looked harmless and was not: one network
+ * blip at startup registered a second, phantom device named after the IP, and
+ * every heartbeat and punch for that process went to it. Better to have no
+ * serial and keep retrying than a confident wrong one.
+ */
 async function readSerial() {
   try {
     const parsed = parseDahuaKv(await device.get('/cgi-bin/magicBox.cgi?action=getSerialNo'))
-    STATE.serial = (parsed.sn || parsed.serialNumber || '').trim() || CFG.deviceHost
+    const sn = (parsed.sn || parsed.serialNumber || '').trim()
+    if (sn) {
+      STATE.serial = sn
+      return sn
+    }
+    logErr('device returned an empty serial')
   } catch (e) {
     logErr('could not read device serial:', e.message)
-    STATE.serial = STATE.serial || CFG.deviceHost
   }
-  return STATE.serial
+  return null
+}
+
+/** Serial we already have, or one more attempt to fetch it. */
+async function ensureSerial() {
+  return STATE.serial ?? (await readSerial())
 }
 
 // ------------------------------------------------------------ live events ---
@@ -310,9 +343,14 @@ async function pollRecords() {
 // -------------------------------------------------------------- heartbeat ---
 
 async function heartbeat() {
+  const serial = await ensureSerial()
+  if (!serial) {
+    logErr('skipping heartbeat — device serial not readable yet')
+    return
+  }
   try {
     await postToCrm('/api/biometric/heartbeat', {
-      device_serial: STATE.serial,
+      device_serial: serial,
       device_name: CFG.deviceName,
       device_ip: CFG.deviceHost,
       agent_version: AGENT_VERSION,
@@ -329,8 +367,8 @@ async function main() {
   log(`DCW Dahua bridge v${AGENT_VERSION}`)
   log(`device ${CFG.deviceProtocol}://${CFG.deviceHost}  ->  CRM ${CFG.crmUrl}`)
 
-  await readSerial()
-  log('device serial:', STATE.serial)
+  const serial = await readSerial()
+  log(serial ? `device serial: ${serial}` : 'device serial not readable yet — will retry')
 
   await heartbeat()
   await flushQueue()

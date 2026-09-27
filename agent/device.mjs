@@ -361,16 +361,32 @@ export async function findAccessRecords(device, { start, end, max = 2000 } = {})
  * key=value form. Returns null when neither shape is available.
  */
 export async function getEnrolledUsers(device) {
+  // Firmware 3.x answers AccessUser.cgi?action=startFind in JSON but only with
+  // a count — the names live in the AccessControlCard record set, which does
+  // return the full roster. Try that first; it is the one that is useful.
   try {
-    const body = await device.get('/cgi-bin/AccessUser.cgi?action=startFind&count=100')
-    const json = JSON.parse(body)
-    return { total: Number(json.Total ?? 0), token: json.Token ?? null, users: [] }
+    const parsed = parseDahuaKv(
+      await device.get('/cgi-bin/recordFinder.cgi?action=find&name=AccessControlCard&count=200')
+    )
+    const rows = parsed.records ?? {}
+    const keys = Object.keys(rows).filter(k => /^\d+$/.test(k))
+    if (keys.length > 0) {
+      const users = keys
+        .sort((a, b) => Number(a) - Number(b))
+        .map(k => ({
+          userId: rows[k].UserID || null,
+          name: rows[k].CardName || rows[k].UserName || null,
+          cardNo: rows[k].CardNo || null,
+        }))
+      return { total: Number(parsed.found ?? users.length), token: null, users }
+    }
   } catch {
-    // fall through to the flat form
+    // fall through
   }
 
+  // Older firmware: the flat user list.
   try {
-    const parsed = parseDahuaKv(await device.get('/cgi-bin/AccessUser.cgi?action=list&count=100'))
+    const parsed = parseDahuaKv(await device.get('/cgi-bin/AccessUser.cgi?action=list&count=200'))
     const rows = parsed.records ?? {}
     const users = Object.keys(rows)
       .filter(k => /^\d+$/.test(k))
@@ -379,7 +395,15 @@ export async function getEnrolledUsers(device) {
         name: rows[k].UserName ?? rows[k].CardName ?? null,
         cardNo: rows[k].CardNo ?? null,
       }))
-    return { total: Number(parsed.found ?? users.length), token: null, users }
+    if (users.length > 0) return { total: Number(parsed.found ?? users.length), token: null, users }
+  } catch {
+    // fall through
+  }
+
+  // Last resort: a count with no names.
+  try {
+    const json = JSON.parse(await device.get('/cgi-bin/AccessUser.cgi?action=startFind&count=100'))
+    return { total: Number(json.Total ?? 0), token: json.Token ?? null, users: [] }
   } catch {
     return null
   }

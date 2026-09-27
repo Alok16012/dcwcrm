@@ -29,10 +29,16 @@ function safeEqual(a: string, b: string): boolean {
  * BIOMETRIC_ALLOW_BEARER is set — useful while commissioning a device, but the
  * signed path is what should run in production.
  */
-export function verifyAgentRequest(req: Request, rawBody: string): AuthResult {
-  const secret = process.env.BIOMETRIC_WEBHOOK_SECRET
+export function verifyAgentRequest(
+  req: Request,
+  rawBody: string,
+  // Other trusted services (the WhatsApp bot) sign the same way with their
+  // own secret; the biometric agent keeps using its env var by default.
+  secret: string | undefined = process.env.BIOMETRIC_WEBHOOK_SECRET,
+  secretName = 'BIOMETRIC_WEBHOOK_SECRET'
+): AuthResult {
   if (!secret) {
-    return { ok: false, reason: 'BIOMETRIC_WEBHOOK_SECRET is not configured', status: 500 }
+    return { ok: false, reason: `${secretName} is not configured`, status: 500 }
   }
 
   const signature = req.headers.get('x-dcw-signature')

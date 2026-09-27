@@ -62,3 +62,8 @@ next-env.d.ts
 !agent/.env.example
 agent/.env
 agent/queue.jsonl
+
+# WhatsApp bot: its own dependencies, and the linked-device credentials —
+# anyone holding those can read and send as the bot's WhatsApp number.
+whatsapp-bot/node_modules
+whatsapp-bot/.wa-auth

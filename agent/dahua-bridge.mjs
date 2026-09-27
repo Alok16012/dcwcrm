@@ -74,7 +74,7 @@ const device = createDeviceClient({
 
 // ----------------------------------------------------------- CRM transport ---
 
-function postToCrm(pathname, payload) {
+function postToCrm(pathname, payload, timeoutMs = 20000) {
   const body = JSON.stringify(payload)
   const timestamp = Math.floor(Date.now() / 1000).toString()
   const signature = createHmac('sha256', CFG.secret).update(`${timestamp}.${body}`).digest('hex')
@@ -87,7 +87,7 @@ function postToCrm(pathname, payload) {
       'x-dcw-signature': `sha256=${signature}`,
     },
     body,
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeoutMs),
   }).then(async res => {
     const text = await res.text()
     if (!res.ok) throw new Error(`CRM ${pathname} -> HTTP ${res.status}: ${text.slice(0, 300)}`)
@@ -116,7 +116,7 @@ async function flushQueue() {
   let delivered = 0
   for (const line of lines) {
     try {
-      await postToCrm('/api/biometric/punch', JSON.parse(line))
+      await postToCrm('/api/biometric/punch', JSON.parse(line), 90000)
       delivered++
     } catch (e) {
       logErr('queue flush failed, will retry:', e.message)
@@ -140,7 +140,9 @@ async function sendPunches(punches, source) {
     punches,
   }
   try {
-    const result = await postToCrm('/api/biometric/punch', payload)
+    // A replay costs the CRM one attendance rebuild per employee per date, so
+    // give a batch room rather than timing out on a write that is succeeding.
+    const result = await postToCrm('/api/biometric/punch', payload, punches.length > 1 ? 90000 : 20000)
     log(
       `sent ${punches.length} ${source} punch(es) ->`,
       `stored ${result.stored ?? '?'}, dup ${result.duplicates ?? '?'}, unmapped ${result.unmapped ?? '?'}`
@@ -298,9 +300,10 @@ async function pollRecords() {
     return
   }
 
-  // Batched so one CRM round trip covers the whole window.
-  for (let i = 0; i < records.length; i += 200) {
-    await sendPunches(records.slice(i, i + 200), 'poll')
+  // Kept small on purpose: each punch can trigger an attendance rebuild, so a
+  // 200-row batch is a long request for no benefit.
+  for (let i = 0; i < records.length; i += 50) {
+    await sendPunches(records.slice(i, i + 50), 'poll')
   }
 }
 

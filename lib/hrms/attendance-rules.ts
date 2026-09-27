@@ -14,6 +14,12 @@ export interface HrmsSettings {
   weekly_off_day: number          // 0 = Sunday, JS getDay()
   office_start: string            // 'HH:MM'
   office_end: string
+  /**
+   * Clock-out assumed for a finished day with a punch-in but no punch-out.
+   * Separate from office_end on purpose: office_end decides early leaving,
+   * this decides what a forgotten punch is worth.
+   */
+  assumed_clock_out: string
   grace_till: string
   late_till: string
   half_day_till: string
@@ -35,6 +41,7 @@ export const DEFAULT_SETTINGS: HrmsSettings = {
   weekly_off_day: 0,
   office_start: '10:30',
   office_end: '18:00',
+  assumed_clock_out: '18:30',
   grace_till: '10:45',
   late_till: '11:30',
   half_day_till: '12:30',
@@ -162,6 +169,7 @@ export async function loadHrmsSettings(db: SupabaseClient<any, any, any>): Promi
     weekly_off_day: num('weekly_off_day', 0),
     office_start: time('office_start', '10:30'),
     office_end: time('office_end', '18:00'),
+    assumed_clock_out: time('assumed_clock_out', '18:30'),
     grace_till: time('grace_till', '10:45'),
     late_till: time('late_till', '11:30'),
     half_day_till: time('half_day_till', '12:30'),

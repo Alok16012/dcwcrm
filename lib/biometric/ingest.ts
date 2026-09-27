@@ -300,7 +300,20 @@ export async function recomputeAttendance(
 
   const clockIn = first.punch_time
   // A single recognition (or two seconds apart) is an arrival, not a full day.
-  const clockOut = spanSeconds >= MIN_SPAN_SECONDS ? last.punch_time : null
+  let clockOut = spanSeconds >= MIN_SPAN_SECONDS ? last.punch_time : null
+
+  // Forgotten punch-out. Close a finished day at the assumed leaving time so
+  // the hours are recorded rather than lost to a 'missing' verdict.
+  //   - never for today: someone still at their desk has not left yet
+  //   - never when the only punch is already past it, which would invent a
+  //     day that ended before it began — those stay open for a human
+  if (
+    !clockOut &&
+    date < istParts(new Date()).date &&
+    clockIn.slice(0, 5) < rules.assumed_clock_out
+  ) {
+    clockOut = `${rules.assumed_clock_out}:00`
+  }
 
   const { data: existing } = await db
     .from('attendance')

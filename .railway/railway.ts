@@ -37,14 +37,28 @@ export default defineRailway(() => {
   // Exactly one replica: two copies sharing one WhatsApp session knock each
   // other off in a loop. The volume keeps the linked-device credentials, so a
   // redeploy does not force the phone to be paired again.
-  const waAuth = volume("wa-auth", { sizeMB: 500 });
+  // Region pinned to where Railway placed it. Left unset, the next apply
+  // "changes" it — and moving a volume destroys it, taking the paired
+  // WhatsApp session with it.
+  const waAuth = volume("wa-auth", { sizeMB: 500, region: "sfo" });
   const whatsappBot = service("whatsapp-bot", {
-    root: "whatsapp-bot",
+    // Matches what Railway recorded. Deploys go through `railway up` from the
+    // repo root; no repo is linked, so pushing CRM changes does not restart
+    // the bot and drop its WhatsApp connection.
+    source: { type: "github", rootDirectory: "whatsapp-bot" },
     start: "npm start",
     healthcheck: "/health",
     healthcheckTimeout: 60,
     replicas: 1,
     volumeMounts: { "/data": waAuth },
+    variables: {
+      SUPABASE_URL: preserve(),
+      SUPABASE_SERVICE_ROLE_KEY: preserve(),
+      CRM_BASE_URL: preserve(),
+      WHATSAPP_BOT_SECRET: preserve(),
+      AI_PROVIDER: preserve(),
+      TZ: preserve(),
+    },
   });
 
   return project("dcwcrm", {

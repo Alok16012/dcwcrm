@@ -91,17 +91,24 @@ export default async function BiometricPage({
 
   const employeeNameById = Object.fromEntries(employees.map(e => [e.id, e.name]))
 
-  // Every device identity seen today that no employee claims — these are the
-  // punches silently doing nothing until someone maps them.
+  // Device identities nobody claims yet. An identity is something you can
+  // point at — a User ID or a card number. A face the controller failed to
+  // recognise carries neither, so it can never be "mapped" to anyone and has
+  // no business in a list whose only action is Map.
   const unmappedMap = new Map<string, { userId: string | null; cardNo: string | null; name: string | null; count: number; lastAt: string }>()
+  let unrecognised = 0
   for (const p of punches) {
+    const identity = p.biometric_user_id ?? p.card_no
+    if (!identity) {
+      unrecognised++
+      continue
+    }
     if (p.employee_id) continue
-    const key = p.biometric_user_id ?? p.card_no ?? 'anon'
-    const existing = unmappedMap.get(key)
+    const existing = unmappedMap.get(identity)
     if (existing) {
       existing.count++
     } else {
-      unmappedMap.set(key, {
+      unmappedMap.set(identity, {
         userId: p.biometric_user_id,
         cardNo: p.card_no,
         name: p.card_name,
@@ -127,6 +134,7 @@ export default async function BiometricPage({
         employees={employees}
         employeeNameById={employeeNameById}
         unmapped={[...unmappedMap.values()].sort((a, b) => b.count - a.count)}
+        unrecognised={unrecognised}
       />
     </div>
   )

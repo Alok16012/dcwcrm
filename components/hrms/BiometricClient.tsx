@@ -62,6 +62,8 @@ interface Props {
   employees: MappableEmployee[]
   employeeNameById: Record<string, string>
   unmapped: UnmappedIdentity[]
+  /** Faces the controller could not place — no User ID, so nothing to map. */
+  unrecognised: number
 }
 
 /** The agent heartbeats every minute; three misses is a dead link. */
@@ -94,7 +96,7 @@ function timeAgo(iso: string | null): string {
 }
 
 export default function BiometricClient({
-  date, devices, punches, employees, employeeNameById, unmapped,
+  date, devices, punches, employees, employeeNameById, unmapped, unrecognised,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -202,10 +204,10 @@ export default function BiometricClient({
       {/* --------------------------------------------------------- stats --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Punches today', value: successPunches.length, icon: CheckCircle2, tone: 'text-blue-600' },
+          { label: 'Punches', value: successPunches.length, icon: CheckCircle2, tone: 'text-blue-600' },
           { label: 'Staff recognised', value: new Set(successPunches.filter(p => p.employee_id).map(p => p.employee_id)).size, icon: ScanFace, tone: 'text-green-600' },
           { label: 'Enrolled & mapped', value: `${mappedCount}/${employees.length}`, icon: UserPlus, tone: 'text-indigo-600' },
-          { label: 'Unknown identities', value: unmapped.length, icon: AlertTriangle, tone: unmapped.length ? 'text-amber-600' : 'text-gray-400' },
+          { label: 'Unrecognised faces', value: unrecognised, icon: ScanFace, tone: unrecognised ? 'text-gray-600' : 'text-gray-400' },
         ].map(s => (
           <div key={s.label} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <s.icon className={`w-4 h-4 ${s.tone}`} />
@@ -223,7 +225,7 @@ export default function BiometricClient({
             <h2 className="font-bold text-amber-900">Unknown device identities</h2>
           </div>
           <p className="text-sm text-amber-800 mt-1">
-            These User IDs punched today but belong to no employee yet. Map one and its past
+            These User IDs punched but belong to no employee yet. Map one and its past
             punches are applied to attendance automatically.
           </p>
 

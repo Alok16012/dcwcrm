@@ -2,7 +2,7 @@
   "name": "dcw-whatsapp-bot",
   "version": "1.0.0",
   "private": true,
-  "description": "DCW admission chatbot on WhatsApp \u2014 qualifies leads and hands them to counsellors",
+  "description": "DCW admission chatbot on WhatsApp — qualifies leads and hands them to counsellors",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.117.2",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
   }
 }

@@ -46,13 +46,33 @@ const db = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROL
 const store = makeStore(db)
 const crm = makeCrm({ baseUrl: required('CRM_BASE_URL'), secret: required('WHATSAPP_BOT_SECRET') })
 
+/**
+ * Mirror the connection state into wa_bot_status for the CRM's WhatsApp page.
+ * Best effort: a failed write must never stop the bot from answering.
+ */
+async function reportStatus(patch) {
+  const { error } = await db.from('wa_bot_status').upsert({
+    id: true,
+    ...patch,
+    ai_provider: aiStats().provider,
+    ai_used_today: aiStats().usedToday,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) log.warn(`status report failed: ${error.message}`)
+}
+
 let bot
 const wa = makeWhatsApp({
   authDir,
   phoneNumber: env.WA_PHONE_NUMBER,
   log,
   onMessage: (m, meta) => bot.onMessage(m, meta),
+  onStatus: patch => reportStatus(patch),
 })
+
+// A heartbeat, so the CRM can tell "connected" from "the process died while
+// the last row still said connected".
+setInterval(() => reportStatus({ status: wa.status }), 60 * 1000)
 bot = makeBot({ wa, store, crm, config, log })
 
 // Health: what Railway (and a person) can check without reading logs. No

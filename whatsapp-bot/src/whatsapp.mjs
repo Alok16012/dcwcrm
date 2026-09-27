@@ -11,10 +11,12 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
+import QR from 'qrcode'
+import fs from 'node:fs'
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
+export function makeWhatsApp({ authDir, phoneNumber, log, onMessage, onStatus = () => {} }) {
   let sock = null
   let status = 'starting'
   let backoff = 2000
@@ -52,6 +54,9 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         status = 'awaiting_pairing'
+        QR.toDataURL(qr, { margin: 1, width: 320 })
+          .then(img => onStatus({ status, qr: img, connected_as: null, last_error: null }))
+          .catch(e => log.error(`qr image: ${e.message}`))
         // A pairing code is far easier than scanning a QR out of a server log.
         if (phoneNumber && !pairingRequested && !state.creds.registered) {
           pairingRequested = true
@@ -59,7 +64,9 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
             const code = await sock.requestPairingCode(phoneNumber.replace(/\D/g, ''))
             log.info('')
             log.info('════════════════════════════════════════════')
-            log.info(`  WhatsApp pairing code:  ${code.match(/.{1,4}/g).join('-')}`)
+            const pretty = code.match(/.{1,4}/g).join('-')
+            onStatus({ status, pairing_code: pretty })
+            log.info(`  WhatsApp pairing code:  ${pretty}`)
             log.info('  On the bot phone: WhatsApp → Settings → Linked devices')
             log.info('  → Link a device → "Link with phone number instead"')
             log.info('════════════════════════════════════════════')
@@ -77,6 +84,8 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
       if (connection === 'open') {
         status = 'connected'
         backoff = 2000
+        const me = sock.user?.id?.split(':')[0]?.split('@')[0] ?? null
+        onStatus({ status, connected_as: me ? `+${me}` : null, qr: null, pairing_code: null, last_error: null })
         log.info(`WhatsApp connected as ${sock.user?.id ?? 'unknown'}`)
       }
 
@@ -85,10 +94,21 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
         status = 'disconnected'
 
         if (code === DisconnectReason.loggedOut) {
-          // The phone removed this device. Reconnecting cannot fix that;
-          // the session has to be paired again.
+          // The phone removed this device. The saved session is dead and can
+          // never reconnect, so throw it away and start a fresh pairing — the
+          // new QR appears on the CRM's WhatsApp page, and linking again
+          // needs no redeploy and no one reading a server log.
           status = 'logged_out'
-          log.error('WhatsApp logged out — delete the auth folder and pair again. Not reconnecting.')
+          onStatus({ status, connected_as: null, last_error: 'Unlinked from the phone — scan the new QR to link again' })
+          log.error('WhatsApp logged out — clearing the session and starting a new pairing')
+          try {
+            for (const f of fs.readdirSync(authDir)) fs.rmSync(`${authDir}/${f}`, { recursive: true, force: true })
+          } catch (e) {
+            log.error(`could not clear auth folder: ${e.message}`)
+          }
+          pairingRequested = false
+          await sleep(3000)
+          connect().catch(e => log.error(`re-pair failed: ${e.message}`))
           return
         }
         if (code === DisconnectReason.connectionReplaced) {
@@ -98,6 +118,7 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage }) {
           await sleep(60000)
         }
         const wait = code === DisconnectReason.restartRequired ? 500 : backoff
+        onStatus({ status, last_error: `Connection closed (${code ?? 'unknown'}) — reconnecting` })
         log.warn(`WhatsApp closed (${code ?? 'unknown'}) — reconnecting in ${Math.round(wait / 1000)}s`)
         await sleep(wait)
         backoff = Math.min(backoff * 2, 60000)

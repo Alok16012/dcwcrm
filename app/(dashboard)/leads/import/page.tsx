@@ -107,12 +107,23 @@ export default function LeadImportPage() {
     let success = 0
     const failed: ImportRow[] = []
 
-    // Fetch existing phones to skip duplicates (avoids 400 from missing unique constraint)
-    const phones = validRows.map((r) => r.phone)
-    const { data: existing } = await supabase.from('leads').select('phone').in('phone', phones)
-    const existingPhones = new Set((existing ?? []).map((r: { phone: string }) => r.phone))
+    // Skip numbers already in the CRM — and repeats inside the file itself.
+    // Compared on the last 10 digits (phone_last10), the same key every other
+    // lead source dedupes on, so '+91 98123 45670' matches '9812345670'.
+    const last10 = (p: string) => String(p ?? '').replace(/\D/g, '').slice(-10)
+    const keys = [...new Set(validRows.map((r) => last10(r.phone)).filter((k) => k.length === 10))]
+    const existingPhones = new Set<string>()
+    for (let i = 0; i < keys.length; i += 200) {
+      const { data: existing } = await supabase.from('leads').select('phone_last10').in('phone_last10', keys.slice(i, i + 200))
+      for (const r of (existing ?? []) as { phone_last10: string }[]) existingPhones.add(r.phone_last10)
+    }
 
-    const newRows = validRows.filter((r) => !existingPhones.has(r.phone))
+    const newRows = validRows.filter((r) => {
+      const k = last10(r.phone)
+      if (existingPhones.has(k)) return false
+      existingPhones.add(k)
+      return true
+    })
     const skipped = validRows.length - newRows.length
 
     const chunkSize = 100

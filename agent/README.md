@@ -157,8 +157,17 @@ sudo systemctl enable --now dcw-biometric
 journalctl -u dcw-biometric -f
 ```
 
-**Windows (reception PC)** — install [NSSM](https://nssm.cc) and run
-`nssm install DCWBiometric "C:\Program Files\nodejs\node.exe" "C:\dcwcrm\agent\dahua-bridge.mjs"`.
+**Windows (reception PC)** — build the package on a machine that has `agent/.env`:
+
+```bash
+bash agent/windows/build-package.sh      # -> ~/Desktop/DCW-Biometric-Windows.zip
+```
+
+Copy the zip to the office PC, unzip, double-click **INSTALL.bat** once. It
+installs Node.js if missing, copies the agent to `%LOCALAPPDATA%\DCWBiometric`,
+and starts it hidden on every login (Startup folder), restarting it if it
+exits. **STATUS.bat** shows the latest log, **UNINSTALL.bat** removes it. The
+zip contains `.env` (device password + webhook secret) — keep it private.
 
 **Anywhere with pm2** — `pm2 start dahua-bridge.mjs --name dcw-biometric && pm2 save`.
 

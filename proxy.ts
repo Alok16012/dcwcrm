@@ -32,13 +32,10 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // getClaims() verifies the session JWT locally against the project's cached
-  // JWKS instead of calling the auth server on every request like getUser()
-  // did — this proxy runs before every page load and prefetch, so that round
-  // trip was a large share of the wait after signing in. (Projects still on
-  // the legacy symmetric JWT secret fall back to a server check, as before.)
-  const { data: claimsData } = await supabase.auth.getClaims()
-  const userId = claimsData?.claims?.sub ?? null
+  // getUser(), not getClaims(): on Vercel getClaims() hung until the proxy
+  // hit MIDDLEWARE_INVOCATION_TIMEOUT (504) on every page, login included.
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id ?? null
   const { pathname } = request.nextUrl
 
   const isStudentRoute   = pathname.startsWith('/student/') && pathname !== '/student/login'

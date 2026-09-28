@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2, PauseCircle } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2, PauseCircle, GraduationCap, Eye, EyeOff, Copy, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -62,7 +62,46 @@ const ASSOC_STATUS: Record<string, { label: string; cls: string }> = {
   inactive: { label: 'Inactive', cls: 'bg-gray-100 text-gray-600' },
 }
 
-type Tab = 'staff' | 'associates'
+type Tab = 'staff' | 'associates' | 'students'
+
+/** Stored passwords are hashed, so the only one anyone can ever see is the one
+ *  being typed or generated right now — this field makes that one readable. */
+function PasswordField({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
+  const [show, setShow] = useState(false)
+  function generate() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(10))
+    const pwd = Array.from(bytes, b => chars[b % chars.length]).join('')
+    onChange(pwd)
+    setShow(true)
+  }
+  return (
+    <div className="flex gap-1.5">
+      <div className="relative flex-1">
+        <Input
+          type={show ? 'text' : 'password'}
+          placeholder="Min 8 characters"
+          value={value ?? ''}
+          onChange={e => onChange(e.target.value)}
+          className="pr-9"
+        />
+        <button type="button" onClick={() => setShow(s => !s)} title={show ? 'Hide password' : 'Show password'}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      <Button type="button" variant="outline" size="sm" title="Generate a password" onClick={generate}>
+        <Wand2 className="w-4 h-4" />
+      </Button>
+      <Button type="button" variant="outline" size="sm" title="Copy" disabled={!value}
+        onClick={() => { navigator.clipboard.writeText(value ?? ''); toast.success('Password copied') }}>
+        <Copy className="w-4 h-4" />
+      </Button>
+    </div>
+  )
+}
+
+const STAFF_EXCLUDED_ROLES = ['associate', 'student']
 
 // Merged profile with optional employee info
 type StaffRow = Profile & { emp_code?: string; department?: string; designation?: string; joining_date?: string }
@@ -92,13 +131,13 @@ export function UsersSettingsClient({
   const [assocNewPassword, setAssocNewPassword] = useState('')
   const [assocDeleteTarget, setAssocDeleteTarget] = useState<AssociateRow | null>(null)
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<CreateUserData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<CreateUserData>({
     resolver: zodResolver(createUserSchema),
   })
 
   // Merge employee details into staff rows
   const empByProfileId = Object.fromEntries(initialEmployees.map(e => [e.profile?.id ?? '', e]))
-  const staffRows: StaffRow[] = users.map(u => {
+  const toRow = (u: Profile): StaffRow => {
     const emp = empByProfileId[u.id]
     return {
       ...u,
@@ -107,7 +146,10 @@ export function UsersSettingsClient({
       designation: emp?.designation ?? undefined,
       joining_date: emp?.joining_date ?? undefined,
     }
-  })
+  }
+  // Associates have their own tab (from the associates table), students theirs.
+  const staffRows: StaffRow[] = users.filter(u => !STAFF_EXCLUDED_ROLES.includes(u.role)).map(toRow)
+  const studentRows: StaffRow[] = users.filter(u => u.role === 'student').map(toRow)
 
   async function onCreateUser(data: CreateUserData) {
     startTransition(async () => {
@@ -365,15 +407,16 @@ export function UsersSettingsClient({
   ]
 
   const tabs: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: 'staff',      label: 'Staff',      icon: Users,       count: users.length },
-    { key: 'associates', label: 'Associates', icon: UserCircle2, count: initialAssociates.length },
+    { key: 'staff',      label: 'Staff',      icon: Users,         count: staffRows.length },
+    { key: 'associates', label: 'Associates', icon: UserCircle2,   count: associates.length },
+    { key: 'students',   label: 'Students',   icon: GraduationCap, count: studentRows.length },
   ]
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="User Management"
-        description="Manage staff and associates"
+        description="Distance Courses Wala staff, associates and students. Berojgar Bharat accounts are on its own Team page."
         action={
           activeTab === 'staff' ? (
             <Dialog open={open} onOpenChange={setOpen}>
@@ -385,7 +428,7 @@ export function UsersSettingsClient({
                 <form onSubmit={handleSubmit(onCreateUser)} className="space-y-4">
                   <div><Label>Full Name</Label><Input {...register('full_name')} />{errors.full_name && <p className="text-xs text-red-500">{errors.full_name.message}</p>}</div>
                   <div><Label>Email</Label><Input type="email" {...register('email')} />{errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}</div>
-                  <div><Label>Password</Label><Input type="password" {...register('password')} />{errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}</div>
+                  <div><Label>Password</Label><PasswordField value={watch('password')} onChange={v => setValue('password', v, { shouldValidate: true })} />{errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}</div>
                   <div><Label>Phone</Label><Input {...register('phone')} /></div>
                   <div>
                     <Label>Role</Label>
@@ -432,6 +475,7 @@ export function UsersSettingsClient({
 
       {activeTab === 'staff'      && <DataTable data={staffRows}  columns={staffColumns} />}
       {activeTab === 'associates' && <DataTable data={associates}  columns={associateColumns} />}
+      {activeTab === 'students'   && <DataTable data={studentRows} columns={staffColumns.filter(c => c.id !== 'dept_desig' && c.id !== 'joining')} />}
 
       {/* ── Dialogs ── */}
       {confirmUser && (
@@ -462,7 +506,8 @@ export function UsersSettingsClient({
           <div className="space-y-4 pt-2">
             <div>
               <Label>New Password</Label>
-              <Input type="password" placeholder="Min 8 characters" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              <PasswordField value={newPassword} onChange={setNewPassword} />
+              <p className="text-[11px] text-gray-400 mt-1">Saved passwords can't be shown — set a new one here and share it.</p>
               {newPassword.length > 0 && newPassword.length < 8 && <p className="text-xs text-red-500 mt-1">Minimum 8 characters required</p>}
             </div>
             <div className="flex justify-end gap-2">
@@ -482,7 +527,8 @@ export function UsersSettingsClient({
           <div className="space-y-4 pt-2">
             <div>
               <Label>New Password</Label>
-              <Input type="password" placeholder="Min 8 characters" value={assocNewPassword} onChange={e => setAssocNewPassword(e.target.value)} />
+              <PasswordField value={assocNewPassword} onChange={setAssocNewPassword} />
+              <p className="text-[11px] text-gray-400 mt-1">Saved passwords can't be shown — set a new one here and share it.</p>
               {assocNewPassword.length > 0 && assocNewPassword.length < 8 && <p className="text-xs text-red-500 mt-1">Minimum 8 characters required</p>}
             </div>
             <div className="flex justify-end gap-2">

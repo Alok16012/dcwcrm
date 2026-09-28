@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { UsersSettingsClient } from './client'
+import { BB_ROLES } from '@/lib/bb/constants'
 
 export default async function UsersSettingsPage() {
   const supabase = await createServerClient()
@@ -11,7 +12,10 @@ export default async function UsersSettingsPage() {
   if (!['admin', 'backend'].includes(profile?.role ?? '')) redirect('/')
 
   const [{ data: users }, { data: employees }, { data: associates }] = await Promise.all([
-    supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+    // Berojgar Bharat accounts are managed on its own Team page, not here.
+    supabase.from('profiles').select('*')
+      .not('role', 'in', `(${BB_ROLES.join(',')})`)
+      .order('created_at', { ascending: false }),
     (supabase as any)
       .from('employees')
       .select('id, employee_code, department, designation, joining_date, is_active, basic_salary, profile:profiles(id, full_name, email, phone, role)')

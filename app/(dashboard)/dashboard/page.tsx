@@ -1,17 +1,10 @@
 import { redirect } from 'next/navigation'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, getCurrentUser, getCurrentProfile } from '@/lib/supabase/server'
 import DashboardClient from '../dashboard-client'
 
 export default async function DashboardPage() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: profile } = user ? await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single() as { data: { role: string } | null } : { data: null }
+  const [supabase, user, profile] = await Promise.all([createServerClient(), getCurrentUser(), getCurrentProfile()])
 
   // Associates get their own portal. Backend used to be bounced to /backend
   // too, which made the sidebar's Dashboard entry a dead link for them — they

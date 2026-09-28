@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createServerClient as _createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database.types'
@@ -23,3 +24,27 @@ export async function createServerClient() {
     }
   )
 }
+
+/**
+ * The signed-in user and their profile row, fetched once per request. The
+ * dashboard layout and the page under it both need them and render in the
+ * same request, so without this each paid for its own auth + profile round
+ * trips before anything could show.
+ */
+export const getCurrentUser = cache(async () => {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+})
+
+export const getCurrentProfile = cache(async () => {
+  const user = await getCurrentUser()
+  if (!user) return null
+  const supabase = await createServerClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+  return data as { id: string; email: string; full_name: string; role: string; phone: string | null; is_active: boolean; created_at: string; module_rights: string[] | null } | null
+})

@@ -104,7 +104,7 @@ export default function LoginPage() {
     if (!brand) return
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signIn, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       })
@@ -113,7 +113,9 @@ export default function LoginPage() {
         return
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
+      // signInWithPassword already returns the verified user — asking the auth
+      // server again with getUser() only added a round trip to every login.
+      const user = signIn.user
       if (!user) {
         toast.error('Could not read your account')
         return

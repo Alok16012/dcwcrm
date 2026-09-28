@@ -32,7 +32,13 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // getClaims() verifies the session JWT locally against the project's cached
+  // JWKS instead of calling the auth server on every request like getUser()
+  // did — this proxy runs before every page load and prefetch, so that round
+  // trip was a large share of the wait after signing in. (Projects still on
+  // the legacy symmetric JWT secret fall back to a server check, as before.)
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub ?? null
   const { pathname } = request.nextUrl
 
   const isStudentRoute   = pathname.startsWith('/student/') && pathname !== '/student/login'
@@ -57,11 +63,11 @@ export async function proxy(request: NextRequest) {
 
   if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
 
-  if (user) {
+  if (userId) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     let role = profile?.role
@@ -71,7 +77,7 @@ export async function proxy(request: NextRequest) {
       const { data: studentRecord } = await supabase
         .from('students')
         .select('id')
-        .eq('portal_user_id', user.id)
+        .eq('portal_user_id', userId)
         .maybeSingle()
       if (studentRecord) role = 'student'
     }

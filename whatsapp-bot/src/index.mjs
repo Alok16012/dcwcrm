@@ -15,6 +15,7 @@ import { makeStore } from './store.mjs'
 import { makeCrm } from './crm.mjs'
 import { makeBot } from './bot.mjs'
 import { aiStats } from './ai.mjs'
+import { makeControl } from './control.mjs'
 
 const env = process.env
 const log = {
@@ -73,7 +74,11 @@ const wa = makeWhatsApp({
 // A heartbeat, so the CRM can tell "connected" from "the process died while
 // the last row still said connected".
 setInterval(() => reportStatus({ status: wa.status }), 60 * 1000)
-bot = makeBot({ wa, store, crm, config, log })
+// Settings, knowledge and outreach from the CRM's control centre. BOT_PAUSED
+// on Railway still wins: it is the brake that works even if the CRM is down.
+const control = makeControl({ db, wa, store, config, envPaused: config.paused, log })
+bot = makeBot({ wa, store, crm, config, log, onStudentMessage: phone => control.noteReply(phone) })
+control.start()
 
 // Health: what Railway (and a person) can check without reading logs. No
 // secrets, no pairing code — those only ever go to the log.
@@ -83,6 +88,7 @@ http.createServer((req, res) => {
     whatsapp: wa.status,
     paused: config.paused,
     ai: aiStats(),
+    control: control.stats(),
     uptimeSeconds: Math.round(process.uptime()),
   }
   // /health is liveness only — 200 whenever the process is up. It must NOT

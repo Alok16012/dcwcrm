@@ -59,7 +59,7 @@ function sentAt(m) {
   return ts ? ts * 1000 : Date.now()
 }
 
-export function makeBot({ wa, store, crm, config, log, ai = realAi }) {
+export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMessage = async () => {} }) {
   const buffers = new Map()
   const chains = new Map()
 
@@ -137,6 +137,8 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi }) {
       if (isNew) fresh.push(it)
     }
     if (fresh.length === 0) return
+    // An outreach message to this number now counts as answered.
+    await onStudentMessage(phone ?? row.phone).catch(e => log.warn(`reply hook: ${e.message}`))
 
     const now = Date.now()
     const patch = {

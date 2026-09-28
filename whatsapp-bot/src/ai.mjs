@@ -39,8 +39,14 @@ function istDay() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 }
 
+// The CRM's control centre can switch AI off without a redeploy.
+let switchedOn = true
+export function setAiSwitch(on) {
+  switchedOn = on !== false
+}
+
 export function aiEnabled() {
-  if (PROVIDER === 'none' || !KEY) return false
+  if (PROVIDER === 'none' || !KEY || !switchedOn) return false
   if (Date.now() < coolUntil) return false
   const day = istDay()
   if (day !== budgetDay) {
@@ -51,7 +57,8 @@ export function aiEnabled() {
 }
 
 export function aiStats() {
-  return { provider: PROVIDER, model: MODEL, usedToday, dailyLimit: DAILY_LIMIT, coolingDown: Date.now() < coolUntil }
+  const provider = PROVIDER === 'none' || !KEY ? 'none' : switchedOn ? PROVIDER : 'off'
+  return { provider, model: MODEL, usedToday, dailyLimit: DAILY_LIMIT, coolingDown: Date.now() < coolUntil }
 }
 
 /** Remove anything that identifies a person before text leaves the server. */

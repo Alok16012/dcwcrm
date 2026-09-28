@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
-import WhatsAppClient, { type Conversation, type BotStatus } from '@/components/whatsapp/WhatsAppClient'
+import { type Conversation, type BotStatus } from '@/components/whatsapp/WhatsAppClient'
+import WhatsAppPageTabs from '@/components/whatsapp/WhatsAppPageTabs'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -51,10 +52,10 @@ export default async function WhatsAppPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">WhatsApp Bot</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Admission chatbot — who it is talking to, what it told them, and when a counsellor takes over
+          Admission chatbot — its chats, what it knows, and who it follows up
         </p>
       </div>
-      <WhatsAppClient
+      <WhatsAppPageTabs
         initialStatus={(statusRes.data ?? null) as BotStatus | null}
         conversations={conversations}
         canManage={canManage}

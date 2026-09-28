@@ -259,10 +259,45 @@ export const FAQ = [
  * Only entries for the current flow (or 'any') are considered, so a college
  * student asking about "board" does not get an Open Schooling answer.
  */
+// ------------------------------------------------ admin-taught answers ---
+// Entries admin adds from the CRM (wa_knowledge), refreshed by the bot every
+// few minutes. They win over the built-in answers above: whoever runs DCW
+// knows this week's facts better than this file does.
+
+let custom = []
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Replace the admin-taught entries. Rows as stored in wa_knowledge. */
+export function setCustomKnowledge(rows) {
+  custom = (rows ?? [])
+    .filter(r => r.is_active !== false && r.body?.trim())
+    .map(r => {
+      const words = (r.keywords ?? []).map(k => normalize(k)).filter(Boolean)
+      return {
+        id: `kb_${r.id}`,
+        flow: r.flow ?? 'any',
+        title: r.title ?? '',
+        body: r.body.trim(),
+        // Whole words/phrases only: "fee" must not fire inside "feeling".
+        match: words.map(w => new RegExp(`(^|\\s)${escapeRe(w)}(\\s|$)`)),
+        answer: () => r.body.trim(),
+      }
+    })
+}
+
+export function customKnowledgeCount() {
+  return custom.length
+}
+
 export function matchFaq(text, flow) {
   const t = normalize(text)
-  const pool = FAQ.filter(f => f.flow === 'any' || f.flow === flow || flow == null)
-  return pool.find(f => f.match.some(re => re.test(t))) ?? null
+  const inFlow = f => f.flow === 'any' || f.flow === flow || flow == null
+  return custom.filter(inFlow).find(f => f.match.some(re => re.test(t)))
+    ?? FAQ.filter(inFlow).find(f => f.match.some(re => re.test(t)))
+    ?? null
 }
 
 export function renderFaq(entry, persona) {
@@ -273,7 +308,7 @@ export function renderFaq(entry, persona) {
 // Handed to the AI only for questions none of the entries above cover. Kept
 // short: it is the facts, not the script.
 
-export const KNOWLEDGE = {
+const BASE_KNOWLEDGE = {
   college: `DCW (Distance Courses Wala) gives admission guidance for distance and online UG/PG programmes.
 Universities DCW works with: Manglayatan University (primary), MATS University, Shubharti University.
 UG courses: BBA, BCA, BA, B.Com. PG courses: MBA, MCA, MA, M.Com.
@@ -285,4 +320,18 @@ Common cases: fail, compartment, marks improvement, new admission, and students 
 TOC (Transfer of Credit) can let passed subjects from a previous board count, subject to rules and marksheet verification.
 NIOS has public exam cycles and On-Demand exams. BBOSE cycles are usually around June and December. BOSSE around April-May and October-November. NWAC 2026-27 Regular session is on DCW's internal chart.
 Eligibility, fees, dates and IIT/JEE acceptance depend on current official rules and are verified by a counselor.`,
+}
+
+/** What the AI may use: the base facts plus everything admin has taught. */
+export const KNOWLEDGE = {}
+for (const flow of ['college', 'school']) {
+  Object.defineProperty(KNOWLEDGE, flow, {
+    enumerable: true,
+    get() {
+      const extra = custom
+        .filter(f => f.flow === 'any' || f.flow === flow)
+        .map(f => `${f.title ? `${f.title}: ` : ''}${f.body}`)
+      return extra.length ? `${BASE_KNOWLEDGE[flow]}\n${extra.join('\n')}` : BASE_KNOWLEDGE[flow]
+    },
+  })
 }

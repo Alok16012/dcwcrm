@@ -47,6 +47,24 @@ names and numbers never leave.
   the marksheet.
 - **Two unreadable answers** skip that question rather than trap the student.
 
+## Control centre (CRM → WhatsApp Bot → Control Centre)
+
+Admin steers the bot from the CRM; the bot re-reads it every minute
+(`src/control.mjs`, tables from migration 113):
+
+- **Settings** — pause everywhere, AI on/off, and outreach limits.
+  `BOT_PAUSED=true` on Railway still wins, so the brake works even if the CRM
+  is down.
+- **AI Knowledge** — answers admin writes. With keywords they are sent word
+  for word when a message contains one (no AI); all active entries are also
+  given to the AI as facts. They take priority over the built-in answers.
+- **Outreach** — admin queues existing leads (by status, source, age); the bot
+  messages them one at a time, inside office hours, up to the daily cap, with
+  a random gap of minutes and a random wording. It skips numbers that opted
+  out, are already chatting, or are not on WhatsApp. Whoever replies is
+  qualified like any other chat and lands on their existing lead. Bulk first
+  messages are what get unofficial clients banned — keep the cap low.
+
 ## The lead in the CRM
 
 Created once through the CRM's normal ingest (`/api/leads/whatsapp`), so

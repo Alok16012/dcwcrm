@@ -61,7 +61,14 @@ async function mergeIntoLead(db: any, leadId: string, fields: Record<string, str
   if (!lead) return false
 
   const update: Record<string, unknown> = {
-    metadata: { ...(lead.metadata ?? {}), ...fields, 'Bot Updated': new Date().toISOString().slice(0, 16).replace('T', ' ') },
+    // whatsapp_bot marks every lead the bot talked to, including ones that
+    // already existed from IVR or Meta and so keep their original source —
+    // it is what the Leads page's WhatsApp filter and badge read.
+    metadata: {
+      ...(lead.metadata ?? {}), ...fields,
+      whatsapp_bot: 'yes',
+      'Bot Updated': new Date().toISOString().slice(0, 16).replace('T', ' '),
+    },
     updated_at: new Date().toISOString(),
   }
   if (!lead.department_id) {
@@ -104,6 +111,15 @@ export async function POST(req: Request) {
     if (!result.leadId) return NextResponse.json({ error: 'Lead could not be created' }, { status: 500 })
 
     await mergeIntoLead(db, result.leadId, fields, body.department)
+
+    // An existing lead often has only a placeholder name ("IVR Caller 98…");
+    // the student's WhatsApp name is better than that, never better than a real one.
+    const pushName = body.push_name?.trim()
+    if (result.duplicate && pushName) {
+      await db.from('leads').update({ full_name: pushName })
+        .eq('id', result.leadId)
+        .or('full_name.ilike.IVR Caller%,full_name.eq.WhatsApp Lead')
+    }
     return NextResponse.json({ ok: true, lead_id: result.leadId, duplicate: result.duplicate, assignee: result.assigneeName })
   }
 

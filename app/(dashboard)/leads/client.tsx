@@ -97,7 +97,12 @@ export function LeadsClient() {
     if (isTelecaller && !isAdmin && currentProfile) query = query.eq('assigned_to', currentProfile.id)
 
     if (filters.status?.length) query = query.in('status', filters.status)
-    if (filters.source?.length) query = query.in('source', filters.source)
+    // "WhatsApp" also covers leads the bot talked to that came in from IVR or
+    // Meta first — they keep that source, and carry metadata.whatsapp_bot.
+    const sourceClause = filters.source?.includes('whatsapp')
+      ? `source.in.(${filters.source.join(',')}),metadata->>whatsapp_bot.eq.yes`
+      : null
+    if (filters.source?.length && !sourceClause) query = query.in('source', filters.source)
     if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
     if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
     if (filters.form) query = query.eq('metadata->>form', filters.form)
@@ -112,7 +117,12 @@ export function LeadsClient() {
 
     // Server-side text search across name / phone / email / referrer
     const term = searchTerm.trim().replace(/[,()*]/g, ' ').trim()
-    if (term) query = query.or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%`)
+    const searchClause = term
+      ? `full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%`
+      : null
+    // Two OR groups must be ANDed; postgrest-js has no .and(), so nest it in .or().
+    if (sourceClause && searchClause) query = query.or(`and(or(${sourceClause}),or(${searchClause}))`)
+    else if (sourceClause || searchClause) query = query.or((sourceClause ?? searchClause)!)
 
     return query
   }, [filters, currentProfile, sortDir, searchTerm])

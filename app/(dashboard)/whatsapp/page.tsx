@@ -6,7 +6,9 @@ import WhatsAppClient, { type Conversation, type BotStatus } from '@/components/
 
 export const dynamic = 'force-dynamic'
 
-const CAN_VIEW = ['admin', 'backend', 'lead', 'counselor']
+/** Every bot chat, across every counsellor's leads, so management only.
+ *  Counsellors see their own bot leads in Leads, with the bot's answers. */
+const CAN_VIEW = ['admin', 'backend']
 /** Linking the bot hands over the WhatsApp number, so only these may see the QR. */
 const CAN_MANAGE = ['admin', 'backend']
 

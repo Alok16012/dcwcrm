@@ -79,7 +79,10 @@ const STATUS_DOT: Record<string, string> = {
  */
 function SourceBadge({ lead }: { lead: Lead }) {
   const label = LEAD_SOURCE_LABELS[lead.source] ?? lead.source
-  const meta = lead.metadata as { ivr_agent?: string; associate_name?: string; associate_code?: string } | undefined
+  const meta = lead.metadata as {
+    ivr_agent?: string; associate_name?: string; associate_code?: string
+    whatsapp_bot?: string; 'Lead Temperature'?: string
+  } | undefined
   const via = lead.source === 'ivr' ? meta?.ivr_agent
     : lead.source === 'associate' ? meta?.associate_name
     : lead.source === 'referral' ? lead.referred_by ?? undefined
@@ -93,6 +96,11 @@ function SourceBadge({ lead }: { lead: Lead }) {
         {(lead.source === 'associate' || lead.source === 'referral') && <UserCheck className="w-2.5 h-2.5 flex-shrink-0" />}
         {label}
       </span>
+      {meta?.whatsapp_bot === 'yes' && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap bg-green-50 text-green-700 border-green-200">
+          WhatsApp Bot{meta['Lead Temperature'] ? ` · ${meta['Lead Temperature']}` : ''}
+        </span>
+      )}
       {via && <span className="text-[10px] text-gray-400 pl-1">{lead.source === 'referral' ? 'by' : 'via'} {via}{code ? ` (${code})` : ''}</span>}
     </div>
   )

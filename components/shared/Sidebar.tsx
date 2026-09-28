@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Notifications',   href: '/associate/notifications', icon: Bell,       roles: ['associate'] },
   { label: 'Profile',         href: '/associate/profile',    icon: User,          roles: ['associate'] },
   { label: 'Leads', href: '/leads', icon: Users, roles: ['admin', 'lead', 'backend', 'counselor'] },
-  { label: 'WhatsApp Bot', href: '/whatsapp', icon: MessageCircle, roles: ['admin', 'lead', 'backend', 'counselor'] },
+  { label: 'WhatsApp Bot', href: '/whatsapp', icon: MessageCircle, roles: ['admin', 'backend'] },
   { label: 'Students', href: '/backend', icon: GraduationCap, roles: ['admin', 'backend'] },
   { label: 'Centre Fee', href: '/centre-fee', icon: Building2, roles: ['admin', 'backend'] },
   { label: 'Finance', href: '/finance', icon: DollarSign, roles: ['admin', 'backend'] },

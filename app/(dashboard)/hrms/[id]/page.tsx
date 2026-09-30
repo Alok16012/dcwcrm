@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
-import { format, getMonth, getYear } from 'date-fns'
+import { format } from 'date-fns'
 import { createServerClient } from '@/lib/supabase/server'
+import { cycleMonthYear } from '@/lib/payroll/cycle'
 import { ROLE_LABELS } from '@/types/app.types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import EmployeeAttendanceCalendar from '@/components/hrms/EmployeeAttendanceCalendar'
@@ -31,8 +32,6 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
   if (!currentProfile || !['admin', 'backend'].includes(currentProfile.role)) redirect('/')
 
   const now = new Date()
-  const currentMonth = Number(sp.month ?? getMonth(now) + 1)
-  const currentYear = Number(sp.year ?? getYear(now))
   const defaultTab = sp.tab ?? 'profile'
 
   const empRes = await supabase.from('employees').select('id, employee_code, department, designation, joining_date, basic_salary, hra, allowances, pf_deduction, tds_deduction, bank_account, bank_ifsc, is_active, profile_id, salary_cycle_start_day').eq('id', id).single()
@@ -46,6 +45,14 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
   } | null
 
   if (!employee) notFound()
+
+  // Default to the cycle today falls in, not the calendar month: with a start
+  // day of N, anything from the Nth onwards already belongs to next month's
+  // payroll, so on e.g. 30 Sep (start day 26) the running cycle is October's.
+  // The server runs in UTC; shift to IST so the day boundary is the office's.
+  const runningCycle = cycleMonthYear(new Date(now.getTime() + 5.5 * 3600 * 1000), employee.salary_cycle_start_day ?? 1)
+  const currentMonth = Number(sp.month ?? runningCycle.month)
+  const currentYear = Number(sp.year ?? runningCycle.year)
 
   // Compute cycle dates FIRST so attendance query uses correct range
   const cycleDay = employee.salary_cycle_start_day ?? 1
@@ -65,7 +72,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
   const [attRes, payrollRes, studentsRes, profileRes, mentorIncRes] = await Promise.all([
     supabase.from('attendance').select('date, status').eq('employee_id', id).gte('date', cycleStartDate).lte('date', cycleEndDate),
     supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
-    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0),
+    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0).order('enrollment_date', { ascending: false, nullsFirst: false }),
     supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
     (supabase as any).from('mentorship_payments')
       .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name))')

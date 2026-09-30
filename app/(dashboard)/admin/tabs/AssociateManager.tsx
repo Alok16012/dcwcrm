@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import {
   UserPlus, Users, CheckCircle2, Clock, XCircle,
   ChevronLeft, ChevronRight, Eye, RefreshCw, KeyRound, Copy, Pencil, Trash2, Search, UserCog, Download,
-  Upload, FileCheck2, X, FileText,
+  Upload, FileCheck2, X, FileText, Mail,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -86,6 +86,7 @@ interface Associate {
   coordinator_name: string | null
   temp_password: string | null
   activity_status?: ActivityStatus | null
+  approved_at?: string | null
   created_at: string
 }
 
@@ -123,6 +124,42 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
   const [credOpen, setCredOpen] = useState(false)
   const [credAssoc, setCredAssoc] = useState<Associate | null>(null)
   const [resettingPass, setResettingPass] = useState(false)
+  const [sendingWelcome, setSendingWelcome] = useState(false)
+
+  async function sendWelcomeEmail(a: Associate) {
+    if (!confirm(`Send welcome email with ID, password and certificate to ${a.email}?`)) return
+    setSendingWelcome(true)
+    try {
+      // react-pdf is browser-only and heavy, so load it on demand
+      const { associateCertificatePdfBase64, certificateFileName } = await import('@/components/associates/AssociateCertificatePDF')
+      const cert = {
+        name: a.name,
+        associate_code: a.associate_code,
+        father_name: a.father_name ?? a.father_phone,
+        phone: a.phone,
+        email: a.email,
+        city: a.city ?? a.current_city,
+        district: a.district,
+        state: a.state ?? a.current_state,
+        institution_name: a.institution_name,
+        coordinator_name: a.coordinator_name,
+        issued_on: a.approved_at ?? null,
+      }
+      const pdf_base64 = await associateCertificatePdfBase64(cert)
+      const res = await fetch(withBase('/api/associates/send-welcome'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ associate_id: a.id, pdf_base64, file_name: certificateFileName(cert) }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Email failed')
+      toast.success(`Welcome email sent to ${json.sent_to}`)
+    } catch (e: any) {
+      toast.error(e.message ?? 'Email failed')
+    } finally {
+      setSendingWelcome(false)
+    }
+  }
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false)
@@ -838,6 +875,16 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                 <RefreshCw className={`w-4 h-4 ${resettingPass ? 'animate-spin' : ''}`} />
                 {resettingPass ? 'Resetting…' : 'Reset Password'}
               </Button>
+              {canSeeAllAssociates && (
+                <Button
+                  className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  disabled={sendingWelcome || !credAssoc.temp_password || !credAssoc.email}
+                  onClick={() => sendWelcomeEmail(credAssoc)}
+                >
+                  <Mail className={`w-4 h-4 ${sendingWelcome ? 'animate-pulse' : ''}`} />
+                  {sendingWelcome ? 'Sending…' : 'Send Welcome Email'}
+                </Button>
+              )}
               <Button className="w-full" onClick={() => setCredOpen(false)}>Close</Button>
             </div>
           )}

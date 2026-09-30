@@ -190,14 +190,34 @@ async function toDataUrl(src: string): Promise<string | null> {
   }
 }
 
+async function buildCertificateBlob(d: AssociateCertificateData): Promise<Blob> {
+  const logo = await toDataUrl(withBase('/brand-logo.png'))
+  return pdf(<CertificateDoc d={d} logo={logo} />).toBlob()
+}
+
+export function certificateFileName(d: AssociateCertificateData): string {
+  return `Associate_Certificate_${(d.associate_code || d.name).trim().replace(/\s+/g, '_')}.pdf`
+}
+
 /** Builds the certificate and triggers a download. */
 export async function downloadAssociateCertificatePdf(d: AssociateCertificateData) {
-  const logo = await toDataUrl(withBase('/brand-logo.png'))
-  const blob = await pdf(<CertificateDoc d={d} logo={logo} />).toBlob()
+  const blob = await buildCertificateBlob(d)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `Associate_Certificate_${(d.associate_code || d.name).trim().replace(/\s+/g, '_')}.pdf`
+  a.download = certificateFileName(d)
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/** Builds the certificate as base64, for attaching to the welcome email. */
+export async function associateCertificatePdfBase64(d: AssociateCertificateData): Promise<string> {
+  const blob = await buildCertificateBlob(d)
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+  return dataUrl.slice(dataUrl.indexOf(',') + 1)
 }

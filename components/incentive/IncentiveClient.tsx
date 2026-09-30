@@ -39,7 +39,9 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
   const [addYear, setAddYear] = useState(String(new Date().getFullYear()))
   const [addIncentive, setAddIncentive] = useState('')
   const [saving, setSaving] = useState(false)
-  const [mentorIncentives, setMentorIncentives] = useState<{ id: string; studentId?: string; studentName: string; amount: number; reason: string | null; created_at: string }[]>([])
+  const [mentorIncentives, setMentorIncentives] = useState<{ id: string; studentId?: string; studentName: string; sessionId: string | null; amount: number; reason: string | null; created_at: string }[]>([])
+  const [sessions, setSessions] = useState<{ id: string; name: string }[]>([])
+  const [mentorSession, setMentorSession] = useState('all')
   const supabase = createClient()
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
       if (!user) return
       // read approved mentorship payments for this mentor (shows old + new)
       const { data } = await (supabase as any).from('mentorship_payments')
-        .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name))')
+        .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name, session_id))')
         .eq('status', 'approved').eq('mentorship.telecaller_id', user.id)
         .order('approved_at', { ascending: false })
       const rows = ((data ?? []) as any[])
@@ -56,12 +58,15 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
           id: p.id as string,
           studentId: p.mentorship?.student?.id as string | undefined,
           studentName: (p.mentorship?.student?.full_name ?? 'student') as string,
+          sessionId: (p.mentorship?.student?.session_id ?? null) as string | null,
           amount: Number(p.incentive_amount ?? p.salary_percentage ?? 0),
           reason: `Mentorship — ${p.mentorship?.student?.full_name ?? 'student'}`,
           created_at: (p.approved_at ?? p.created_at) as string,
         }))
         .filter(m => m.amount > 0)
       setMentorIncentives(rows)
+      const { data: sess } = await supabase.from('sessions').select('id, name').order('created_at', { ascending: false })
+      setSessions((sess ?? []) as { id: string; name: string }[])
     }
     loadMentorInc().catch(() => {})
   }, [supabase])
@@ -147,7 +152,13 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
     }
   }
 
-  const mentorIncentiveGroups = Object.values(mentorIncentives.reduce((acc, item) => {
+  // Session filter for the mentorship list — by the mentored student's session.
+  const filteredMentorIncentives = mentorSession === 'all'
+    ? mentorIncentives
+    : mentorIncentives.filter(m => (mentorSession === 'none' ? !m.sessionId : m.sessionId === mentorSession))
+  const filteredMentorshipTotal = filteredMentorIncentives.reduce((s, r) => s + Number(r.amount), 0)
+  const mentorSessionIds = new Set(mentorIncentives.map(m => m.sessionId))
+  const mentorIncentiveGroups = Object.values(filteredMentorIncentives.reduce((acc, item) => {
     const key = item.studentId ?? item.studentName
     if (!acc[key]) {
       acc[key] = {
@@ -268,10 +279,24 @@ export function IncentiveClient({ role, myEmployeeId, employees, studentIncentiv
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-base">Mentorship Incentives</h3>
             <span className="text-sm text-blue-700 font-bold bg-blue-50 px-3 py-1 rounded-full">
-              Total: {fmt(mentorshipTotal)}
+              Total: {fmt(filteredMentorshipTotal)}
             </span>
           </div>
+          <select
+            value={mentorSession}
+            onChange={e => setMentorSession(e.target.value)}
+            className="h-9 w-full sm:w-56 rounded-lg border border-gray-200 bg-white px-3 text-sm"
+          >
+            <option value="all">All Sessions</option>
+            {sessions.filter(se => mentorSessionIds.has(se.id)).map(se => (
+              <option key={se.id} value={se.id}>{se.name}</option>
+            ))}
+            {mentorSessionIds.has(null) && <option value="none">No session</option>}
+          </select>
           <div className="rounded-lg border overflow-hidden bg-white divide-y">
+            {mentorIncentiveGroups.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-gray-400">No mentorship incentive in this session</p>
+            )}
             {mentorIncentiveGroups.map(mi => (
               <div key={mi.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">

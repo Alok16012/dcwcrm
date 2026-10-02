@@ -25,6 +25,7 @@ export default async function LitigationPage() {
     { data: litigations },
     { data: payments },
     { data: droppedStudents },
+    { data: studentFees },
   ] = await Promise.all([
     supabase.from('departments').select('id, name, dept_fund').order('name'),
     supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
@@ -42,6 +43,8 @@ export default async function LitigationPage() {
       .select(`id, full_name, phone, guardian_name, drop_reason, status, department:departments(id,name), sub_section:department_sub_sections(id,name), session:sessions(id,name)`)
       .eq('status', 'dropped')
       .order('updated_at', { ascending: false }),
+    // Fees each student has paid — shown as "Amount Received" per case
+    supabase.from('students').select('id, full_name, phone, amount_paid'),
   ])
 
   return (
@@ -52,6 +55,7 @@ export default async function LitigationPage() {
       initialLitigations={(litigations ?? []) as any}
       initialPayments={(payments ?? []) as any}
       droppedStudents={(droppedStudents ?? []) as any}
+      studentFees={(studentFees ?? []) as any}
     />
   )
 }

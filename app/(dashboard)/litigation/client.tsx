@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -39,6 +39,7 @@ interface Litigation {
   amount_paid: number
   amount_refunded: number
   adjusted_with: string | null
+  emi_months?: number | null
   notes: string | null
   created_at: string
   department: { id: string; name: string } | null
@@ -68,6 +69,10 @@ interface DroppedStudent {
   session: { id: string; name: string } | null
 }
 
+interface StudentFee { id: string; full_name: string; phone: string | null; amount_paid: number | null }
+
+const last10 = (p: string | null | undefined) => (p ?? '').replace(/\D/g, '').slice(-10)
+
 interface FormState {
   record_type: 'litigation' | 'debt'
   department_id: string
@@ -81,6 +86,7 @@ interface FormState {
   litigation_amount: string
   amount_refunded: string
   adjusted_with: string
+  emi_months: string
   notes: string
 }
 
@@ -110,6 +116,21 @@ const DEBT_TYPES = [
   { value: 'adjusted', label: 'Adjusted' },
 ]
 
+// "Debt" records are now Loans DCW took from a lender; litigation_type holds the purpose
+const LOAN_PURPOSES = [
+  { value: 'working_capital', label: 'Working Capital' },
+  { value: 'business_expansion', label: 'Business Expansion' },
+  { value: 'salary_payment', label: 'Salary Payment' },
+  { value: 'office_rent', label: 'Office Rent / Expenses' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'equipment', label: 'Equipment / Asset Purchase' },
+  { value: 'student_refund', label: 'Student Refund' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'other', label: 'Other' },
+]
+
+const EMI_TENURES = [3, 6, 9, 12, 18, 24, 36]
+
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Demand Draft', 'Other']
 
 const EMPTY_FORM: FormState = {
@@ -125,6 +146,7 @@ const EMPTY_FORM: FormState = {
   litigation_amount: '',
   amount_refunded: '',
   adjusted_with: '',
+  emi_months: '',
   notes: '',
 }
 
@@ -191,7 +213,7 @@ function downloadReceipt(payment: LitigationPayment, litigation: Litigation) {
 <body>
 <div class="header">
   <h1>Payment Receipt</h1>
-  <p>${litigation.record_type === 'debt' ? 'Debt Payment' : 'Litigation Payment'}</p>
+  <p>${litigation.record_type === 'debt' ? 'Loan Repayment' : 'Litigation Payment'}</p>
 </div>
 ${payment.receipt_no ? `<div class="receipt-no">Receipt No: <strong>${payment.receipt_no}</strong></div>` : ''}
 <table>
@@ -229,6 +251,7 @@ export function LitigationClient({
   initialLitigations,
   initialPayments,
   droppedStudents,
+  studentFees,
 }: {
   departments: Dept[]
   subSections: SubSection[]
@@ -236,6 +259,7 @@ export function LitigationClient({
   initialLitigations: Litigation[]
   initialPayments: LitigationPayment[]
   droppedStudents: DroppedStudent[]
+  studentFees: StudentFee[]
 }) {
   const supabase = createClient()
   const [litigations, setLitigations] = useState<Litigation[]>(initialLitigations)
@@ -262,7 +286,9 @@ export function LitigationClient({
 
   // ─── Derived ────────────────────────────────────────────────────────────────
   const filterList = (list: Litigation[]) => list.filter((l) => {
-    if (deptFilter !== 'all' && l.department_id !== deptFilter) return false
+    // deptFilter is 'all', 'd:<department id>' or 'b:<board / university id>'
+    if (deptFilter.startsWith('d:') && l.department_id !== deptFilter.slice(2)) return false
+    if (deptFilter.startsWith('b:') && l.sub_section_id !== deptFilter.slice(2)) return false
     if (search) {
       const q = search.toLowerCase()
       return (
@@ -277,13 +303,54 @@ export function LitigationClient({
   const litigationList = useMemo(() => filterList(litigations.filter((l) => l.record_type !== 'debt')), [litigations, deptFilter, search])
   const debtList = useMemo(() => filterList(litigations.filter((l) => l.record_type === 'debt')), [litigations, deptFilter, search])
 
+  // Case counts per department and per board / university, so the filter
+  // shows at a glance which board has the most litigation.
+  const caseCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const l of litigations) {
+      m.set(`d:${l.department_id}`, (m.get(`d:${l.department_id}`) ?? 0) + 1)
+      if (l.sub_section_id) m.set(`b:${l.sub_section_id}`, (m.get(`b:${l.sub_section_id}`) ?? 0) + 1)
+    }
+    return m
+  }, [litigations])
+
+  const filterLabel = deptFilter === 'all'
+    ? 'All Departments'
+    : deptFilter.startsWith('d:')
+      ? `All ${departments.find((d) => d.id === deptFilter.slice(2))?.name ?? ''}`
+      : subSections.find((b) => b.id === deptFilter.slice(2))?.name ?? 'All Departments'
+
+  // Fees the student has paid us, found by linked student, else by phone
+  // (last 10 digits), else by exact name. null = no matching student record.
+  const feeIndex = useMemo(() => {
+    const byId = new Map<string, number>()
+    const byPhone = new Map<string, number>()
+    const byName = new Map<string, number>()
+    for (const st of studentFees) {
+      const amt = Number(st.amount_paid ?? 0)
+      byId.set(st.id, amt)
+      const ph = last10(st.phone)
+      if (ph.length === 10) byPhone.set(ph, (byPhone.get(ph) ?? 0) + amt)
+      const nm = st.full_name.trim().toLowerCase()
+      byName.set(nm, (byName.get(nm) ?? 0) + amt)
+    }
+    return { byId, byPhone, byName }
+  }, [studentFees])
+
+  function amountReceived(l: Litigation): number | null {
+    if (l.student_id && feeIndex.byId.has(l.student_id)) return feeIndex.byId.get(l.student_id)!
+    const ph = last10(l.phone)
+    if (ph.length === 10 && feeIndex.byPhone.has(ph)) return feeIndex.byPhone.get(ph)!
+    return feeIndex.byName.get(l.student_name.trim().toLowerCase()) ?? null
+  }
+
   const totalLit = litigationList.reduce((s, l) => s + (l.litigation_amount ?? 0), 0)
   const paidLit = litigationList.reduce((s, l) => s + (l.amount_paid ?? 0), 0)
   const totalDebt = debtList.reduce((s, l) => s + (l.litigation_amount ?? 0), 0)
   const paidDebt = debtList.reduce((s, l) => s + (l.amount_paid ?? 0), 0)
 
   function litTypeLabel(val: string | null, type: string) {
-    const list = type === 'debt' ? DEBT_TYPES : LITIGATION_TYPES
+    const list = type === 'debt' ? [...LOAN_PURPOSES, ...DEBT_TYPES] : LITIGATION_TYPES
     return list.find((t) => t.value === val)?.label ?? val ?? '—'
   }
 
@@ -340,6 +407,7 @@ export function LitigationClient({
       litigation_amount: String(l.litigation_amount),
       amount_refunded: String(l.amount_refunded ?? 0),
       adjusted_with: l.adjusted_with ?? '',
+      emi_months: l.emi_months ? String(l.emi_months) : '',
       notes: l.notes ?? '',
     })
     setFormBoards(subSections.filter((s) => s.department_id === l.department_id))
@@ -349,7 +417,8 @@ export function LitigationClient({
   }
 
   function saveRecord() {
-    if (!form.student_name.trim()) { toast.error('Student name is required'); return }
+    const isLoan = form.record_type === 'debt'
+    if (!form.student_name.trim()) { toast.error(isLoan ? 'Lender name is required' : 'Student name is required'); return }
     if (!form.department_id) { toast.error('Department is required'); return }
     const amt = parseFloat(form.litigation_amount) || 0
     const refund = parseFloat(form.amount_refunded) || 0
@@ -370,11 +439,15 @@ export function LitigationClient({
         amount_refunded: refund,
         adjusted_with: form.litigation_type === 'adjusted' ? (form.adjusted_with.trim() || null) : null,
         notes: form.notes.trim() || null,
+        ...(isLoan ? { emi_months: form.emi_months ? parseInt(form.emi_months) : null } : {}),
       }
+      const failMsg = (m: string) => m.includes('emi_months')
+        ? 'EMI column missing — Supabase me migration 114_loan_emi_months.sql run karein'
+        : m
 
       if (editRecord) {
         const { error } = await supabase.from('department_litigations').update(payload as never).eq('id', editRecord.id)
-        if (error) { toast.error('Update failed: ' + error.message); return }
+        if (error) { toast.error('Update failed: ' + failMsg(error.message)); return }
         const { data } = await supabase.from('department_litigations').select(selectQ).eq('id', editRecord.id).single()
         if (data) setLitigations((prev) => prev.map((l) => l.id === editRecord.id ? data as Litigation : l))
         toast.success('Record updated!')
@@ -384,9 +457,9 @@ export function LitigationClient({
           .insert({ ...payload, amount_paid: 0 } as never)
           .select(selectQ)
           .single()
-        if (error) { toast.error('Add failed: ' + error.message); return }
+        if (error) { toast.error('Add failed: ' + failMsg(error.message)); return }
         setLitigations((prev) => [data as Litigation, ...prev])
-        toast.success(`${form.record_type === 'debt' ? 'Debt' : 'Litigation'} case added!`)
+        toast.success(isLoan ? 'Loan added!' : 'Litigation case added!')
       }
       setShowForm(false)
     })
@@ -424,7 +497,7 @@ export function LitigationClient({
       // Auto-create expense entry
       await supabase.from('expenses').insert({
         category: 'misc',
-        description: `${payTarget.record_type === 'debt' ? 'Debt' : 'Litigation'} payment: ${payTarget.student_name}${payTarget.reason ? ' - ' + payTarget.reason : ''}`,
+        description: `${payTarget.record_type === 'debt' ? 'Loan' : 'Litigation'} payment: ${payTarget.student_name}${payTarget.reason ? ' - ' + payTarget.reason : ''}`,
         amount: adding,
         expense_date: payForm.payment_date,
         payment_mode: payForm.payment_mode || null,
@@ -484,10 +557,10 @@ export function LitigationClient({
         <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
           <Scale className="w-8 h-8 text-gray-300" />
         </div>
-        <p className="text-gray-500 font-semibold">No {type === 'debt' ? 'debt' : 'litigation'} cases</p>
+        <p className="text-gray-500 font-semibold">No {type === 'debt' ? 'loans' : 'litigation cases'}</p>
         <p className="text-xs text-gray-400 mt-1">Add the first case to get started</p>
         <Button className="mt-5 gap-1.5" onClick={() => openAdd(type)}>
-          <Plus className="w-4 h-4" /> Add {type === 'debt' ? 'Debt' : 'Litigation'}
+          <Plus className="w-4 h-4" /> Add {type === 'debt' ? 'Loan' : 'Litigation'}
         </Button>
       </div>
     )
@@ -496,12 +569,13 @@ export function LitigationClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left px-5 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Student</th>
+              <th className="text-left px-5 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">{type === 'debt' ? 'Lender' : 'Student'}</th>
               <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Department</th>
-              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Type & Reason</th>
-              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Total</th>
-              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Refund Due</th>
-              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Paid Back</th>
+              <th className="text-left px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">{type === 'debt' ? 'Purpose & EMI' : 'Type & Reason'}</th>
+              {type !== 'debt' && <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Amount Received</th>}
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">{type === 'debt' ? 'Borrowed' : 'Total'}</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">{type === 'debt' ? 'To Repay' : 'Refund Due'}</th>
+              <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">{type === 'debt' ? 'Repaid' : 'Paid Back'}</th>
               <th className="text-right px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Pending</th>
               <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Status</th>
               <th className="text-center px-4 py-3.5 font-semibold text-gray-400 text-[11px] uppercase tracking-widest">Actions</th>
@@ -518,6 +592,7 @@ export function LitigationClient({
                 ? Math.min(100, Math.round((paid / refundable) * 100))
                 : isCleared ? 100 : 0
               const pCount = paymentsFor(l.id).length
+              const received = amountReceived(l)
               return (
                 <tr key={l.id} className="hover:bg-slate-50/60 transition-colors group">
                   {/* Student */}
@@ -545,6 +620,13 @@ export function LitigationClient({
                     ) : (
                       <span className="text-xs text-gray-300">—</span>
                     )}
+                    {type === 'debt' && (
+                      <p className="text-[11px] text-amber-700 font-medium mt-1">
+                        {l.emi_months
+                          ? `${l.emi_months} months EMI · ${formatCurrency(Math.ceil((l.amount_refunded || l.litigation_amount) / l.emi_months))}/mo`
+                          : 'One-time repayment'}
+                      </p>
+                    )}
                     {l.litigation_type === 'adjusted' && l.adjusted_with && (
                       <p className="text-[11px] text-orange-600 font-medium mt-1">↔ {l.adjusted_with}</p>
                     )}
@@ -552,6 +634,13 @@ export function LitigationClient({
                       <p className="text-[11px] text-gray-500 mt-1 leading-relaxed line-clamp-2">{l.reason}</p>
                     )}
                   </td>
+                  {/* Amount Received — fees recorded against this student */}
+                  {type !== 'debt' && <td className="px-4 py-4 text-right">
+                    {received === null
+                      ? <p className="text-[11px] text-gray-300" title="No matching student record">Not found</p>
+                      : <p className={`font-semibold text-[13px] ${received > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(received)}</p>
+                    }
+                  </td>}
                   {/* Total */}
                   <td className="px-4 py-4 text-right">
                     <p className="font-bold text-gray-900 text-[13px]">{formatCurrency(l.litigation_amount)}</p>
@@ -638,7 +727,8 @@ export function LitigationClient({
     )
   }
 
-  const typeList = form.record_type === 'debt' ? DEBT_TYPES : LITIGATION_TYPES
+  const isLoanForm = form.record_type === 'debt'
+  const typeList = isLoanForm ? LOAN_PURPOSES : LITIGATION_TYPES
 
   return (
     <div className="space-y-6">
@@ -650,7 +740,7 @@ export function LitigationClient({
             <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
               <Scale className="w-5 h-5 text-white" />
             </div>
-            Litigation & Debt
+            Litigation & Loans
           </h1>
           <p className="text-sm text-gray-400 mt-1 ml-11">Department-wise cases, refunds & recovery tracking</p>
         </div>
@@ -659,7 +749,7 @@ export function LitigationClient({
             <Plus className="w-4 h-4" /> Add Litigation
           </Button>
           <Button onClick={() => openAdd('debt')} variant="outline" className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50">
-            <CreditCard className="w-4 h-4" /> Add Debt
+            <CreditCard className="w-4 h-4" /> Add Loan
           </Button>
         </div>
       </div>
@@ -668,8 +758,8 @@ export function LitigationClient({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Litigation Cases" value={litigationList.length} sub={`₹${(totalLit/1000).toFixed(0)}K total`} icon={Scale} color="blue" />
         <StatCard label="Lit. Pending" value={formatCurrency(totalLit - paidLit)} sub={`${paidLit > 0 ? Math.round(paidLit/totalLit*100) : 0}% recovered`} icon={TrendingDown} color={totalLit - paidLit > 0 ? 'red' : 'green'} />
-        <StatCard label="Debt Cases" value={debtList.length} sub={`₹${(totalDebt/1000).toFixed(0)}K total`} icon={CreditCard} color="amber" />
-        <StatCard label="Debt Pending" value={formatCurrency(totalDebt - paidDebt)} sub={`${paidDebt > 0 ? Math.round(paidDebt/totalDebt*100) : 0}% recovered`} icon={TrendingDown} color={totalDebt - paidDebt > 0 ? 'red' : 'green'} />
+        <StatCard label="Loans" value={debtList.length} sub={`₹${(totalDebt/1000).toFixed(0)}K total`} icon={CreditCard} color="amber" />
+        <StatCard label="Loan Pending" value={formatCurrency(totalDebt - paidDebt)} sub={`${paidDebt > 0 ? Math.round(paidDebt/totalDebt*100) : 0}% repaid`} icon={TrendingDown} color={totalDebt - paidDebt > 0 ? 'red' : 'green'} />
       </div>
 
       {/* Filters */}
@@ -684,15 +774,33 @@ export function LitigationClient({
           />
         </div>
         <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v ?? 'all')}>
-          <SelectTrigger className="w-52 h-9 rounded-xl border-gray-200">
+          <SelectTrigger className="w-60 h-9 rounded-xl border-gray-200">
             <Building2 className="w-4 h-4 mr-2 text-gray-400" />
-            <SelectValue placeholder="All Departments" />
+            <SelectValue>{filterLabel}</SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-96">
             <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-            ))}
+            {departments.map((d) => {
+              const boards = subSections
+                .filter((b) => b.department_id === d.id)
+                .sort((a, b) => (caseCounts.get(`b:${b.id}`) ?? 0) - (caseCounts.get(`b:${a.id}`) ?? 0) || a.name.localeCompare(b.name))
+              return (
+                <SelectGroup key={d.id}>
+                  <SelectSeparator />
+                  <SelectLabel className="text-[11px] uppercase tracking-wider text-gray-400">{d.name}</SelectLabel>
+                  <SelectItem value={`d:${d.id}`}>
+                    <span className="flex-1">All {d.name}</span>
+                    <span className="text-[11px] text-gray-400">{caseCounts.get(`d:${d.id}`) ?? 0}</span>
+                  </SelectItem>
+                  {boards.map((b) => (
+                    <SelectItem key={b.id} value={`b:${b.id}`} className="pl-5">
+                      <span className="flex-1">{b.name}</span>
+                      <span className="text-[11px] text-gray-400">{caseCounts.get(`b:${b.id}`) ?? 0}</span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -705,7 +813,7 @@ export function LitigationClient({
             <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">{litigationList.length}</span>
           </TabsTrigger>
           <TabsTrigger value="debt" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <CreditCard className="w-3.5 h-3.5" /> Debt
+            <CreditCard className="w-3.5 h-3.5" /> Loans
             <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{debtList.length}</span>
           </TabsTrigger>
           {droppedStudents.length > 0 && (
@@ -772,12 +880,6 @@ export function LitigationClient({
                             >
                               <Scale className="w-3 h-3" /> Litigation
                             </button>
-                            <button
-                              onClick={() => openAddFromStudent(s, 'debt')}
-                              className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                            >
-                              <CreditCard className="w-3 h-3" /> Debt
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -796,23 +898,23 @@ export function LitigationClient({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {form.record_type === 'debt'
-                ? <><CreditCard className="w-5 h-5 text-orange-500" /> {editRecord ? 'Edit Debt' : 'Add New Debt'}</>
+                ? <><CreditCard className="w-5 h-5 text-orange-500" /> {editRecord ? 'Edit Loan' : 'Add New Loan'}</>
                 : <><Scale className="w-5 h-5 text-indigo-600" /> {editRecord ? 'Edit Litigation' : 'Add New Litigation'}</>
               }
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">Student Name *</label>
-              <Input placeholder="Student name" value={form.student_name} onChange={(e) => setForm((f) => ({ ...f, student_name: e.target.value }))} />
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">{isLoanForm ? 'Lender Name *' : 'Student Name *'}</label>
+              <Input placeholder={isLoanForm ? 'Person / bank / company you borrowed from' : 'Student name'} value={form.student_name} onChange={(e) => setForm((f) => ({ ...f, student_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Father&apos;s Name</label>
-                <Input placeholder="Father's name" value={form.father_name} onChange={(e) => setForm((f) => ({ ...f, father_name: e.target.value }))} />
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">{isLoanForm ? 'Lender Contact Person' : 'Father\'s Name'}</label>
+                <Input placeholder={isLoanForm ? 'Contact person (optional)' : 'Father\'s name'} value={form.father_name} onChange={(e) => setForm((f) => ({ ...f, father_name: e.target.value }))} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Phone Number</label>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">{isLoanForm ? 'Lender Phone' : 'Phone Number'}</label>
                 <Input placeholder="Mobile number" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
             </div>
@@ -829,6 +931,7 @@ export function LitigationClient({
                 </SelectContent>
               </Select>
             </div>
+            {!isLoanForm && <>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Board / University</label>
               <Select
@@ -863,12 +966,17 @@ export function LitigationClient({
                 </SelectContent>
               </Select>
             </div>
+            </>}
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">
-                {form.record_type === 'debt' ? 'Debt Type' : 'Litigation Type'}
+                {isLoanForm ? 'Purpose of Loan' : 'Litigation Type'}
               </label>
               <Select value={form.litigation_type} onValueChange={(v) => setForm((f) => ({ ...f, litigation_type: v ?? '' }))}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectTrigger>
+                  <span className="text-sm truncate">
+                    {typeList.find((t) => t.value === form.litigation_type)?.label ?? (isLoanForm ? 'Select purpose' : 'Select type')}
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">— None —</SelectItem>
                   {typeList.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -888,9 +996,9 @@ export function LitigationClient({
               </div>
             )}
             <div>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">Reason</label>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">{isLoanForm ? 'Loan Details' : 'Reason'}</label>
               <Input
-                placeholder="Brief reason or case description"
+                placeholder={isLoanForm ? 'Interest rate, terms, etc.' : 'Brief reason or case description'}
                 value={form.reason}
                 onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
               />
@@ -898,25 +1006,49 @@ export function LitigationClient({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-gray-600 mb-1 block">
-                  {form.record_type === 'debt' ? 'Debt Amount (₹)' : 'Litigation Amount (₹)'}
+                  {isLoanForm ? 'Amount Borrowed (₹)' : 'Litigation Amount (₹)'}
                 </label>
                 <Input
                   type="number"
-                  placeholder="Total amount"
+                  placeholder={isLoanForm ? 'Amount borrowed' : 'Total amount'}
                   value={form.litigation_amount}
                   onChange={(e) => setForm((f) => ({ ...f, litigation_amount: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Amount to be Refunded (₹)</label>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">{isLoanForm ? 'Total to Repay (₹)' : 'Amount to be Refunded (₹)'}</label>
                 <Input
                   type="number"
-                  placeholder="Refund amount"
+                  placeholder={isLoanForm ? 'Principal + interest' : 'Refund amount'}
                   value={form.amount_refunded}
                   onChange={(e) => setForm((f) => ({ ...f, amount_refunded: e.target.value }))}
                 />
               </div>
             </div>
+            {isLoanForm && (() => {
+              const months = parseInt(form.emi_months) || 0
+              const repay = parseFloat(form.amount_refunded) || parseFloat(form.litigation_amount) || 0
+              return (
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">EMI Tenure</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[0, ...EMI_TENURES].map((m) => (
+                      <button key={m} type="button" onClick={() => setForm((f) => ({ ...f, emi_months: m ? String(m) : '' }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          months === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
+                        }`}>
+                        {m ? `${m} months` : 'One-time'}
+                      </button>
+                    ))}
+                  </div>
+                  {months > 0 && repay > 0 && (
+                    <p className="text-xs text-amber-700 mt-2">
+                      EMI ≈ <b>{formatCurrency(Math.ceil(repay / months))}</b> / month for {months} months
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Notes</label>
               <Input
@@ -946,7 +1078,7 @@ export function LitigationClient({
           {payTarget && (
             <div className="space-y-4 mt-2">
               <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                <p><span className="text-gray-500">Student:</span> <span className="font-semibold">{payTarget.student_name}</span></p>
+                <p><span className="text-gray-500">{payTarget.record_type === 'debt' ? 'Lender:' : 'Student:'}</span> <span className="font-semibold">{payTarget.student_name}</span></p>
                 <p><span className="text-gray-500">Total:</span> <span className="font-semibold">{formatCurrency(payTarget.litigation_amount)}</span></p>
                 <p><span className="text-gray-500">Already Paid:</span> <span className="font-semibold text-green-700">{formatCurrency(payTarget.amount_paid)}</span></p>
                 <p><span className="text-gray-500">Pending:</span> <span className="font-semibold text-red-600">{formatCurrency(payTarget.litigation_amount - payTarget.amount_paid)}</span></p>

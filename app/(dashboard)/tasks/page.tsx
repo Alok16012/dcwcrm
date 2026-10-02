@@ -136,7 +136,10 @@ export default function TasksPage() {
 
     const [profileRes, staffRes, assocRes, mineRes, createdRes] = await Promise.all([
       db.from('profiles').select('full_name').eq('id', user.id).single(),
-      db.from('profiles').select('id, full_name').neq('role', 'associate').order('full_name'),
+      // Only active DCW employees — no students, Berojgar Bharat logins or ex-staff
+      db.from('profiles').select('id, full_name')
+        .in('role', ['admin', 'backend', 'lead', 'telecaller', 'counselor', 'finance', 'housekeeping'])
+        .eq('is_active', true).order('full_name'),
       db.from('associates').select('id, name, user_id').eq('status', 'approved').order('name'),
       db.from('tasks').select('*').eq('assigned_to', user.id).order('due_date'),
       db.from('tasks').select('*').eq('created_by', user.id).order('due_date'),

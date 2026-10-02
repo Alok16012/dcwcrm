@@ -14,7 +14,7 @@ export default async function AnalyticsPage() {
     .eq('id', user.id)
     .single() as { data: { role: string } | null }
 
-  if (!profile || !['admin', 'backend'].includes(profile.role)) redirect('/')
+  if (!profile || profile.role !== 'admin') redirect('/')
 
   return <AnalyticsClient role={profile.role} />
 }

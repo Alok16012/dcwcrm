@@ -364,8 +364,8 @@ export function DispatchManager() {
     if (!form.father_name.trim()) { toast.error("Father's name is required"); return }
     const docs = form.documents.filter(d => d.document_type)
     if (docs.length === 0) { toast.error('Add at least one document'); return }
-    if (form.received_by === 'guardian' && (!form.receiver_name.trim() || !form.receiver_relation)) {
-      toast.error('Receiver name and relation are required for guardian/relative')
+    if (form.received_by === 'guardian' && (!form.receiver_name.trim() || !form.receiver_relation || !form.receiver_phone.trim())) {
+      toast.error('Receiver name, phone and relation are required for guardian/relative')
       return
     }
     setSaving(true)
@@ -472,8 +472,12 @@ export function DispatchManager() {
       : 'Your following document(s) have been dispatched from Distance Courses Wala:')
     lines.push(docList)
     lines.push('')
-    if (d.received_by === 'self') lines.push('Handed over to: Self (collected from office)')
-    if (d.received_by === 'guardian') lines.push(`Handed over to: ${d.receiver_name ?? 'Guardian'}${d.receiver_relation ? ` (${d.receiver_relation})` : ''}${d.receiver_phone ? `, ${d.receiver_phone}` : ''}`)
+    // Name + number of whoever actually collected it, instead of just "Self"
+    if (d.received_by === 'self') {
+      const phone = d.receiver_phone || d.student_phone
+      lines.push(`Handed over to: ${d.receiver_name || d.student_name} (Student)${phone ? `, ${phone}` : ''}`)
+    }
+    if (d.received_by === 'guardian') lines.push(`Handed over to: ${d.receiver_name || 'Guardian'} (${d.receiver_relation || 'Guardian'})${d.receiver_phone ? `, ${d.receiver_phone}` : ''}`)
     if (d.party_name) lines.push(`${isInbound ? 'From' : 'To'}: ${d.party_name}`)
     if (d.party_address) lines.push(`Address: ${d.party_address}`)
     if (d.courier) lines.push(`Courier: ${d.courier}`)
@@ -1160,7 +1164,7 @@ export function DispatchManager() {
                         className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">Phone</Label>
+                      <Label className="text-[10px] font-semibold text-slate-500 uppercase">{form.received_by === 'guardian' ? 'Phone *' : 'Phone'}</Label>
                       <input type="tel" value={form.receiver_phone}
                         onChange={e => setForm(p => ({ ...p, receiver_phone: e.target.value }))}
                         placeholder="Phone number"

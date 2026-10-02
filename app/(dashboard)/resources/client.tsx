@@ -12,7 +12,7 @@ import {
   Upload, FileText, Download, Eye, EyeOff, Trash2, Plus, X, Search, Folder, Loader2,
 } from 'lucide-react'
 
-// Prospectus / pamphlets / posters that associates download, uploaded here by
+// Prospectus / pamphlets / posters that counsellors (and associates) download, uploaded here by
 // admin & backend and tagged department-wise.
 
 const TYPES: { value: string; label: string }[] = [
@@ -23,10 +23,10 @@ const TYPES: { value: string; label: string }[] = [
   { value: 'fee_structure', label: 'Fee Structure' },
   { value: 'admission_form', label: 'Admission Form' },
   { value: 'marketing', label: 'Marketing' },
-  { value: 'training', label: 'Training' },
   { value: 'other', label: 'Other' },
 ]
-const TYPE_LABEL = Object.fromEntries(TYPES.map(t => [t.value, t.label]))
+// 'training' is no longer offered, but older uploads may still carry it
+const TYPE_LABEL: Record<string, string> = { ...Object.fromEntries(TYPES.map(t => [t.value, t.label])), training: 'Training' }
 
 interface Resource {
   id: string
@@ -149,7 +149,7 @@ export function ResourcesClient() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <PageHeader title="Resources" description="Prospectus, pamphlets and posters associates can download" />
+        <PageHeader title="Resources" description="Prospectus, pamphlets and posters counsellors can download" />
         {canManage && (
           <Button onClick={() => { setForm(EMPTY_FORM); setFile(null); setUploadOpen(true) }} className="gap-1.5">
             <Upload className="w-4 h-4" /> Upload Resource

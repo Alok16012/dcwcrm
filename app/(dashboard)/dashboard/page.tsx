@@ -153,7 +153,9 @@ export default async function DashboardPage() {
     }
   }
 
+  // Only admin sees every counsellor's interested count; others see just their own row
   const counselorInterestedStats = Object.values(tallyMap)
+    .filter(r => profile?.role === 'admin' || r.id === user?.id)
     .sort((a, b) => b.interested_total - a.interested_total)
     .slice(0, 10) // Show top 10 counselors by interested count
 

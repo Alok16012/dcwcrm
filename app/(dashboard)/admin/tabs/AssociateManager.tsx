@@ -87,11 +87,16 @@ interface Associate {
   temp_password: string | null
   activity_status?: ActivityStatus | null
   approved_at?: string | null
+  rejection_reason?: string | null
   created_at: string
 }
 
 // lockedStatus pins the list to one status (e.g. the "Approved" tab) and hides the status filter
-export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateStatus } = {}) {
+// onReview turns it into the Approvals list: rows open the review dialog instead of the profile page
+export function AssociateManager({ lockedStatus, onReview }: {
+  lockedStatus?: AssociateStatus
+  onReview?: (a: Associate) => void
+} = {}) {
   const router = useRouter()
   const supabase = createClient()
   const db = supabase as any
@@ -160,6 +165,8 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
       setSendingWelcome(false)
     }
   }
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false)
@@ -271,6 +278,19 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
       setDeleteOpen(false)
       load()
     } finally { setDeleting(false) }
+  }
+
+  async function handleBulkDelete() {
+    if (checked.size === 0) return
+    if (!confirm(`Delete ${checked.size} associate(s)? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    try {
+      const { error } = await db.from('associates').delete().in('id', [...checked])
+      if (error) { toast.error(error.message); return }
+      toast.success(`${checked.size} associate(s) deleted`)
+      setChecked(new Set())
+      load()
+    } finally { setBulkDeleting(false) }
   }
 
   async function setActivityStatus(a: Associate, value: ActivityStatus) {
@@ -397,7 +417,13 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
     XLSX.writeFile(wb, `DCW_Associates${tag ? `_${tag}` : ''}.xlsx`)
   }
 
-  const statusBadge = (s: AssociateStatus) => {
+  // Edit / delete: admin everywhere; backend too on the Approvals list
+  const canEdit = isAdmin || (!!onReview && canSeeAllAssociates)
+
+  const statusBadge = (s: AssociateStatus, a?: Associate) => {
+    if (s === 'pending' && a?.activity_status === 'hold') {
+      return <Badge className="bg-orange-100 text-orange-800 border-0 gap-1" title={a.rejection_reason ?? ''}><Clock className="w-3 h-3" />On Hold</Badge>
+    }
     if (s === 'approved') return <Badge className="bg-green-100 text-green-800 border-0 gap-1"><CheckCircle2 className="w-3 h-3" />Approved</Badge>
     if (s === 'rejected') return <Badge className="bg-red-100 text-red-800 border-0 gap-1"><XCircle className="w-3 h-3" />Rejected</Badge>
     return <Badge className="bg-amber-100 text-amber-800 border-0 gap-1"><Clock className="w-3 h-3" />Pending</Badge>
@@ -458,7 +484,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
       {/* Toolbar: Add Associate */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-          {lockedStatus === 'approved' ? 'Approved Associates' : 'All Associates'}
+          {onReview ? 'Associate Applications' : lockedStatus === 'approved' ? 'Approved Associates' : 'All Associates'}
         </p>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={exportExcel} disabled={loading || filtered.length === 0}
@@ -493,6 +519,16 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
           ) : null
         })()}
       </div>
+
+      {canEdit && checked.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2">
+          <span className="text-sm font-semibold text-blue-800">{checked.size} selected</span>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setChecked(new Set())}>Clear</Button>
+          <Button size="sm" className="h-7 text-xs gap-1 ml-auto bg-red-600 hover:bg-red-700" disabled={bulkDeleting} onClick={handleBulkDelete}>
+            <Trash2 className="w-3.5 h-3.5" /> {bulkDeleting ? 'Deleting…' : 'Delete selected'}
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white border rounded-xl p-3 flex flex-wrap gap-2">
@@ -579,6 +615,17 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b">
               <tr>
+                {canEdit && (
+                  <th className="pl-4 pr-1 py-3 w-8">
+                    <input type="checkbox" className="w-4 h-4 accent-blue-600 cursor-pointer"
+                      checked={pageRows.length > 0 && pageRows.every(a => checked.has(a.id))}
+                      onChange={e => setChecked(prev => {
+                        const next = new Set(prev)
+                        pageRows.forEach(a => e.target.checked ? next.add(a.id) : next.delete(a.id))
+                        return next
+                      })} />
+                  </th>
+                )}
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">S.No</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Associate Code</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
@@ -600,7 +647,18 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
             </thead>
             <tbody className="divide-y">
               {pageRows.map((a, idx) => (
-                <tr key={a.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => router.push(`/associates/${a.id}`)}>
+                <tr key={a.id} className={`hover:bg-slate-50 transition-colors cursor-pointer ${checked.has(a.id) ? 'bg-blue-50/50' : ''}`}
+                  onClick={() => onReview ? onReview(a) : router.push(`/associates/${a.id}`)}>
+                  {canEdit && (
+                    <td className="pl-4 pr-1 py-3" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" className="w-4 h-4 accent-blue-600 cursor-pointer" checked={checked.has(a.id)}
+                        onChange={e => setChecked(prev => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(a.id); else next.delete(a.id)
+                          return next
+                        })} />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{pageStart + idx + 1}</td>
                   <td className="px-4 py-3">
                     {a.associate_code
@@ -648,7 +706,7 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                       </>
                     )
                   })() : (
-                    <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
+                    <td className="px-4 py-3 text-center">{statusBadge(a.status, a)}</td>
                   )}
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
@@ -658,11 +716,17 @@ export function AssociateManager({ lockedStatus }: { lockedStatus?: AssociateSta
                           <KeyRound className="w-3.5 h-3.5" /> ID & Pass
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
-                        onClick={() => router.push(`/associates/${a.id}`)}>
-                        <Eye className="w-3.5 h-3.5" /> View <ChevronRight className="w-3 h-3" />
-                      </Button>
-                      {isAdmin && (
+                      {onReview ? (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => onReview(a)}>
+                          <Eye className="w-3.5 h-3.5" /> Review
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
+                          onClick={() => router.push(`/associates/${a.id}`)}>
+                          <Eye className="w-3.5 h-3.5" /> View <ChevronRight className="w-3 h-3" />
+                        </Button>
+                      )}
+                      {canEdit && (
                         <>
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
                             onClick={() => openEdit(a)} title="Edit">

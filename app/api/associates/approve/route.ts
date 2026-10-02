@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@/lib/supabase/server'
 
 function makePassword(length = 10) {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#'
@@ -18,6 +19,15 @@ async function nextAssociateCode(adminClient: any): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    // Only admin / backend may approve applications
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: { role: string } | null }
+    if (!['admin', 'backend'].includes(profile?.role ?? '')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { associate_id } = await request.json()
     if (!associate_id) return NextResponse.json({ error: 'associate_id required' }, { status: 400 })
 
@@ -67,6 +77,9 @@ export async function POST(request: NextRequest) {
         user_id: authData.user.id,
         temp_password: password,
         approved_at: new Date().toISOString(),
+        // clear any earlier "on hold" marker
+        activity_status: 'active',
+        rejection_reason: null,
       })
       .eq('id', associate_id)
 

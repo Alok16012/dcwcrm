@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   CheckCircle2, XCircle, Clock, Eye, RefreshCw,
-  Copy, UserCheck, Users, UserPlus, Award,
+  Copy, UserCheck, Users, UserPlus, Award, Mail, FileText,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AssociateManager } from '@/app/(dashboard)/admin/tabs/AssociateManager'
@@ -41,6 +41,7 @@ interface Associate {
   state: string | null; district: string | null; city: string | null; pincode: string | null
   institution_name: string | null; institution_address: string | null; photo_url: string | null
   coordinator_name: string | null
+  activity_status?: string | null; rejection_reason?: string | null
 }
 
 interface Credentials { associate_code: string; email: string; password: string }
@@ -108,8 +109,6 @@ export default function AssociatesClient() {
   }, [supabase])
 
   // ── Associate Approvals state ──
-  const [associates, setAssociates] = useState<Associate[]>([])
-  const [assocLoading, setAssocLoading] = useState(false)
   const [assocFilter, setAssocFilter] = useState<'pending' | 'all'>('pending')
   const [selected, setSelected] = useState<Associate | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -117,20 +116,17 @@ export default function AssociatesClient() {
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [holdOpen, setHoldOpen] = useState(false)
+  const [holdReason, setHoldReason] = useState('')
+  const [holding, setHolding] = useState(false)
   const [credOpen, setCredOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
   const [downloadingCert, setDownloadingCert] = useState(false)
+  const [mailingId, setMailingId] = useState<string | null>(null)
 
-  const loadAssociates = useCallback(async () => {
-    setAssocLoading(true)
-    const q = db.from('associates').select('*').order('created_at', { ascending: false })
-    if (assocFilter === 'pending') q.eq('status', 'pending')
-    const { data } = await q
-    setAssociates((data ?? []) as Associate[])
-    setAssocLoading(false)
-  }, [db, assocFilter])
-
-  useEffect(() => { if (activeTab === 'approvals') loadAssociates() }, [activeTab, loadAssociates])
+  // Bumping this remounts the Approvals list so it re-fetches
+  const [approvalsKey, setApprovalsKey] = useState(0)
+  const loadAssociates = useCallback(() => setApprovalsKey(k => k + 1), [])
 
   // Pre-load pending counts on mount for badges
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
@@ -156,6 +152,39 @@ export default function AssociatesClient() {
       setPendingApprovalCount(p => Math.max(0, p - 1))
       loadAssociates()
     } finally { setApproving(false) }
+  }
+
+  // Welcome email with ID, password and the certificate attached (same as the Approved tab)
+  async function mailCredentials(assoc: Associate, code?: string | null) {
+    setMailingId(assoc.id)
+    try {
+      // react-pdf is browser-only and heavy, so load it on demand
+      const { associateCertificatePdfBase64, certificateFileName } = await import('@/components/associates/AssociateCertificatePDF')
+      const cert = {
+        name: assoc.name,
+        associate_code: code ?? assoc.associate_code,
+        father_name: assoc.father_name ?? assoc.father_phone,
+        phone: assoc.phone,
+        email: assoc.email,
+        city: assoc.city ?? assoc.current_city,
+        district: assoc.district,
+        state: assoc.state ?? assoc.current_state,
+        institution_name: assoc.institution_name,
+        coordinator_name: assoc.coordinator_name,
+        issued_on: null,
+      }
+      const pdf_base64 = await associateCertificatePdfBase64(cert)
+      const res = await fetch(withBase('/api/associates/send-welcome'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ associate_id: assoc.id, pdf_base64, file_name: certificateFileName(cert) }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Mail failed'); return }
+      toast.success(`Welcome email sent to ${data.sent_to}`)
+    } catch {
+      toast.error('Mail failed')
+    } finally { setMailingId(null) }
   }
 
   async function downloadCertificate(assoc: Associate, code?: string | null) {
@@ -193,6 +222,23 @@ export default function AssociatesClient() {
       setPendingApprovalCount(p => Math.max(0, p - 1))
       loadAssociates()
     } finally { setRejecting(false) }
+  }
+
+  async function handleHoldAssoc() {
+    if (!selected || !holdReason.trim()) { toast.error('Batao kya missing hai'); return }
+    setHolding(true)
+    try {
+      const res = await fetch(withBase('/api/associates/hold'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ associate_id: selected.id, reason: holdReason.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed'); return }
+      toast.success(data.notified ? 'On hold — coordinator ko notification bhej diya' : 'On hold (no coordinator set to notify)')
+      setHoldOpen(false); setDetailOpen(false); setHoldReason('')
+      loadAssociates()
+    } finally { setHolding(false) }
   }
 
   const sBadge = (s: AStatus) => {
@@ -266,7 +312,7 @@ export default function AssociatesClient() {
             </span>
           )}
         </button>
-        {isAdmin && (
+        {canSeeAllAssociates && (
           <>
             <button
               onClick={() => setActiveTab('approvals')}
@@ -295,62 +341,18 @@ export default function AssociatesClient() {
       {/* ── APPROVALS ── */}
       {activeTab === 'approvals' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex gap-1.5">
-              {(['pending', 'all'] as const).map(f => (
-                <Button key={f} size="sm" variant={assocFilter === f ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setAssocFilter(f)}>
-                  {f === 'pending' ? 'Pending Only' : 'All'}
-                </Button>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" onClick={loadAssociates} className="gap-1.5 h-8 ml-auto">
-              <RefreshCw className="w-3.5 h-3.5" /> Refresh
-            </Button>
+          <div className="flex gap-1.5">
+            {(['pending', 'all'] as const).map(f => (
+              <Button key={f} size="sm" variant={assocFilter === f ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setAssocFilter(f)}>
+                {f === 'pending' ? 'Pending Only' : 'All'}
+              </Button>
+            ))}
           </div>
-
-          {assocLoading ? (
-            <div className="text-center py-16 text-muted-foreground text-sm">Loading…</div>
-          ) : associates.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">{assocFilter === 'pending' ? 'No pending applications' : 'No associates found'}</p>
-            </div>
-          ) : (
-            <div className="rounded-xl border overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 w-14">S.No</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Name</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Email</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Applied On</th>
-                    <th className="text-center px-4 py-3 font-semibold text-slate-600">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {associates.map((a, idx) => (
-                    <tr key={a.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{a.name}</td>
-                      <td className="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">{fmtPhone(a.phone)}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{a.email}</td>
-                      <td className="px-4 py-3 text-slate-400 text-xs hidden lg:table-cell">
-                        {new Date(a.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-3 text-center">{sBadge(a.status)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setSelected(a); setDetailOpen(true) }}>
-                          <Eye className="w-3.5 h-3.5" /> Review
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <AssociateManager
+            key={`approvals-${assocFilter}-${approvalsKey}`}
+            lockedStatus={assocFilter === 'pending' ? 'pending' : undefined}
+            onReview={a => { setSelected(a as unknown as Associate); setDetailOpen(true) }}
+          />
         </div>
       )}
 
@@ -374,32 +376,38 @@ export default function AssociatesClient() {
                 <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Bank Details</div>
                 <D label="Account Holder" value={selected.account_holder_name} /><D label="Bank" value={selected.bank_name} />
                 <D label="Account No." value={selected.account_number} /><D label="IFSC" value={selected.ifsc_code} />
-                {(selected.photo_url || selected.aadhar_doc_url || selected.pan_doc_url || selected.cheque_doc_url) && (
-                  <>
-                    <div className="col-span-2 border-t pt-2 text-xs font-semibold text-slate-500 uppercase">Documents</div>
-                    {selected.photo_url && (
-                      <div><p className="text-xs text-muted-foreground">Passport Photo</p>
-                        <a href={selected.photo_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>
-                    )}
-                    {selected.aadhar_doc_url && (
-                      <div><p className="text-xs text-muted-foreground">Aadhaar Card</p>
-                        <a href={selected.aadhar_doc_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>
-                    )}
-                    {selected.pan_doc_url && (
-                      <div><p className="text-xs text-muted-foreground">PAN Card</p>
-                        <a href={selected.pan_doc_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>
-                    )}
-                    {selected.cheque_doc_url && (
-                      <div><p className="text-xs text-muted-foreground">Cancelled Cheque</p>
-                        <a href={selected.cheque_doc_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">View ↗</a></div>
-                    )}
-                  </>
-                )}
               </div>
-              {selected.status === 'pending' && (
+              {/* Documents — previewed inline so they can be checked before approving */}
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Documents Review</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    ['Passport Photo', selected.photo_url],
+                    ['Aadhaar Card', selected.aadhar_doc_url],
+                    ['PAN Card', selected.pan_doc_url],
+                    ['Cancelled Cheque', selected.cheque_doc_url],
+                  ] as const).map(([label, url]) => <DocPreview key={label} label={label} url={url} />)}
+                </div>
+              </div>
+              {selected.status === 'approved' && (
                 <div className="flex gap-3 pt-2 border-t">
+                  <Button className="flex-1 gap-2" disabled={mailingId === selected.id} onClick={() => mailCredentials(selected)}>
+                    <Mail className="w-4 h-4" /> {mailingId === selected.id ? 'Sending…' : 'Send Welcome Email'}
+                  </Button>
+                </div>
+              )}
+              {selected.status === 'pending' && selected.activity_status === 'hold' && selected.rejection_reason && (
+                <p className="text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <b>On hold:</b> {selected.rejection_reason}
+                </p>
+              )}
+              {selected.status === 'pending' && (
+                <div className="flex flex-wrap gap-3 pt-2 border-t">
                   <Button className="flex-1 bg-green-600 hover:bg-green-700 gap-2" onClick={() => handleApproveAssoc(selected)} disabled={approving}>
                     {approving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> Approve & Generate ID</>}
+                  </Button>
+                  <Button variant="outline" className="flex-1 text-orange-700 border-orange-200 hover:bg-orange-50 gap-2" onClick={() => setHoldOpen(true)} disabled={approving}>
+                    <Clock className="w-4 h-4" /> On Hold / Docs Missing
                   </Button>
                   <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={() => setRejectOpen(true)} disabled={approving}>
                     <XCircle className="w-4 h-4" /> Reject
@@ -408,6 +416,32 @@ export default function AssociatesClient() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Associate Hold Dialog ── */}
+      <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-orange-700">On Hold / Documents Missing</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground"><strong>{selected?.name}</strong> ki application hold par jayegi aur coordinator ko notification jayega.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {['PAN card missing', 'Aadhaar card missing', 'Cancelled cheque missing', 'Photo missing', 'Bank details missing', 'Document not clear'].map(r => (
+                <button key={r} type="button" onClick={() => setHoldReason(prev => prev ? `${prev}, ${r}` : r)}
+                  className="text-[11px] px-2 py-1 rounded-full border border-orange-200 text-orange-700 hover:bg-orange-50">{r}</button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label>What is missing?</Label>
+              <Input placeholder="e.g. PAN card missing, bank details missing" value={holdReason} onChange={e => setHoldReason(e.target.value)} />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setHoldOpen(false)} disabled={holding}>Cancel</Button>
+              <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleHoldAssoc} disabled={holding}>
+                {holding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Put On Hold & Notify'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -460,12 +494,47 @@ export default function AssociatesClient() {
                   Download Certificate
                 </Button>
               )}
+              {selected && (
+                <Button variant="outline" className="w-full gap-2 border-green-300 text-green-700 hover:bg-green-50"
+                  disabled={mailingId === selected.id}
+                  onClick={() => mailCredentials(selected, credentials.associate_code)}>
+                  <Mail className="w-4 h-4" /> {mailingId === selected.id ? 'Sending…' : `Mail to ${credentials.email}`}
+                </Button>
+              )}
               <Button className="w-full" onClick={() => setCredOpen(false)}>Done</Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function DocPreview({ label, url }: { label: string; url: string | null }) {
+  if (!url) {
+    return (
+      <div className="rounded-lg border border-dashed border-red-200 bg-red-50/40 p-3 text-center">
+        <p className="text-xs font-medium text-slate-600">{label}</p>
+        <p className="text-[11px] text-red-500 mt-1">Not uploaded</p>
+      </div>
+    )
+  }
+  const isPdf = /\.pdf($|\?)/i.test(url)
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="group block rounded-lg border bg-slate-50 overflow-hidden hover:border-blue-300">
+      {isPdf ? (
+        <div className="h-32 flex flex-col items-center justify-center gap-1 text-slate-500">
+          <FileText className="w-8 h-8" /><span className="text-[11px]">PDF</span>
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={label} className="h-32 w-full object-contain bg-white" />
+      )}
+      <div className="flex items-center justify-between px-2 py-1.5 border-t bg-white">
+        <span className="text-xs font-medium text-slate-700">{label}</span>
+        <span className="text-[11px] text-blue-600 group-hover:underline">Open ↗</span>
+      </div>
+    </a>
   )
 }
 

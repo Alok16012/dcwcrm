@@ -7,9 +7,10 @@ import WhatsAppPageTabs from '@/components/whatsapp/WhatsAppPageTabs'
 
 export const dynamic = 'force-dynamic'
 
-/** Every bot chat, across every counsellor's leads, so management only.
- *  Counsellors see their own bot leads in Leads, with the bot's answers. */
-const CAN_VIEW = ['admin', 'backend']
+/** Admin sees every bot chat; a counsellor sees only the chats whose lead is
+ *  allotted to them. Backend runs the bot (Control Centre) but not the chats. */
+const CAN_VIEW = ['admin', 'backend', 'lead', 'counselor']
+const COUNSELLOR_ROLES = ['lead', 'counselor']
 /** Linking the bot hands over the WhatsApp number, so only these may see the QR. */
 const CAN_MANAGE = ['admin', 'backend']
 
@@ -23,14 +24,19 @@ export default async function WhatsAppPage() {
   if (!profile || !CAN_VIEW.includes(profile.role)) redirect('/dashboard')
 
   const canManage = CAN_MANAGE.includes(profile.role)
+  const isCounsellor = COUNSELLOR_ROLES.includes(profile.role)
+  const canSeeChats = profile.role === 'admin' || isCounsellor
   const db = supabase as any
+
+  let convQuery = db.from('wa_conversations')
+    .select(`id, chat_jid, phone, push_name, flow, status, lead_temperature, lead_id, human_until, last_inbound_at, last_outbound_at, created_at, state${isCounsellor ? ', lead:leads!inner(assigned_to)' : ''}`)
+    .order('last_inbound_at', { ascending: false, nullsFirst: false })
+    .limit(300)
+  if (isCounsellor) convQuery = convQuery.eq('lead.assigned_to', user.id)
 
   const [statusRes, convRes] = await Promise.all([
     canManage ? db.from('wa_bot_status').select('*').maybeSingle() : Promise.resolve({ data: null }),
-    db.from('wa_conversations')
-      .select('id, chat_jid, phone, push_name, flow, status, lead_temperature, lead_id, human_until, last_inbound_at, last_outbound_at, created_at, state')
-      .order('last_inbound_at', { ascending: false, nullsFirst: false })
-      .limit(300),
+    canSeeChats ? convQuery : Promise.resolve({ data: [] }),
   ])
 
   const conversations: Conversation[] = ((convRes.data ?? []) as any[]).map(c => ({
@@ -59,6 +65,8 @@ export default async function WhatsAppPage() {
         initialStatus={(statusRes.data ?? null) as BotStatus | null}
         conversations={conversations}
         canManage={canManage}
+        canSeeChats={canSeeChats}
+        canControl={canManage}
       />
     </div>
   )

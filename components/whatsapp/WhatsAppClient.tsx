@@ -60,8 +60,8 @@ const TEMP_STYLE: Record<string, string> = {
 const FLOW_LABEL: Record<string, string> = { school: 'Open School', college: 'College' }
 
 export default function WhatsAppClient({
-  initialStatus, conversations, canManage,
-}: { initialStatus: BotStatus | null; conversations: Conversation[]; canManage: boolean }) {
+  initialStatus, conversations, canManage, connectionOnly = false,
+}: { initialStatus: BotStatus | null; conversations: Conversation[]; canManage: boolean; connectionOnly?: boolean }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [status, setStatus] = useState<BotStatus | null>(initialStatus)
@@ -219,6 +219,7 @@ export default function WhatsAppClient({
         </div>
       )}
 
+      {!connectionOnly && <>
       {/* ---------------------------------------------------- stats ----- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -238,7 +239,7 @@ export default function WhatsAppClient({
       </div>
 
       {/* -------------------------------------------- conversations ----- */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,420px),1fr]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[70vh]">
           <div className="p-3 border-b border-gray-100 space-y-2">
             <div className="relative">
@@ -369,6 +370,7 @@ export default function WhatsAppClient({
           )}
         </div>
       </div>
+      </>}
     </div>
   )
 }

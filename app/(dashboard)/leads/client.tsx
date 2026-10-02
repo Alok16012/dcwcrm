@@ -75,7 +75,7 @@ export function LeadsClient() {
 
   // Builds the filtered + sorted leads query (without a row range). Shared by
   // the paginated on-screen fetch and the "export all" path.
-  const buildLeadsQuery = useCallback((withCount: boolean) => {
+  const buildLeadsQuery = useCallback((withCount: boolean, withReferral = true) => {
     const role = (currentProfile?.role as string) ?? ''
     const isTelecaller = role === 'lead' || role === 'telecaller' || role === 'counselor'
     const isAdmin = role === 'admin'
@@ -118,7 +118,8 @@ export function LeadsClient() {
     // Server-side text search across name / phone / email / referrer
     const term = searchTerm.trim().replace(/[,()*]/g, ' ').trim()
     const searchClause = term
-      ? `full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%`
+      ? `full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%` +
+        (withReferral ? `,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%` : '')
       : null
     // Two OR groups must be ANDed; postgrest-js has no .and(), so nest it in .or().
     if (sourceClause && searchClause) query = query.or(`and(or(${sourceClause}),or(${searchClause}))`)
@@ -132,8 +133,15 @@ export function LeadsClient() {
     setLoading(true)
     try {
       const fromIdx = (page - 1) * pageSize
-      const { data, count, error } = await buildLeadsQuery(true).range(fromIdx, fromIdx + pageSize - 1)
+      let { data, count, error } = await buildLeadsQuery(true).range(fromIdx, fromIdx + pageSize - 1)
+      // Databases without the referral columns (migration 105) reject the
+      // search clause — retry without them instead of silently failing.
+      if (error?.code === '42703') {
+        ({ data, count, error } = await buildLeadsQuery(true, false).range(fromIdx, fromIdx + pageSize - 1))
+      }
       if (error) {
+        setLeads([])
+        setTotalCount(0)
         console.error('Database Error:', error)
         throw error
       }
@@ -161,7 +169,8 @@ export function LeadsClient() {
     let from = 0
     let all: Lead[] = []
     for (let guard = 0; guard < 50; guard++) {
-      const { data, error } = await buildLeadsQuery(false).range(from, from + CHUNK - 1)
+      let { data, error } = await buildLeadsQuery(false).range(from, from + CHUNK - 1)
+      if (error?.code === '42703') ({ data, error } = await buildLeadsQuery(false, false).range(from, from + CHUNK - 1))
       if (error) throw error
       const batch = (data as Lead[]) ?? []
       all = all.concat(batch)

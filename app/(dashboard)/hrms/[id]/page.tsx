@@ -72,7 +72,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
   const [attRes, payrollRes, studentsRes, profileRes, mentorIncRes] = await Promise.all([
     supabase.from('attendance').select('date, status').eq('employee_id', id).gte('date', cycleStartDate).lte('date', cycleEndDate),
     supabase.from('payroll').select('*').eq('employee_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
-    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).gt('incentive_amount', 0).order('enrollment_date', { ascending: false, nullsFirst: false }),
+    supabase.from('students').select('id, full_name, course:courses(name), incentive_amount, enrollment_date').eq('assigned_counsellor', employee.profile_id).not('enrollment_date', 'is', null).order('enrollment_date', { ascending: false, nullsFirst: false }),
     supabase.from('profiles').select('id, full_name, email, phone, role').eq('id', employee.profile_id).single(),
     (supabase as any).from('mentorship_payments')
       .select('id, incentive_amount, salary_percentage, approved_at, created_at, mentorship:student_mentorships!inner(telecaller_id, student:students(id, full_name))')
@@ -323,7 +323,7 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
               <tbody className="divide-y">
                 {assignedStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">No incentives recorded yet</td>
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">No admissions yet</td>
                   </tr>
                 ) : (
                   assignedStudents.map((s: any) => (
@@ -331,7 +331,11 @@ export default async function EmployeeDetailPage({ params, searchParams }: PageP
                       <td className="px-4 py-3 font-medium">{s.full_name}</td>
                       <td className="px-4 py-3 text-gray-600">{s.course?.name || '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{s.enrollment_date ? format(new Date(s.enrollment_date), 'dd MMM yyyy') : '—'}</td>
-                      <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(s.incentive_amount)}</td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {Number(s.incentive_amount) > 0
+                          ? <span className="text-green-600">{fmt(s.incentive_amount)}</span>
+                          : <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Incentive not set</span>}
+                      </td>
                     </tr>
                   ))
                 )}

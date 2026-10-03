@@ -1,4 +1,5 @@
 'use client'
+import { DCW_STAFF_ROLES } from '@/lib/dcw-roles'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -111,7 +112,7 @@ export default function TaskManager() {
 
     const [profileRes, staffRes, assocRes, taskRes] = await Promise.all([
       db.from('profiles').select('full_name').eq('id', user.id).single(),
-      db.from('profiles').select('id, full_name, role').neq('role', 'associate').order('full_name'),
+      db.from('profiles').select('id, full_name, role').in('role', DCW_STAFF_ROLES).eq('is_active', true).order('full_name'),
       db.from('associates').select('id, name, user_id').eq('status', 'approved').order('name'),
       db.from('tasks').select('*').order('due_date', { ascending: true }),
     ])

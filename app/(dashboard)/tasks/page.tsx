@@ -1,4 +1,5 @@
 'use client'
+import { DCW_STAFF_ROLES } from '@/lib/dcw-roles'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -138,7 +139,7 @@ export default function TasksPage() {
       db.from('profiles').select('full_name').eq('id', user.id).single(),
       // Only active DCW employees — no students, Berojgar Bharat logins or ex-staff
       db.from('profiles').select('id, full_name')
-        .in('role', ['admin', 'backend', 'lead', 'telecaller', 'counselor', 'finance', 'housekeeping'])
+        .in('role', DCW_STAFF_ROLES)
         .eq('is_active', true).order('full_name'),
       db.from('associates').select('id, name, user_id').eq('status', 'approved').order('name'),
       db.from('tasks').select('*').eq('assigned_to', user.id).order('due_date'),

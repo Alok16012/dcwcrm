@@ -172,7 +172,7 @@
   .crm-shell.app-bg { background: var(--m-canvas); }
 
   /* Page titles */
-  .crm-shell main h1 {
+  .crm-shell main h1:not([data-size]) {
     font-size: 22px;
     line-height: 1.25;
     font-weight: 700;
@@ -220,7 +220,7 @@
   }
 
   /* Inputs and selects: soft rounded fields */
-  .crm-shell main input:not([type='checkbox']):not([type='radio']),
+  .crm-shell main input:not([type='checkbox']):not([type='radio']):not([data-bare]),
   .crm-shell main select,
   .crm-shell main [data-slot='select-trigger'] {
     border-radius: 14px;

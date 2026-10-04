@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
 import type { UserRole } from '@/types/app.types'
 
-interface NavItem {
+export interface NavItem {
   label: string
   href: string
   icon: React.ElementType
@@ -24,7 +24,7 @@ interface NavItem {
   module?: string
 }
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'lead', 'backend', 'counselor'] },
   // Associate portal sub-nav (only visible to associate role)
   { label: 'Dashboard',       href: '/associate',            icon: Home,          roles: ['associate'] },
@@ -68,6 +68,13 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Performance',  href: '/performance', icon: TrendingUp,   roles: ['lead', 'counselor'] },
 ]
 
+/** Menu entries a user can open: by role, or by an explicit module grant. */
+export function visibleNavItems(role: UserRole, moduleRights: string[] = []): NavItem[] {
+  return NAV_ITEMS.filter((item) =>
+    item.roles.includes(role) || (item.module != null && moduleRights.includes(item.module))
+  )
+}
+
 interface SidebarProps {
   role: UserRole
   moduleRights?: string[]
@@ -77,9 +84,7 @@ export function Sidebar({ role, moduleRights = [] }: SidebarProps) {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useUIStore()
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    item.roles.includes(role) || (item.module != null && moduleRights.includes(item.module))
-  )
+  const visibleItems = visibleNavItems(role, moduleRights)
 
   function NavLinks({ collapsed = false, onNavClick }: { collapsed?: boolean; onNavClick?: () => void }) {
     return (

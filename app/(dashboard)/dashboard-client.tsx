@@ -5,6 +5,8 @@ import { format, parseISO } from 'date-fns'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
+import { MobileHome } from '@/components/dashboard/MobileHome'
+import type { UserRole } from '@/types/app.types'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
@@ -74,6 +76,10 @@ interface DashboardClientProps {
   /** Payments recorded with today's date (IST) — admin/backend only */
   todaysCollection?: number
   todaysCollectionCount?: number
+  /** For the phone home screen */
+  userName?: string
+  role?: UserRole
+  moduleRights?: string[]
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -137,6 +143,7 @@ export default function DashboardClient({
   followupsToday, interestedStats, incentiveHistory = [],
   isLead = false, docReceivedCount = 0, expectedEnrollmentCount = 0, departmentStats = [],
   todaysCollection = 0, todaysCollectionCount = 0,
+  userName = '', role = 'admin', moduleRights = [],
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [myTasks, setMyTasks] = useState<any[]>([])
@@ -157,8 +164,15 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
+      <MobileHome
+        name={userName} role={role} moduleRights={moduleRights} isLead={isLead}
+        newToday={newToday} followupsToday={followupsToday.length} todayAppointments={todayAppointments}
+        convertedThisMonth={convertedThisMonth} todaysCollection={todaysCollection}
+        todaysCollectionCount={todaysCollectionCount} outstandingFees={outstandingFees}
+      />
+
+      {/* Header — the phone gets MobileHome above instead */}
+      <div className="hidden md:block">
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-xs text-gray-400 mt-0.5">{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
       </div>

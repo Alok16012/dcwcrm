@@ -144,3 +144,90 @@
 /* Hide scrollbars on horizontal scroll strips */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* ── Phone layout of the CRM ─────────────────────────────────────────────
+ * Mirrors the DriveWay / Zavtoo app design system: lavender canvas, Poppins,
+ * white 20px cards with a soft shadow instead of borders, pill tabs with a
+ * filled blue active tab, and big bold page titles. Phone width only, and only
+ * inside the dashboard shell (.crm-shell) — desktop, the login screen, the
+ * student portal and Berojgar Bharat keep their own look. These rules sit
+ * outside @layer on purpose so they win over per-page Tailwind classes. */
+:root {
+  --m-canvas: #eef1fb;
+  --m-surface: #ffffff;
+  --m-ink: #0f1729;
+  --m-ink-soft: #5b6478;
+  --m-ink-mute: #98a1b5;
+  --m-blue: #0b5cff;
+  --m-blue-tint: #e8effe;
+  --m-shadow-card: 0 2px 10px rgba(15, 23, 41, 0.05);
+  --m-shadow-float: 0 8px 24px rgba(15, 23, 41, 0.14);
+}
+
+@media (max-width: 767px) {
+  body:has(.crm-shell) {
+    font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+    background: var(--m-canvas);
+    color: var(--m-ink);
+  }
+  .crm-shell.app-bg { background: var(--m-canvas); }
+
+  /* Page titles */
+  .crm-shell main h1 {
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Cards: shadcn Card, .app-card, and the white bordered panels pages build by hand */
+  .crm-shell [data-slot='card'],
+  .crm-shell .app-card,
+  .crm-shell main div.bg-white.border.rounded-lg,
+  .crm-shell main div.bg-white.border.rounded-xl,
+  .crm-shell main div.bg-white.border.rounded-2xl,
+  .crm-shell main div.rounded-lg.border:not([class*='bg-']),
+  .crm-shell main div.rounded-xl.border:not([class*='bg-']) {
+    border-radius: 20px;
+    border-color: transparent;
+    background-color: var(--m-surface);
+    box-shadow: var(--m-shadow-card);
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
+  /* Pill tabs: white track, filled blue active tab */
+  .crm-shell [data-slot='tabs-list'][data-variant='default'] {
+    height: auto;
+    padding: 4px;
+    gap: 2px;
+    border-radius: 999px;
+    border: none;
+    background: var(--m-surface);
+    box-shadow: var(--m-shadow-card);
+  }
+  .crm-shell [data-slot='tabs-list'][data-variant='default'] [data-slot='tabs-trigger'] {
+    height: auto;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: none;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--m-ink-soft);
+    box-shadow: none;
+  }
+  .crm-shell [data-slot='tabs-list'][data-variant='default'] [data-slot='tabs-trigger'][data-active] {
+    background: var(--m-blue);
+    color: #ffffff;
+  }
+
+  /* Inputs and selects: soft rounded fields */
+  .crm-shell main input:not([type='checkbox']):not([type='radio']),
+  .crm-shell main select,
+  .crm-shell main [data-slot='select-trigger'] {
+    border-radius: 14px;
+    border-color: #e6eaf5;
+    background-color: var(--m-surface);
+  }
+
+  /* Buttons get the app's rounder corners */
+  .crm-shell main [data-slot='button'] { border-radius: 12px; }
+}

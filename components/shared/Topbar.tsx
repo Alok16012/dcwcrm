@@ -1,6 +1,6 @@
 'use client'
 import { withBase } from '@/lib/base-path'
-import { LogOut, Menu } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useUIStore } from '@/store/useUIStore'
 import type { Profile } from '@/types/app.types'
 import { NotificationBell } from './NotificationBell'
 
@@ -20,7 +19,6 @@ interface TopbarProps {
 export function Topbar({ user }: TopbarProps) {
   const router = useRouter()
   const supabase = createClient()
-  const { toggleMobileSidebar } = useUIStore()
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -29,19 +27,15 @@ export function Topbar({ user }: TopbarProps) {
   }
 
   return (
-    <header className="h-14 bg-white/75 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-3 md:px-5 flex-shrink-0 z-20">
-      {/* Mobile: hamburger + brand name */}
-      <div className="flex items-center gap-2 md:hidden">
-        <button
-          onClick={toggleMobileSidebar}
-          className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors -ml-1"
-          aria-label="Open menu"
-        >
-          <Menu className="w-5 h-5 text-gray-600" />
-        </button>
-        <div className="flex items-center gap-2">
-          <img src={withBase("/brand-logo.png")} alt="" className="w-7 h-7 rounded-lg" />
-          <span className="font-bold text-sm text-gray-900 leading-tight">Distance Courses</span>
+    <header className="h-16 md:h-14 bg-transparent md:bg-white/75 md:backdrop-blur-xl md:border-b md:border-gray-100 flex items-center justify-between px-4 md:px-5 flex-shrink-0 z-20">
+      {/* Mobile: brand lockup, as in the DriveWay app — the menu lives under "More" in the bottom nav */}
+      <div className="flex items-center gap-2.5 md:hidden">
+        <img src={withBase("/brand-logo.png")} alt="" className="w-10 h-10 rounded-xl" />
+        <div className="flex flex-col leading-none">
+          <span className="text-[17px] font-extrabold tracking-tight text-[#0f1729]">
+            Distance <span className="text-[#0b5cff]">Courses</span>
+          </span>
+          <span className="mt-1 text-[9.5px] font-semibold tracking-[0.18em] text-[#5b6478]">WALA · CRM</span>
         </div>
       </div>
 

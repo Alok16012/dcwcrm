@@ -143,34 +143,56 @@ export function Sidebar({ role, moduleRights = [] }: SidebarProps) {
         <NavLinks collapsed={sidebarCollapsed} />
       </div>
 
-      {/* Mobile drawer overlay */}
+      {/* Mobile: "More" opens a bottom sheet of app tiles, like DriveWay's service grid */}
       {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[#0f1729]/40 backdrop-blur-[2px]"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          {/* Drawer panel */}
-          <div className="absolute left-0 top-0 h-full w-72 flex flex-col bg-gray-900 text-white shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <div className="flex items-center gap-3">
-                <img src={withBase("/brand-logo.png")} alt="Distance Courses Wala" className="w-9 h-9 rounded" />
-                <div className="flex flex-col justify-center">
-                  <span className="font-bold text-sm leading-tight">Distance Courses</span>
-                  <span className="text-[10px] text-blue-400 font-bold leading-tight uppercase tracking-wider mt-0.5">Wala</span>
-                </div>
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[85vh] flex flex-col rounded-t-[28px] bg-[#eef1fb] shadow-2xl"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          >
+            <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-[#d5dbea]" />
+            <div className="flex items-center justify-between px-5 pt-3 pb-2">
+              <div>
+                <p className="text-[13px] font-medium text-[#5b6478]">Distance Courses Wala</p>
+                <h2 className="text-[22px] font-bold leading-tight text-[#0f1729]">All modules</h2>
               </div>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="p-1.5 rounded hover:bg-gray-700 transition-colors"
+                aria-label="Close"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(15,23,41,0.05)]"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-[#0f1729]" />
               </button>
             </div>
-            <NavLinks onNavClick={() => setMobileSidebarOpen(false)} />
-            <div className="p-4 border-t border-gray-700 text-center text-xs text-gray-500">
-              Developed by <span className="text-blue-400 font-semibold">Blinks AI</span>
+            <div className="grid grid-cols-4 gap-x-2.5 gap-y-4 overflow-y-auto px-4 pt-2 pb-6">
+              {visibleItems.map((item) => {
+                const isActive = pathname === item.href
+                  || (item.href !== '/' && item.href !== '/dashboard' && item.href !== '/associate' && pathname.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className="flex flex-col items-center gap-1.5 text-center"
+                  >
+                    <span
+                      className={cn(
+                        'flex aspect-square w-full items-center justify-center rounded-[20px] shadow-[0_2px_10px_rgba(15,23,41,0.05)]',
+                        isActive ? 'bg-[#0b5cff] text-white' : 'bg-white text-[#0b5cff]'
+                      )}
+                    >
+                      <item.icon className="w-6 h-6" />
+                    </span>
+                    <span className={cn('text-[11.5px] leading-tight', isActive ? 'font-semibold text-[#0b5cff]' : 'font-medium text-[#0f1729]')}>
+                      {item.label}
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </div>

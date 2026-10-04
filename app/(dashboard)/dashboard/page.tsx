@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { createServerClient, getCurrentUser, getCurrentProfile } from '@/lib/supabase/server'
 import DashboardClient from '../dashboard-client'
+import type { UserRole } from '@/types/app.types'
 
 export default async function DashboardPage() {
   const [supabase, user, profile] = await Promise.all([createServerClient(), getCurrentUser(), getCurrentProfile()])
@@ -105,7 +106,7 @@ export default async function DashboardPage() {
   const outstandingFees = ((studentFees ?? []) as { total_fee: number | null; amount_paid: number | null }[]).reduce((s, r) => s + Math.max(0, (r.total_fee ?? 0) - (r.amount_paid ?? 0)), 0)
 
   const conversionCount = convertedThisMonth ?? 0
-  const totalCount = totalLeadsForRate ?? 1
+  const totalCount = totalLeadsForRate || 1
   const conversionRate = ((conversionCount / totalCount) * 100).toFixed(1) + '%'
 
   const recentLeads = ((recentLeadsRaw ?? []) as { id: string; full_name: string; status: string; created_at: string; courses: { name: string } | null }[]).map((l) => ({
@@ -217,6 +218,9 @@ export default async function DashboardPage() {
       departmentStats={departmentStats}
       todaysCollection={todaysCollection}
       todaysCollectionCount={todaysPayments.length}
+      userName={profile?.full_name ?? ''}
+      role={(profile?.role ?? 'admin') as UserRole}
+      moduleRights={profile?.module_rights ?? []}
     />
   )
 }

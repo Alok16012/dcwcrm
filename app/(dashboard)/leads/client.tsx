@@ -37,7 +37,10 @@ export function LeadsClient() {
   // so the table stays fast even with thousands of leads.
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  const [searchTerm, setSearchTerm] = useState('')
+  const searchParams = useSearchParams()
+  // ?q= comes from the phone home screen's search box. Read it at mount so the
+  // search field starts with it — set later, the field's own debounce wiped it.
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '')
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
   const [totalCount, setTotalCount] = useState(0)
 
@@ -45,7 +48,6 @@ export function LeadsClient() {
   const [telecallers, setTelecallers] = useState<Profile[]>([])
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
   const { filters, setFilters } = useLeadStore()
-  const searchParams = useSearchParams()
 
   // Apply URL params as initial filters (from dashboard quick-cards)
   useEffect(() => {

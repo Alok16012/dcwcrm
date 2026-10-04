@@ -32,10 +32,10 @@ export function Topbar({ user }: TopbarProps) {
       <div className="flex items-center gap-2.5 md:hidden">
         <img src={withBase("/brand-logo.png")} alt="" className="w-10 h-10 rounded-xl" />
         <div className="flex flex-col leading-none">
-          <span className="text-[17px] font-extrabold tracking-tight text-[#0f1729]">
-            Distance <span className="text-[#0b5cff]">Courses</span>
+          <span className="text-[16px] font-extrabold tracking-tight text-[#0f1729] whitespace-nowrap">
+            Distance Courses <span className="text-[#0b5cff]">Wala</span>
           </span>
-          <span className="mt-1 text-[9.5px] font-semibold tracking-[0.18em] text-[#5b6478]">WALA · CRM</span>
+          <span className="mt-1 text-[9.5px] font-semibold tracking-[0.18em] text-[#5b6478]">CRM</span>
         </div>
       </div>
 

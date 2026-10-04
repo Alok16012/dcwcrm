@@ -55,44 +55,40 @@ export function MobileBottomNav({ role }: { role: UserRole }) {
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/associate' && pathname.startsWith(href))
 
+  // A floating pill over the content, as in the DriveWay app: no bar of its
+  // own, only the pill is solid; the active item sits in a light-blue pill.
+  const cell = (active: boolean) => cn(
+    'flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-1.5 transition-colors',
+    active ? 'bg-[#e8effe] text-[#0b5cff]' : 'text-[#0f1729]'
+  )
+
   return (
-    <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur-xl border-t border-gray-100"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    <div
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 px-3.5 pointer-events-none"
+      style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))' }}
     >
-      <div className="flex items-stretch justify-around px-1 pt-1.5 pb-1.5">
+      <nav
+        className="pointer-events-auto flex items-stretch rounded-full bg-white/95 p-1 backdrop-blur-xl"
+        style={{ boxShadow: '0 8px 24px rgba(15,23,41,0.14)' }}
+      >
         {items.map((item) => {
           const active = isActive(item.href)
           const Icon = item.icon
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl"
-            >
-              <span className={cn(
-                'flex items-center justify-center w-10 h-7 rounded-full transition-colors',
-                active ? 'bg-blue-600 text-white shadow-sm shadow-blue-200' : 'text-gray-400'
-              )}>
-                <Icon className="w-[18px] h-[18px]" />
-              </span>
-              <span className={cn('text-[10px] font-semibold leading-none', active ? 'text-blue-600' : 'text-gray-400')}>
+            <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cell(active)}>
+              <Icon className="w-[21px] h-[21px]" strokeWidth={active ? 2.4 : 2} />
+              <span className={cn('text-[10.5px] leading-tight', active ? 'font-semibold' : 'font-medium')}>
                 {item.label}
               </span>
             </Link>
           )
         })}
-        {/* More → opens the full sidebar drawer */}
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl"
-        >
-          <span className="flex items-center justify-center w-10 h-7 rounded-full text-gray-400">
-            <MoreHorizontal className="w-[18px] h-[18px]" />
-          </span>
-          <span className="text-[10px] font-semibold leading-none text-gray-400">More</span>
+        {/* More → opens the full menu sheet */}
+        <button onClick={() => setMobileSidebarOpen(true)} className={cell(false)}>
+          <MoreHorizontal className="w-[21px] h-[21px]" strokeWidth={2} />
+          <span className="text-[10.5px] font-medium leading-tight">More</span>
         </button>
-      </div>
-    </nav>
+      </nav>
+    </div>
   )
 }

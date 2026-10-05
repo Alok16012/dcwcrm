@@ -417,8 +417,10 @@ export function AssociateManager({ lockedStatus, onReview }: {
     XLSX.writeFile(wb, `DCW_Associates${tag ? `_${tag}` : ''}.xlsx`)
   }
 
-  // Edit / delete: admin everywhere; backend too on the Approvals list
+  // Delete (and bulk select): admin everywhere; backend too on the Approvals list
   const canEdit = isAdmin || (!!onReview && canSeeAllAssociates)
+  // Edit: also the coordinator counsellor of that associate, so they can fill in its details
+  const canEditRow = (a: Associate) => canEdit || (!!viewerId && a.coordinator_id === viewerId)
 
   const statusBadge = (s: AssociateStatus, a?: Associate) => {
     if (s === 'pending' && a?.activity_status === 'hold') {
@@ -726,6 +728,12 @@ export function AssociateManager({ lockedStatus, onReview }: {
                           <Eye className="w-3.5 h-3.5" /> View <ChevronRight className="w-3 h-3" />
                         </Button>
                       )}
+                      {!canEdit && canEditRow(a) && (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => openEdit(a)}>
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </Button>
+                      )}
                       {canEdit && (
                         <>
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
@@ -781,7 +789,7 @@ export function AssociateManager({ lockedStatus, onReview }: {
         </div>
       )}
 
-      {/* Edit Dialog — admin only */}
+      {/* Edit Dialog — admin, backend (approvals) and the associate's own coordinator */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

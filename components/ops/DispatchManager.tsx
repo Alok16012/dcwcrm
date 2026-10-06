@@ -130,6 +130,36 @@ function groupDispatches(list: Dispatch[]): DispatchGroup[] {
   return Array.from(map.values())
 }
 
+// The panel shows one row per student; every receive / dispatch entry of that
+// student sits in its history underneath. Same name = same student, unless the
+// entries carry different enrollment numbers.
+interface StudentHistory { key: string; latest: DispatchGroup; entries: DispatchGroup[] }
+
+const entryTime = (g: DispatchGroup) => g.head.dispatch_date ?? g.head.created_at.slice(0, 10)
+
+function groupByStudent(groups: DispatchGroup[]): StudentHistory[] {
+  const byName = new Map<string, DispatchGroup[]>()
+  for (const g of groups) {
+    const name = g.head.student_name.trim().toLowerCase()
+    byName.set(name, [...(byName.get(name) ?? []), g])
+  }
+  const out: StudentHistory[] = []
+  for (const [name, list] of byName) {
+    const enrollments = [...new Set(list.map(g => g.head.enrollment_number?.trim()).filter(Boolean))] as string[]
+    const buckets = new Map<string, DispatchGroup[]>()
+    for (const g of list) {
+      // Entries without an enrollment number join the first known one
+      const en = g.head.enrollment_number?.trim() || enrollments[0] || ''
+      buckets.set(en, [...(buckets.get(en) ?? []), g])
+    }
+    for (const [en, entries] of buckets) {
+      entries.sort((a, b) => entryTime(b).localeCompare(entryTime(a)) || b.head.created_at.localeCompare(a.head.created_at))
+      out.push({ key: `${name}|${en}`, latest: entries[0], entries })
+    }
+  }
+  return out.sort((a, b) => entryTime(b.latest).localeCompare(entryTime(a.latest)))
+}
+
 const EMPTY_FORM = {
   dispatch_type: 'outbound' as 'inbound' | 'outbound',
   student_id: '',
@@ -268,6 +298,12 @@ export function DispatchManager() {
   const [manualEntry, setManualEntry] = useState(false)
   const [showOptional, setShowOptional] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleHistory = (key: string) => setExpanded(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -579,6 +615,8 @@ export function DispatchManager() {
     return matchSearch && matchStatus && matchAssoc
   })
 
+  const studentRows = groupByStudent(groups)
+
   const inboundCount  = allGroups.filter(g => g.head.dispatch_type === 'inbound').length
   const outboundCount = allGroups.filter(g => g.head.dispatch_type === 'outbound').length
   const currentStatuses = activeTab === 'inbound' ? INBOUND_STATUSES : activeTab === 'outbound' ? OUTBOUND_STATUSES : [...new Map([...INBOUND_STATUSES, ...OUTBOUND_STATUSES].map(s => [s.value, s])).values()]
@@ -695,7 +733,7 @@ export function DispatchManager() {
 
       {(search || filterStatus || filterAssociate) && (
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span>{groups.length} result{groups.length !== 1 ? 's' : ''}</span>
+          <span>{studentRows.length} student{studentRows.length !== 1 ? 's' : ''}</span>
           <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterAssociate('') }} className="text-red-500 hover:text-red-700 flex items-center gap-0.5">
             <X className="w-3 h-3" /> Clear
           </button>
@@ -717,14 +755,15 @@ export function DispatchManager() {
         <>
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {groups.map(g => {
+            {studentRows.map(sh => (expanded.has(sh.key) ? sh.entries : [sh.latest]).map((g, idx) => {
               const d = g.head
               const ids = g.rows.map(r => r.id)
               const sm = statusMeta(d.status, d.dispatch_type)
               const isInbound = d.dispatch_type === 'inbound'
               const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
+              const isHistory = idx > 0
               return (
-                <div key={g.key} className={`bg-white border rounded-xl p-4 space-y-3 ${isInbound ? 'border-teal-200' : 'border-blue-200'}`}>
+                <div key={g.key} className={`border rounded-xl p-4 space-y-3 ${isHistory ? 'ml-4 bg-slate-50' : 'bg-white'} ${isInbound ? 'border-teal-200' : 'border-blue-200'}`}>
                   <div className="flex items-start gap-2">
                     <div className={`mt-0.5 p-1.5 rounded-lg flex-shrink-0 ${isInbound ? 'bg-teal-50 text-teal-600' : 'bg-blue-50 text-blue-600'}`}>
                       {isInbound ? <ArrowDownToLine className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
@@ -733,8 +772,15 @@ export function DispatchManager() {
                       <p className={`text-[10px] font-bold uppercase tracking-wide ${isInbound ? 'text-teal-600' : 'text-blue-600'}`}>
                         {isInbound ? 'Received' : 'Dispatched'}
                       </p>
-                      <p className="font-semibold text-gray-900 leading-tight">{d.student_name}</p>
-                      {d.enrollment_number && <p className="text-xs text-gray-400 font-mono">{d.enrollment_number}</p>}
+                      {!isHistory && <p className="font-semibold text-gray-900 leading-tight">{d.student_name}</p>}
+                      {!isHistory && d.enrollment_number && <p className="text-xs text-gray-400 font-mono">{d.enrollment_number}</p>}
+                      {!isHistory && sh.entries.length > 1 && (
+                        <button onClick={() => toggleHistory(sh.key)}
+                          className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600">
+                          {expanded.has(sh.key) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          History · {sh.entries.length} entries
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <DropdownMenu>
@@ -797,6 +843,10 @@ export function DispatchManager() {
                         <p className="font-medium text-gray-700">{format(new Date(d.dispatch_date + 'T00:00:00'), 'dd MMM yyyy')}</p>
                       </div>
                     )}
+                    <div>
+                      <p className="text-[10px] text-gray-400">Recorded</p>
+                      <p className="font-medium text-gray-700">{format(new Date(d.created_at), 'dd MMM yyyy')}</p>
+                    </div>
                     {d.expected_delivery && (
                       <div>
                         <p className="text-[10px] text-gray-400">Expected</p>
@@ -808,7 +858,7 @@ export function DispatchManager() {
                   {d.remarks && <p className="text-xs text-gray-400 italic">{d.remarks}</p>}
                 </div>
               )
-            })}
+            }))}
           </div>
 
           {/* Desktop table */}
@@ -828,14 +878,15 @@ export function DispatchManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {groups.map(g => {
+                  {studentRows.map(sh => (expanded.has(sh.key) ? sh.entries : [sh.latest]).map((g, idx) => {
                     const d = g.head
                     const ids = g.rows.map(r => r.id)
                     const sm = statusMeta(d.status, d.dispatch_type)
                     const isInbound = d.dispatch_type === 'inbound'
                     const statuses = isInbound ? INBOUND_STATUSES : OUTBOUND_STATUSES
+                    const isHistory = idx > 0
                     return (
-                      <tr key={g.key} className="hover:bg-slate-50 transition-colors">
+                      <tr key={g.key} className={`transition-colors ${isHistory ? 'bg-slate-50/70 hover:bg-slate-100/70' : 'hover:bg-slate-50'}`}>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold ${isInbound ? 'bg-teal-50 text-teal-700' : 'bg-blue-50 text-blue-700'}`}>
                             {isInbound ? <ArrowDownToLine className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -843,8 +894,21 @@ export function DispatchManager() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{d.student_name}</p>
-                          {d.enrollment_number && <p className="text-[11px] text-gray-400 font-mono">{d.enrollment_number}</p>}
+                          {isHistory ? (
+                            <p className="text-[11px] text-slate-400 pl-3 border-l-2 border-slate-200">Earlier entry</p>
+                          ) : (
+                            <>
+                              <p className="font-medium text-gray-900">{d.student_name}</p>
+                              {d.enrollment_number && <p className="text-[11px] text-gray-400 font-mono">{d.enrollment_number}</p>}
+                              {sh.entries.length > 1 && (
+                                <button onClick={() => toggleHistory(sh.key)}
+                                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800">
+                                  {expanded.has(sh.key) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                  History · {sh.entries.length} entries
+                                </button>
+                              )}
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
@@ -870,6 +934,7 @@ export function DispatchManager() {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                           {d.dispatch_date ? format(new Date(d.dispatch_date + 'T00:00:00'), 'dd MMM yyyy') : <span className="text-gray-300">—</span>}
+                          <p className="text-[10px] text-slate-400 mt-0.5">Recorded {format(new Date(d.created_at), 'dd MMM yyyy')}</p>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <DropdownMenu>
@@ -899,11 +964,11 @@ export function DispatchManager() {
                         </td>
                       </tr>
                     )
-                  })}
+                  }))}
                 </tbody>
               </table>
             </div>
-            <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">{groups.length} entr{groups.length !== 1 ? 'ies' : 'y'}</div>
+            <div className="px-4 py-2 border-t bg-slate-50 text-xs text-slate-500">{studentRows.length} student{studentRows.length !== 1 ? 's' : ''} · {groups.length} entr{groups.length !== 1 ? 'ies' : 'y'}</div>
           </div>
         </>
       )}

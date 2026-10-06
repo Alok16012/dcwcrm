@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Users, TrendingUp, CheckCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -92,8 +92,10 @@ export function LeadsClient() {
         sub_section:department_sub_sections(id, name, is_active, created_at, department_id),
         assigned_user:profiles!leads_assigned_to_fkey(id, email, full_name, role, is_active, created_at)
       `, withCount ? { count: 'exact' } : undefined)
-      .order('updated_at', { ascending: sortDir === 'asc', nullsFirst: sortDir === 'asc' })
+      // Newest / Oldest = by Date Added (the column shown). Sorting by
+      // updated_at reshuffled rows whenever a status changed.
       .order('created_at', { ascending: sortDir === 'asc' })
+      .order('id', { ascending: sortDir === 'asc' })
 
     // Telecallers only see their own assigned leads, Admins see ALL
     if (isTelecaller && !isAdmin && currentProfile) query = query.eq('assigned_to', currentProfile.id)
@@ -130,8 +132,13 @@ export function LeadsClient() {
     return query
   }, [filters, currentProfile, sortDir, searchTerm])
 
+  // Only the newest request may update the table — a slower, older one
+  // (e.g. from before the sort was flipped) must not overwrite it.
+  const fetchSeq = useRef(0)
+
   const fetchLeads = useCallback(async () => {
     if (!currentProfile) return
+    const seq = ++fetchSeq.current
     setLoading(true)
     try {
       const fromIdx = (page - 1) * pageSize
@@ -141,6 +148,7 @@ export function LeadsClient() {
       if (error?.code === '42703') {
         ({ data, count, error } = await buildLeadsQuery(true, false).range(fromIdx, fromIdx + pageSize - 1))
       }
+      if (seq !== fetchSeq.current) return
       if (error) {
         setLeads([])
         setTotalCount(0)
@@ -160,7 +168,7 @@ export function LeadsClient() {
     } catch (err: unknown) {
       console.error('Fetch Leads Error:', err)
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) setLoading(false)
     }
   }, [buildLeadsQuery, page, pageSize, currentProfile])
 

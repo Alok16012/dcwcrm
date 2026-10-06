@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { onlyStaff } from '@/lib/hrms/staff'
 import { createServerClient } from '@/lib/supabase/server'
 import HrmsReportsClient from '@/components/hrms/HrmsReportsClient'
 import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'
@@ -37,10 +38,12 @@ export default async function HrmsReportsPage({
     db.from('attendance').select('employee_id, date, status').in('status', ['cl', 'sl']),
   ])
 
-  const empRows = (employees ?? []) as Record<string, any>[]
-  const { data: profiles } = empRows.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', empRows.map(e => e.profile_id))
+  const empRowsRaw = (employees ?? []) as Record<string, any>[]
+  const { data: profiles } = empRowsRaw.length
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', empRowsRaw.map(e => e.profile_id))
     : { data: [] }
+  // DCW staff only — not associates, students or Berojgar Bharat logins
+  const empRows = onlyStaff(empRowsRaw as { profile_id: string }[], Object.fromEntries(((profiles ?? []) as { id: string; role: string }[]).map(p => [p.id, p.role]))) as Record<string, any>[]
   const nameByProfile = Object.fromEntries(((profiles ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name]))
 
   const attByEmp = new Map<string, any[]>()

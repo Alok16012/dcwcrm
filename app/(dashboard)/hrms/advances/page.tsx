@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { isStaffRole } from '@/lib/hrms/staff'
 import { createServerClient } from '@/lib/supabase/server'
 import AdvanceManager from '@/components/hrms/AdvanceManager'
 
@@ -32,12 +33,11 @@ export default async function AdvancesPage() {
     ((profs ?? []) as { id: string; full_name: string; role: string }[]).map(p => [p.id, p])
   )
 
-  // Only real salaried staff — associates and students are not employees
-  const NON_EMPLOYEE_ROLES = new Set(['associate', 'student'])
+  // Only real salaried DCW staff — not associates, students or Berojgar Bharat logins
 
   const employees = emps
     .map(e => ({ id: e.id, name: profMap[e.profile_id]?.full_name ?? '—', role: profMap[e.profile_id]?.role }))
-    .filter(e => e.role && !NON_EMPLOYEE_ROLES.has(e.role))
+    .filter(e => isStaffRole(e.role))
     .map(e => ({ id: e.id, name: e.name }))
     .sort((a, b) => a.name.localeCompare(b.name))
 

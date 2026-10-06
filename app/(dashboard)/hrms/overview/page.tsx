@@ -1,4 +1,5 @@
 import { withBase } from '@/lib/base-path'
+import { DCW_STAFF_ROLES } from '@/lib/dcw-roles'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
@@ -30,22 +31,26 @@ export default async function HrmsOverviewPage() {
   const settings = await loadHrmsSettings(supabase as never)
 
   const [
-    { count: totalEmployees },
-    { data: todayRows },
+    { data: staffRows },
+    { data: todayRowsRaw },
     { count: pendingLeave },
     { count: pendingRegularization },
     { data: payrollRows },
     { data: holidayToday },
   ] = await Promise.all([
-    db.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    db.from('attendance').select('status, late_minutes').eq('date', today),
+    // DCW staff only — not associates, students or Berojgar Bharat logins
+    db.from('employees').select('id, profile:profiles!inner(role)').eq('is_active', true).in('profile.role', DCW_STAFF_ROLES),
+    db.from('attendance').select('employee_id, status, late_minutes').eq('date', today),
     db.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('attendance_regularizations').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('payroll').select('gross, net, status, is_locked').eq('month', month).eq('year', year),
     db.from('holidays').select('name').eq('holiday_date', today).eq('is_active', true).maybeSingle(),
   ])
 
-  const rows = (todayRows ?? []) as { status: string; late_minutes: number | null }[]
+  const staffIds = new Set(((staffRows ?? []) as { id: string }[]).map(e => e.id))
+  const totalEmployees = staffIds.size
+  const rows = ((todayRowsRaw ?? []) as { employee_id: string; status: string; late_minutes: number | null }[])
+    .filter(r => staffIds.has(r.employee_id))
   const count = (s: string[]) => rows.filter(r => s.includes(r.status)).length
 
   const present = count(['present', 'late', 'weekly_off_worked', 'holiday_worked'])

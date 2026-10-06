@@ -756,9 +756,9 @@ export function LitigationClient({
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Litigation Cases" value={litigationList.length} sub={`₹${(totalLit/1000).toFixed(0)}K total`} icon={Scale} color="blue" />
-        <StatCard label="Lit. Pending" value={formatCurrency(totalLit - paidLit)} sub={`${paidLit > 0 ? Math.round(paidLit/totalLit*100) : 0}% recovered`} icon={TrendingDown} color={totalLit - paidLit > 0 ? 'red' : 'green'} />
-        <StatCard label="Loans" value={debtList.length} sub={`₹${(totalDebt/1000).toFixed(0)}K total`} icon={CreditCard} color="amber" />
+        <StatCard label="Litigation Cases" value={litigationList.length} sub={`${formatCurrency(totalLit)} total`} icon={Scale} color="blue" />
+        <StatCard label="Lit. Pending" value={formatCurrency(totalLit - paidLit)} sub={`${paidLit > 0 ? Math.round(paidLit/totalLit*100) : 0}% disbursed`} icon={TrendingDown} color={totalLit - paidLit > 0 ? 'red' : 'green'} />
+        <StatCard label="Loans" value={debtList.length} sub={`${formatCurrency(totalDebt)} total`} icon={CreditCard} color="amber" />
         <StatCard label="Loan Pending" value={formatCurrency(totalDebt - paidDebt)} sub={`${paidDebt > 0 ? Math.round(paidDebt/totalDebt*100) : 0}% repaid`} icon={TrendingDown} color={totalDebt - paidDebt > 0 ? 'red' : 'green'} />
       </div>
 

@@ -8,7 +8,7 @@ import {
   ChevronRight, Building2, Home, ListTree,
   Gift, TrendingUp, X, Scale, ClockIcon, UserCircle2,
   Wallet, Package, Bell, User, IndianRupee, HeartHandshake, ClipboardList, School,
-  Award, Truck, FileInput, CalendarClock, MessageCircle,
+  Award, Truck, FileInput, CalendarClock, MessageCircle, MonitorPlay,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
@@ -60,6 +60,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Resources', href: '/resources', icon: BookOpen, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Tasks', href: '/tasks', icon: ClipboardList, roles: ['admin', 'backend', 'lead', 'counselor'] },
   { label: 'Student Portal', href: '/student-portal', icon: School, roles: ['admin', 'backend'] },
+  { label: 'LMS', href: '/lms', icon: MonitorPlay, roles: ['admin', 'backend'], module: 'lms' },
   { label: 'Dispatch', href: '/dispatch', icon: Truck, roles: ['admin', 'backend'] },
   { label: 'Push Notification', href: '/push-notification', icon: Bell, roles: ['admin', 'backend'] },
   { label: 'Settings', href: '/settings/users', icon: Settings, roles: ['admin'] },

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, GraduationCap, Wallet, BookOpen,
-  HelpCircle, User, LogOut, Gift, Package, Award,
+  HelpCircle, User, LogOut, Gift, Package, Award, MonitorPlay,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -20,6 +20,7 @@ interface StudentInfo {
 
 const NAV = [
   { label: 'Dashboard',      href: '/student/dashboard', icon: Home },
+  { label: 'My Learning',    href: '/student/learning',  icon: MonitorPlay },
   { label: 'My Admission',   href: '/student/admission', icon: GraduationCap },
   { label: 'Accounts',       href: '/student/accounts',  icon: Wallet },
   { label: 'Study Materials',href: '/student/materials',   icon: BookOpen },

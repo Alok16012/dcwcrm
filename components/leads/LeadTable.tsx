@@ -496,7 +496,8 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
       {selected.size > 0 && (
         <div className="px-4 py-2.5 bg-blue-600 border-b border-blue-700 flex items-center gap-3">
           <span className="text-white text-sm font-semibold">{selected.size} lead{selected.size > 1 ? 's' : ''} selected</span>
-          <div className="flex items-center gap-2 ml-2">
+          {/* Transfer / delete: admin & backend only, never counsellors */}
+          {!isTelecaller && <div className="flex items-center gap-2 ml-2">
             <Button
               size="sm"
               variant="secondary"
@@ -512,7 +513,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
             >
               Delete
             </Button>
-          </div>
+          </div>}
           <button
             className="ml-auto text-blue-200 hover:text-white"
             onClick={() => setSelected(new Set())}
@@ -562,11 +563,13 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)}>View Details</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setEditLead(lead)}>Update Details</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
-                        Delete Lead
-                      </DropdownMenuItem>
+                      {!isTelecaller && <>
+                        <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
+                          Delete Lead
+                        </DropdownMenuItem>
+                      </>}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -769,11 +772,13 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)}>View Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditLead(lead)}>Update Details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
-                          Delete Lead
-                        </DropdownMenuItem>
+                        {!isTelecaller && <>
+                          <DropdownMenuItem onClick={() => setTransferLeadIds([lead.id])}>Transfer Lead</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => setDeleteLead(lead)}>
+                            Delete Lead
+                          </DropdownMenuItem>
+                        </>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

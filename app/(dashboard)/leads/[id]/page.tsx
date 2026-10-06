@@ -64,8 +64,13 @@ export default async function LeadDetailPage({ params }: Props) {
     console.error('Failed to fetch appointments:', err)
   }
 
+  // Transfer is for admin / backend only, never counsellors
+  const { data: viewer } = await supabase.from('profiles').select('role').eq('id', user.id).single() as { data: { role: string } | null }
+  const canTransfer = ['admin', 'backend'].includes(viewer?.role ?? '')
+
   return (
     <LeadDetailClient
+      canTransfer={canTransfer}
       lead={lead as never}
       activities={(activities ?? []) as never}
       payments={(payments ?? []) as never}

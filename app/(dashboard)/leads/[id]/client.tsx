@@ -28,9 +28,10 @@ interface LeadDetailClientProps {
   activities: LeadActivity[]
   payments: Payment[]
   appointments: Appointment[]
+  canTransfer?: boolean
 }
 
-export function LeadDetailClient({ lead: initialLead, activities: initialActivities, payments, appointments: initialAppointments }: LeadDetailClientProps) {
+export function LeadDetailClient({ lead: initialLead, activities: initialActivities, payments, appointments: initialAppointments, canTransfer = false }: LeadDetailClientProps) {
   const [appointments, setAppointments] = useState(initialAppointments)
   const [showAppointmentForm, setShowAppointmentForm] = useState(false)
   const [associates, setAssociates] = useState<{ id: string; name: string; associate_code: string | null }[]>([])
@@ -150,9 +151,11 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
         <Button variant="outline" size="sm" onClick={() => setShowAppointmentForm(true)} className="px-2 sm:px-3">
           <CalendarClock className="w-4 h-4" /><span className="hidden sm:inline ml-1">Schedule</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)} className="px-2 sm:px-3">
-          <ArrowRightLeft className="w-4 h-4" /><span className="hidden sm:inline ml-1">Transfer</span>
-        </Button>
+        {canTransfer && (
+          <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)} className="px-2 sm:px-3">
+            <ArrowRightLeft className="w-4 h-4" /><span className="hidden sm:inline ml-1">Transfer</span>
+          </Button>
+        )}
         <Button size="sm" onClick={() => setShowEdit(true)} className="px-2 sm:px-3">
           <Edit className="w-4 h-4" /><span className="hidden sm:inline ml-1">Edit</span>
         </Button>

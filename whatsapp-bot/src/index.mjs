@@ -74,6 +74,23 @@ const wa = makeWhatsApp({
 // A heartbeat, so the CRM can tell "connected" from "the process died while
 // the last row still said connected".
 setInterval(() => reportStatus({ status: wa.status }), 60 * 1000)
+// "Unlink / link another number" from the CRM: it stamps relink_requested_at
+// and the bot picks that up here. Cleared before acting so it runs once.
+let relinking = false
+setInterval(async () => {
+  if (relinking) return
+  const { data, error } = await db.from('wa_bot_status').select('relink_requested_at').maybeSingle()
+  if (error || !data?.relink_requested_at) return
+  relinking = true
+  try {
+    await db.from('wa_bot_status').update({ relink_requested_at: null }).eq('id', true)
+    await wa.relink()
+  } catch (e) {
+    log.error(`relink failed: ${e.message}`)
+  } finally {
+    relinking = false
+  }
+}, 10 * 1000)
 // Settings, knowledge and outreach from the CRM's control centre. BOT_PAUSED
 // on Railway still wins: it is the brake that works even if the CRM is down.
 const control = makeControl({ db, wa, store, config, envPaused: config.paused, log })

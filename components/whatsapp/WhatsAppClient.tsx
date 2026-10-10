@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import {
   MessageCircle, Smartphone, CheckCircle2, AlertTriangle, RefreshCw, Search,
-  PauseCircle, PlayCircle, UserRound, Bot, Headset, Flame, ExternalLink, WifiOff,
+  PauseCircle, PlayCircle, UserRound, Bot, Headset, Flame, ExternalLink, WifiOff, Unlink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,6 +21,7 @@ export interface BotStatus {
   ai_provider: string | null
   ai_used_today: number | null
   last_error: string | null
+  relink_requested_at?: string | null
   updated_at: string
 }
 
@@ -167,9 +168,17 @@ export default function WhatsAppClient({
                   </p>
                 </div>
               </div>
-              <span className="text-xs text-gray-400">
-                checked {formatDistanceToNow(parseISO(status!.updated_at), { addSuffix: true })}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">
+                  checked {formatDistanceToNow(parseISO(status!.updated_at), { addSuffix: true })}
+                </span>
+                <RelinkButton
+                  pending={Boolean(status?.relink_requested_at)}
+                  label="Unlink / link another number"
+                  confirmText={`Unlink ${status?.connected_as ?? 'this number'}? The bot stops answering until a number is linked again.`}
+                  onRequested={at => setStatus(s => (s ? { ...s, relink_requested_at: at } : s))}
+                />
+              </div>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-[auto,1fr] items-center">
@@ -213,6 +222,14 @@ export default function WhatsAppClient({
                 {status?.last_error && (
                   <p className="mt-2 text-xs text-gray-500">{status.last_error}</p>
                 )}
+                <div className="mt-4">
+                  <RelinkButton
+                    pending={Boolean(status?.relink_requested_at)}
+                    label="Stuck? Start a fresh link"
+                    confirmText="Throw away the current link attempt and show a new QR?"
+                    onRequested={at => setStatus(s => (s ? { ...s, relink_requested_at: at } : s))}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -377,4 +394,59 @@ export default function WhatsAppClient({
 
 function Tag({ cls, children }: { cls: string; children: React.ReactNode }) {
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{children}</span>
+}
+
+/**
+ * Ask the bot to unlink its number and show a fresh QR — to recover a stuck
+ * connection or switch the bot to another number. The bot polls for this
+ * every ~10s; the QR then appears in the card above.
+ */
+function RelinkButton({ pending, label, confirmText, onRequested }: {
+  pending: boolean; label: string; confirmText: string; onRequested: (at: string) => void
+}) {
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function request() {
+    setBusy(true)
+    const at = new Date().toISOString()
+    const supabase = createClient() as any
+    const { error } = await supabase.from('wa_bot_status').update({ relink_requested_at: at }).eq('id', true)
+    setBusy(false)
+    setConfirming(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    onRequested(at)
+    toast.success('Unlinking — a new QR will appear here in a few seconds')
+  }
+
+  if (pending) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Unlinking…
+      </span>
+    )
+  }
+  if (confirming) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-gray-700">{confirmText}</span>
+        <button onClick={request} disabled={busy}
+          className="px-2.5 py-1 rounded-lg bg-red-600 text-white font-semibold disabled:opacity-50">
+          {busy ? 'Requesting…' : 'Yes, unlink'}
+        </button>
+        <button onClick={() => setConfirming(false)} className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600">
+          Cancel
+        </button>
+      </span>
+    )
+  }
+  return (
+    <button onClick={() => setConfirming(true)}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50">
+      <Unlink className="w-3.5 h-3.5" /> {label}
+    </button>
+  )
 }

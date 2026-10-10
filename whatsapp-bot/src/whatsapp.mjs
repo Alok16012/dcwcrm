@@ -49,9 +49,13 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage, onStatus = 
       // they arrive as 'append', and only 'notify' is answered.
     })
 
+    const self = sock
     sock.ev.on('creds.update', saveCreds)
 
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      // A socket that relink() has replaced: its closing must not start
+      // another reconnect next to the fresh pairing.
+      if (self !== sock) return
       if (qr) {
         status = 'awaiting_pairing'
         QR.toDataURL(qr, { margin: 1, width: 320 })
@@ -101,12 +105,7 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage, onStatus = 
           status = 'logged_out'
           onStatus({ status, connected_as: null, last_error: 'Unlinked from the phone — scan the new QR to link again' })
           log.error('WhatsApp logged out — clearing the session and starting a new pairing')
-          try {
-            for (const f of fs.readdirSync(authDir)) fs.rmSync(`${authDir}/${f}`, { recursive: true, force: true })
-          } catch (e) {
-            log.error(`could not clear auth folder: ${e.message}`)
-          }
-          pairingRequested = false
+          clearSession()
           await sleep(3000)
           connect().catch(e => log.error(`re-pair failed: ${e.message}`))
           return
@@ -145,6 +144,36 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage, onStatus = 
     })
   }
 
+  function clearSession() {
+    try {
+      for (const f of fs.readdirSync(authDir)) fs.rmSync(`${authDir}/${f}`, { recursive: true, force: true })
+    } catch (e) {
+      log.error(`could not clear auth folder: ${e.message}`)
+    }
+    pairingRequested = false
+  }
+
+  /**
+   * Unlink the current number and start a fresh pairing, on admin's request
+   * from the CRM — to recover a stuck connection or to switch the bot to a
+   * different number. The new QR shows up on the CRM's WhatsApp page.
+   */
+  async function relink() {
+    const old = sock
+    sock = null
+    status = 'logged_out'
+    onStatus({ status, connected_as: null, qr: null, pairing_code: null, last_error: 'Unlinked from the CRM — scan the new QR to link a number' })
+    log.warn('Relink requested from the CRM — unlinking and starting a new pairing')
+    // logout() also removes the device from the phone's Linked devices list.
+    // It fails if the socket is already down, which is fine: clearing the
+    // saved session is what actually forces the new pairing.
+    try { await old?.logout() } catch (e) { log.warn(`logout: ${e.message}`) }
+    try { old?.end(undefined) } catch { /* already closed */ }
+    clearSession()
+    backoff = 2000
+    await connect()
+  }
+
   /**
    * Send text the way a person would: seen, typing, then the message.
    * The pause scales with length and is capped — long enough to not look like
@@ -176,6 +205,7 @@ export function makeWhatsApp({ authDir, phoneNumber, log, onMessage, onStatus = 
 
   return {
     connect,
+    relink,
     send,
     markRead,
     get sock() { return sock },

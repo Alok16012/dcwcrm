@@ -67,7 +67,8 @@ Admin steers the bot from the CRM; the bot re-reads it every minute
 
 ## The lead in the CRM
 
-Created once through the CRM's normal ingest (`/api/leads/whatsapp`), so
+Created on the student's first message — even a bare "Hi", or a chat the
+bot stays silent in — through the CRM's normal ingest (`/api/leads/whatsapp`), so
 dedupe by phone and round-robin assignment work as for every other source.
 Answers land on the lead as readable fields (Class, Previous Board, Lead
 Temperature, Bot Summary…). On handoff the summary goes on the lead's
@@ -104,6 +105,12 @@ the main business number and its chats safe.
 The credentials live on the Railway volume at `/data`, so redeploys do not
 need a new pairing. `/health` is liveness; `/ready` is 200 only while
 connected.
+
+To unlink, recover a stuck link, or move the bot to another number, use
+**Unlink / link another number** on the CRM's WhatsApp page (admin/backend).
+It stamps `wa_bot_status.relink_requested_at`; within ~10s the bot logs the
+number out, clears `/data/wa-auth` and shows a fresh QR on that page. One
+bot service holds one number — two numbers at once means a second service.
 
 ## Tests
 

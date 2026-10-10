@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2, PauseCircle, GraduationCap, Eye, EyeOff, Copy, Wand2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, Trash2, KeyRound, Users, UserCircle2, PauseCircle, GraduationCap, Eye, EyeOff, Copy, Wand2, AtSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,9 +21,14 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { Profile, UserRole } from '@/types/app.types'
 import { ROLE_LABELS } from '@/types/app.types'
 
+/** Same rule as the profiles_username_format check in the database. */
+const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
+
 const createUserSchema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Valid email required'),
+  username: z.string().trim().toLowerCase()
+    .refine(v => v === '' || USERNAME_RE.test(v), '3–30 letters, numbers, . _ or -').optional(),
   password: z.string().min(8, 'Min 8 characters'),
   role: z.enum(['admin', 'lead', 'backend', 'housekeeping', 'counselor', 'associate']),
   phone: z.string().optional(),
@@ -123,6 +128,8 @@ export function UsersSettingsClient({
   const [deleteUser, setDeleteUser] = useState<Profile | null>(null)
   const [resetPasswordUser, setResetPasswordUser] = useState<Profile | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [usernameUser, setUsernameUser] = useState<Profile | null>(null)
+  const [newUsername, setNewUsername] = useState('')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
@@ -157,7 +164,7 @@ export function UsersSettingsClient({
         const res = await fetch(withBase('/api/admin/create-user'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, username: data.username || null }),
         })
         const result = await res.json()
         if (!res.ok) throw new Error(result.error)
@@ -179,6 +186,22 @@ export function UsersSettingsClient({
       toast.success(user.is_active ? 'User deactivated' : 'User activated')
     } catch { toast.error('Failed to update user') }
     setConfirmUser(null)
+  }
+
+  async function handleSetUsername() {
+    if (!usernameUser) return
+    const target = usernameUser
+    const username = newUsername || null
+    startTransition(async () => {
+      const { error } = await supabase.from('profiles').update({ username } as never).eq('id', target.id)
+      if (error) {
+        toast.error(error.code === '23505' ? 'That username is already taken' : error.message)
+        return
+      }
+      setUsers(prev => prev.map(u => u.id === target.id ? { ...u, username } : u))
+      toast.success(username ? `Username set: ${username}` : 'Username removed')
+      setUsernameUser(null)
+    })
   }
 
   async function handleUpdatePassword() {
@@ -283,7 +306,15 @@ export function UsersSettingsClient({
         </div>
       )
     },
-    { accessorKey: 'email', header: 'Email', cell: ({ row }) => <span className="text-xs">{row.original.email}</span> },
+    {
+      accessorKey: 'email', header: 'Email / Username',
+      cell: ({ row }) => (
+        <div>
+          <span className="text-xs">{row.original.email}</span>
+          {row.original.username && <p className="text-[11px] text-gray-400 font-mono">@{row.original.username}</p>}
+        </div>
+      )
+    },
     {
       accessorKey: 'role', header: 'Role',
       cell: ({ row }) => <Badge variant="outline">{ROLE_LABELS[row.original.role] ?? row.original.role}</Badge>
@@ -323,6 +354,9 @@ export function UsersSettingsClient({
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" title="Change Password" onClick={() => { setResetPasswordUser(row.original); setNewPassword('') }}>
             <KeyRound className="w-4 h-4 text-blue-500" />
+          </Button>
+          <Button variant="ghost" size="sm" title="Set Username" onClick={() => { setUsernameUser(row.original); setNewUsername(row.original.username ?? '') }}>
+            <AtSign className="w-4 h-4 text-indigo-500" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setConfirmUser(row.original)}>
             {row.original.is_active ? <UserX className="w-4 h-4 text-red-500" /> : <UserCheck className="w-4 h-4 text-green-500" />}
@@ -428,6 +462,7 @@ export function UsersSettingsClient({
                 <form onSubmit={handleSubmit(onCreateUser)} className="space-y-4">
                   <div><Label>Full Name</Label><Input {...register('full_name')} />{errors.full_name && <p className="text-xs text-red-500">{errors.full_name.message}</p>}</div>
                   <div><Label>Email</Label><Input type="email" {...register('email')} />{errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}</div>
+                  <div><Label>Username <span className="text-gray-400 font-normal">(optional — can sign in with this instead of email)</span></Label><Input autoCapitalize="none" spellCheck={false} placeholder="e.g. rahul.patel" {...register('username')} />{errors.username && <p className="text-xs text-red-500">{errors.username.message}</p>}</div>
                   <div><Label>Password</Label><PasswordField value={watch('password')} onChange={v => setValue('password', v, { shouldValidate: true })} />{errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}</div>
                   <div><Label>Phone</Label><Input {...register('phone')} /></div>
                   <div>
@@ -514,6 +549,27 @@ export function UsersSettingsClient({
               <Button variant="outline" onClick={() => { setResetPasswordUser(null); setNewPassword('') }}>Cancel</Button>
               <Button onClick={handleUpdatePassword} disabled={isPending || newPassword.length < 8}>
                 {isPending ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!usernameUser} onOpenChange={o => { if (!o) setUsernameUser(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Username — {usernameUser?.full_name}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Username</Label>
+              <Input autoCapitalize="none" spellCheck={false} placeholder="e.g. rahul.patel"
+                value={newUsername} onChange={e => setNewUsername(e.target.value.trim().toLowerCase())} />
+              <p className="text-[11px] text-gray-400 mt-1">They can sign in with this or their email. Leave empty to remove.</p>
+              {newUsername && !USERNAME_RE.test(newUsername) && <p className="text-xs text-red-500 mt-1">3–30 letters, numbers, . _ or -</p>}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setUsernameUser(null)}>Cancel</Button>
+              <Button onClick={handleSetUsername} disabled={isPending || (!!newUsername && !USERNAME_RE.test(newUsername))}>
+                {isPending ? 'Saving...' : 'Save Username'}
               </Button>
             </div>
           </div>

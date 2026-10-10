@@ -15,7 +15,9 @@ import { Briefcase, GraduationCap, ArrowLeft, ArrowRight } from 'lucide-react'
 import { isBbRole } from '@/lib/bb/constants'
 
 const loginSchema = z.object({
-  email: z.string().email('Valid email required'),
+  // An email, or a staff username (anything without an "@").
+  email: z.string().trim().min(3, 'Enter your email or username')
+    .refine(v => !v.includes('@') || z.string().email().safeParse(v).success, 'Valid email required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
@@ -104,18 +106,33 @@ export default function LoginPage() {
     if (!brand) return
     setLoading(true)
     try {
-      const { data: signIn, error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      })
-      if (error) {
-        toast.error(error.message)
-        return
+      let user
+      if (data.email.includes('@')) {
+        const { data: signIn, error } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        })
+        if (error) {
+          toast.error(error.message)
+          return
+        }
+        // signInWithPassword already returns the verified user — asking the
+        // auth server again with getUser() only added a round trip.
+        user = signIn.user
+      } else {
+        // Username: resolved and signed in server-side, which sets the session
+        // cookies; the browser client then reads that session.
+        const res = await fetch(withBase('/api/auth/username-login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: data.email, password: data.password }),
+        })
+        if (!res.ok) {
+          toast.error((await res.json().catch(() => null))?.error ?? 'Invalid login credentials')
+          return
+        }
+        user = (await supabase.auth.getUser()).data.user
       }
-
-      // signInWithPassword already returns the verified user — asking the auth
-      // server again with getUser() only added a round trip to every login.
-      const user = signIn.user
       if (!user) {
         toast.error('Could not read your account')
         return
@@ -285,14 +302,16 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email Address</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email or Username</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="name@company.com"
+                  type="text"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="name@company.com or username"
                   className={`rounded-xl h-11 border-gray-300 transition-shadow ${b.ring}`}
                   {...register('email')}
-                  autoComplete="email"
+                  autoComplete="username"
                 />
                 {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
               </div>

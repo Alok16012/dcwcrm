@@ -101,6 +101,8 @@ export interface Profile {
   full_name: string
   role: UserRole
   phone?: string
+  /** Optional staff sign-in name, lower-case; email works too. */
+  username?: string | null
   is_active: boolean
   created_at: string
   /** Per-user module grants beyond the role's own rights (e.g. 'courses',

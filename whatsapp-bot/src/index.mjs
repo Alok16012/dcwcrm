@@ -16,6 +16,7 @@ import { makeCrm } from './crm.mjs'
 import { makeBot } from './bot.mjs'
 import { aiStats } from './ai.mjs'
 import { makeControl } from './control.mjs'
+import { backfillLeads } from './backfill.mjs'
 
 const env = process.env
 const log = {
@@ -96,6 +97,14 @@ setInterval(async () => {
 const control = makeControl({ db, wa, store, config, envPaused: config.paused, log })
 bot = makeBot({ wa, store, crm, config, log, onStudentMessage: phone => control.noteReply(phone) })
 control.start()
+
+// Link any chat that never got a lead (older chats, or a CRM outage). Off the
+// startup path: it must not hold up connecting to WhatsApp.
+setTimeout(() => {
+  backfillLeads({ db, crm, log })
+    .then(({ total, ok }) => total && log.info(`backfill: ${ok}/${total} chat(s) linked to a lead`))
+    .catch(e => log.error(`backfill: ${e.message}`))
+}, 30 * 1000)
 
 // Health: what Railway (and a person) can check without reading logs. No
 // secrets, no pairing code — those only ever go to the log.

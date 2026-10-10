@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/supabase/guard'
 
 export async function POST(request: NextRequest) {
   try {
+    const caller = await requireRole(['admin', 'backend'])
+    if (caller instanceof NextResponse) return caller
+
     const body = await request.json()
     const { full_name, email, password, role, phone } = body
+    const username = body.username ? String(body.username).trim().toLowerCase() : null
 
     const adminClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,13 +35,17 @@ export async function POST(request: NextRequest) {
         full_name,
         role,
         phone: phone || null,
+        username,
         is_active: true,
       })
       .select()
       .single()
 
     if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 400 })
+      // Don't leave an auth account behind that has no profile to sign in to.
+      await adminClient.auth.admin.deleteUser(authData.user.id)
+      const taken = profileError.code === '23505' && profileError.message.includes('username')
+      return NextResponse.json({ error: taken ? 'That username is already taken' : profileError.message }, { status: 400 })
     }
 
     return NextResponse.json({ user: profileData })

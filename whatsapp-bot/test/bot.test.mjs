@@ -13,7 +13,7 @@ const OFF = { aiEnabled: () => false, classify: async () => null, extractField: 
 const JID = '919876543210@s.whatsapp.net'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-function rig() {
+function rig({ config = {} } = {}) {
   const sent = []
   const crmCalls = []
   const rows = new Map()
@@ -47,7 +47,7 @@ function rig() {
     handoff: async a => { crmCalls.push({ action: 'handoff', ...a }); return { ok: true } },
   }
   const log = { info() {}, warn() {}, error: (...a) => console.error(...a) }
-  const bot = makeBot({ wa, store, crm, config: { counselorPhone: '+91 9' }, log, ai: OFF })
+  const bot = makeBot({ wa, store, crm, config: { counselorPhone: '+91 9', ...config }, log, ai: OFF })
 
   let seq = 0
   const msg = (text, { jid = JID, id, fromMe = false } = {}) => ({
@@ -117,6 +117,33 @@ test('CRM: lead is created once, updated as answers come, handed off at the end'
   assert.equal(r.crmCalls[0].phone, '919876543210')
   assert.equal(r.crmCalls.at(-1).department, 'Open School')
   assert.equal(r.rows.get(JID).lead_id, 'lead-1')
+})
+
+test('CRM: a bare "Hi" is already a lead, before any flow is picked', async () => {
+  const r = rig()
+  await r.say('Hi')
+  await sleep(80)
+  assert.deepEqual(r.crmCalls.map(c => c.action), ['ensure'])
+  assert.equal(r.crmCalls[0].fields['Chatbot Flow'], 'Not chosen yet')
+  assert.equal(r.rows.get(JID).lead_id, 'lead-1')
+
+  // Picking a flow later updates that lead rather than creating another
+  await r.say('1')
+  await sleep(80)
+  assert.equal(r.crmCalls.filter(c => c.action === 'ensure').length, 1)
+})
+
+test('CRM: a chat the bot stays silent in still becomes a lead', async () => {
+  const r = rig({ config: { paused: true } })
+  await r.say('12th fail hua')
+  await sleep(80)
+  assert.equal(r.sent.length, 0, 'paused bot does not reply')
+  assert.deepEqual(r.crmCalls.map(c => c.action), ['ensure'])
+  assert.equal(r.rows.get(JID).lead_id, 'lead-1')
+
+  await r.say('hello?')
+  await sleep(80)
+  assert.equal(r.crmCalls.length, 1, 'not ensured again once linked')
 })
 
 test('extract unwraps captions, ignores reactions and bare stickers', () => {

@@ -153,7 +153,10 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
       fresh.every(it => now - sentAt(it.m) > MAX_AGE_MS)
 
     if (silent) {
-      await store.save(row.id, patch)
+      // Not answering this chat doesn't mean ignoring the student — they still
+      // belong in the CRM's Leads table.
+      const leadId = await runCrmEvents({ jid, events: [], leadId: row.lead_id, phone: phone ?? row.phone, pushName: pushName ?? row.push_name })
+      await store.save(row.id, { ...patch, lead_id: leadId })
       return
     }
 
@@ -191,7 +194,7 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
 
     let leadId = row.lead_id
     const effectivePhone = phone ?? row.phone
-    leadId = await runCrmEvents({ jid, events, leadId, phone: effectivePhone, pushName: pushName ?? row.push_name, state })
+    leadId = await runCrmEvents({ jid, events, leadId, phone: effectivePhone, pushName: pushName ?? row.push_name })
 
     const handoff = [...events].reverse().find(e => e.fields?.['Lead Temperature'])
     await store.save(row.id, {
@@ -204,24 +207,32 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
   }
 
   /**
-   * Fire the engine's CRM events in order. Returns the lead id.
+   * Make sure the chat has a lead, then fire the engine's CRM events. Returns
+   * the lead id.
+   *
+   * The lead is created on the student's very first message, not when the
+   * engine first asks for it (after they pick a flow): students who only say
+   * "Hi", or whose chat the bot stays silent in (paused, counsellor took
+   * over, message too old), must still reach the Leads table. A chat whose
+   * phone number isn't resolved yet is retried on its next message.
+   *
    * Failures are logged, never thrown: a CRM hiccup must not stop the bot
    * answering the student — the next message retries.
    */
-  async function runCrmEvents({ jid, events, leadId, phone, pushName, state }) {
-    if (events.length === 0) return leadId
+  async function runCrmEvents({ jid, events, leadId, phone, pushName }) {
     const last = events.at(-1)
+    if (leadId && !last) return leadId
 
     // Every event carries the full current field set, so only the newest
     // matters — plus making sure the lead exists at all.
-    const needsLead = !leadId && events.some(e => e.type === 'lead.ensure' || e.type === 'lead.handoff' || e.type === 'lead.update')
     try {
-      if (needsLead) {
+      if (!leadId) {
         if (!phone) {
           log.warn(`[${jid}] no phone number resolved yet — lead creation deferred`)
           return leadId
         }
-        const r = await crm.ensure({ phone, pushName, fields: last.fields, department: last.department })
+        const fields = last?.fields ?? { 'Chatbot Flow': 'Not chosen yet' }
+        const r = await crm.ensure({ phone, pushName, fields, department: last?.department })
         leadId = r.lead_id
         log.info(`[${jid}] lead ${r.duplicate ? 'matched' : 'created'} ${leadId}${r.assignee ? ` → ${r.assignee}` : ''}`)
       } else if (last.type !== 'lead.handoff') {

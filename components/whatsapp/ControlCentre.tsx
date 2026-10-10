@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
 import {
-  Settings2, BookOpen, Send, Plus, Trash2, Save, Pencil, X, AlertTriangle, RefreshCw,
+  Settings2, BookOpen, Send, Plus, Trash2, Save, Pencil, X, AlertTriangle, RefreshCw, Workflow,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { LEAD_STATUS_LABELS, LEAD_SOURCE_LABELS } from '@/types/app.types'
+import FlowBuilder from './FlowBuilder'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -73,9 +74,10 @@ function db() {
 // ================================================================ tabs ===
 
 export default function ControlCentre({ aiProvider }: { aiProvider: string | null }) {
-  const [tab, setTab] = useState<'settings' | 'knowledge' | 'outreach'>('settings')
+  const [tab, setTab] = useState<'settings' | 'flows' | 'knowledge' | 'outreach'>('settings')
   const tabs = [
     { key: 'settings', label: 'Settings', icon: Settings2 },
+    { key: 'flows', label: 'Flow Builder', icon: Workflow },
     { key: 'knowledge', label: 'AI Knowledge', icon: BookOpen },
     { key: 'outreach', label: 'Outreach', icon: Send },
   ] as const
@@ -97,6 +99,7 @@ export default function ControlCentre({ aiProvider }: { aiProvider: string | nul
         ))}
       </div>
       {tab === 'settings' && <SettingsPanel aiProvider={aiProvider} />}
+      {tab === 'flows' && <FlowBuilder />}
       {tab === 'knowledge' && <KnowledgePanel />}
       {tab === 'outreach' && <OutreachPanel />}
     </div>

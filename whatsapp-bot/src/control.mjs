@@ -14,6 +14,7 @@
 
 import { setCustomKnowledge, customKnowledgeCount } from './faq.mjs'
 import { setAiSwitch } from './ai.mjs'
+import { compileFlows } from './custom.mjs'
 
 const REFRESH_MS = 60 * 1000
 /** Someone who wrote in this recently is already talking — do not cold-open them. */
@@ -62,14 +63,17 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
   let busy = false
 
   async function refresh() {
-    const [s, k] = await Promise.all([
+    const [s, k, f] = await Promise.all([
       db.from('wa_bot_settings').select('*').maybeSingle(),
       db.from('wa_knowledge').select('id, title, body, keywords, flow, is_active').eq('is_active', true),
+      db.from('wa_flows').select('id, name, triggers, match_mode, on_first_message, root, is_active').eq('is_active', true).order('created_at'),
     ])
     if (s.error) log.warn(`settings load failed: ${s.error.message}`)
     else if (s.data) settings = { ...DEFAULTS, ...s.data }
     if (k.error) log.warn(`knowledge load failed: ${k.error.message}`)
     else setCustomKnowledge(k.data)
+    if (f.error) log.warn(`flows load failed: ${f.error.message}`)
+    else config.customFlows = compileFlows(f.data)
 
     config.paused = envPaused || settings.paused
     setAiSwitch(settings.ai_enabled)
@@ -186,6 +190,6 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     },
     refresh,
     noteReply,
-    stats: () => ({ knowledge: customKnowledgeCount(), outreach: settings.outreach_enabled }),
+    stats: () => ({ knowledge: customKnowledgeCount(), flows: config.customFlows?.length ?? 0, outreach: settings.outreach_enabled }),
   }
 }

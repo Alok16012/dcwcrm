@@ -10,6 +10,9 @@
  *   1. opt-out            — "stop" must always work, whatever else is going on
  *   2. voice notes        — nothing to parse; say so instead of guessing
  *   3. upset              — an angry person gets an apology, not the next menu
+ *   3b. admin's flows     — a trigger word admin set up in the CRM (e.g. "Hi")
+ *                           gets admin's reply, and a flow question waiting
+ *                           for its answer gets first look at the reply
  *   4. restart / human    — explicit requests beat the script
  *   5. after handoff      — answer questions, otherwise stay out of the way
  *   6. choose a flow      — from the ad's prefilled text if possible
@@ -24,6 +27,7 @@ import { detectPersona, say } from './tone.mjs'
 import { matchFaq, renderFaq, KNOWLEDGE } from './faq.mjs'
 import { FLOWS, INTENT, detectFlow, pickIntent } from './flows/index.mjs'
 import { leadFields, temperature } from './lead.mjs'
+import { matchTrigger, pickBranch, walk, questionText } from './custom.mjs'
 
 /** Options vague enough that they may only answer the question actually asked. */
 const GENERIC = new Set(['Not Sure', 'Other', 'Not Decided', 'Both', 'Available', 'Not Available', 'Later', 'Yes', 'No'])
@@ -233,6 +237,15 @@ export async function handle(conv, input, deps) {
     return { conv: c, replies, events }
   }
 
+  // 3b ── flows admin built in the CRM
+  const flows = config.customFlows ?? []
+  if (flows.length || c.custom) {
+    const handled = runCustom(c, text, {
+      flows, replies, events, config, name: deps.name, firstMessage: (conv.turn ?? 0) === 0,
+    })
+    if (handled) return { conv: c, replies, events }
+  }
+
   // 4 ── restart / human
   if (wantsRestart(text)) {
     const keepPersona = c.persona
@@ -406,6 +419,104 @@ export async function handle(conv, input, deps) {
     finish(c, replies, events, config)
   }
   return { conv: c, replies, events }
+}
+
+// ----------------------------------------------------- admin's flows ---
+
+/**
+ * Run a CRM-built flow for this message. Returns true when it handled the
+ * message; false hands it on to the built-in script.
+ */
+function runCustom(c, text, { flows, replies, events, config, name, firstMessage }) {
+  let flow = null
+  let start = null
+
+  if (c.custom) {
+    const f = flows.find(x => x.id === c.custom.flowId)
+    const node = f?.nodes.get(c.custom.nodeId)
+    if (node?.type === 'question') {
+      const opt = pickBranch(text, node.options ?? [])
+      if (opt) {
+        if (node.saveAs?.trim()) c.customAnswers = { ...c.customAnswers, [node.saveAs.trim()]: opt.label }
+        flow = f
+        start = opt.next
+      }
+    }
+    if (!flow) {
+      const trig = matchTrigger(text, flows)
+      if (trig) {
+        flow = trig
+        start = trig.root
+      } else if (node?.type === 'question' && !wantsHuman(text) && !wantsRestart(text) && !c.custom.missed) {
+        // One more go, then let the built-in script have the conversation —
+        // a student stuck on a menu leaves.
+        c.custom.missed = true
+        replies.push(`Please number bhej dijiye 🙏\n\n${questionText(node, name)}`)
+        return true
+      } else {
+        c.custom = null
+        return false
+      }
+    }
+  } else {
+    const trig = matchTrigger(text, flows, { firstMessage })
+    if (!trig) return false
+    flow = trig
+    start = trig.root
+  }
+
+  c.custom = null
+  c.customFlow = flow.name
+  const before = replies.length
+  const r = walk(start, { replies, name })
+
+  if (r.wait) {
+    c.custom = { flowId: flow.id, nodeId: r.wait }
+  } else if (r.end === 'handoff') {
+    c.status = 'handoff'
+    events.push({ type: 'lead.handoff', fields: customFields(c, true), department: c.flow ? FLOWS[c.flow].department(c.answers) : undefined })
+    return true
+  } else if (r.end === 'builtin') {
+    startBuiltin(c, r.target, replies, events, config)
+    return true
+  } else if (replies.length === before) {
+    // A branch admin left empty: say something rather than go quiet.
+    replies.push('Thank you! 🙏 Humare counselor jald hi aapse contact karenge.')
+  }
+  if (c.customAnswers) events.push({ type: 'lead.update', fields: customFields(c, false), department: c.flow ? FLOWS[c.flow].department(c.answers) : undefined })
+  return true
+}
+
+/** Lead fields for a chat in an admin-built flow. */
+function customFields(c, handoff) {
+  const out = c.flow ? leadFields(c) : { 'Chatbot Flow': `Custom: ${c.customFlow}` }
+  out['Custom Flow'] = c.customFlow
+  Object.assign(out, c.customAnswers ?? {})
+  if (handoff) {
+    out['Lead Temperature'] = out['Lead Temperature'] ?? 'Hot'
+    out['CRM Status'] = 'Counselor Required'
+  }
+  return out
+}
+
+/** Hand over from an admin flow to the built-in admission script. */
+function startBuiltin(c, target, replies, events, config) {
+  c.status = 'bot'
+  if (target !== 'school' && target !== 'college') {
+    c.flow = null
+    c.awaitingIntent = true
+    replies.push(intentQuestion())
+    return
+  }
+  c.flow = target
+  c.awaitingIntent = false
+  const flow = FLOWS[target]
+  events.push({ type: 'lead.ensure', fields: leadFields(c), department: flow.department(c.answers) })
+  c.leadEnsured = true
+  replies.push(flow.welcome(c.persona))
+  const step = nextStep(flow, c.answers)
+  if (step) replies.push(question(step, c.persona, c.answers))
+  else finish(c, replies, events, config)
 }
 
 // ------------------------------------------------------------ finishing ---

@@ -176,7 +176,7 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
     const replies = []
     const events = []
     for (const input of toInputs(fresh)) {
-      const r = await handle(state, input, { ai: aiDeps, config, now })
+      const r = await handle(state, input, { ai: aiDeps, config, now, name: pushName ?? row.push_name })
       state = r.conv
       replies.push(...r.replies)
       events.push(...r.events)

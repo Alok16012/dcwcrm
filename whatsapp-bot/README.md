@@ -55,6 +55,13 @@ Admin steers the bot from the CRM; the bot re-reads it every minute
 - **Settings** — pause everywhere, AI on/off, and outreach limits.
   `BOT_PAUSED=true` on Railway still wins, so the brake works even if the CRM
   is down.
+- **Flow Builder** — admin's own flows (`src/custom.mjs`, migration 119): a
+  start point with trigger words ("hi", whole message or anywhere in it, or
+  any first message), then steps — send a message, ask a question whose
+  answer picks the branch, hand to a counsellor, or continue in the built-in
+  script. A trigger beats the built-in script; a flow question gets first look
+  at the reply, is asked once more if the reply fits no option, then the
+  script takes over. If two active flows share a trigger, the older one wins.
 - **AI Knowledge** — answers admin writes. With keywords they are sent word
   for word when a message contains one (no AI); all active entries are also
   given to the AI as facts. They take priority over the built-in answers.

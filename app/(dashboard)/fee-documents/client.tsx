@@ -22,11 +22,16 @@ interface FeeDoc {
   file_url: string
   file_name: string | null
   file_size: string | null
+  audience: Audience | null
   is_active: boolean
   created_at: string
 }
 
-const EMPTY_FORM = { category: '', sub_category: '', level: '', title: '' }
+// Who a fee PDF is published to; null = older uploads visible to everyone
+type Audience = 'counselor' | 'associate'
+const AUDIENCE_LABEL: Record<Audience, string> = { counselor: 'Counsellors', associate: 'Associates' }
+
+const EMPTY_FORM = { audience: '' as Audience | '', category: '', sub_category: '', level: '', title: '' }
 
 function humanSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -65,6 +70,10 @@ export function FeeDocumentsClient() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const isAdmin = role === 'admin' || role === 'backend'
+  // Admins browse everything; everyone else only sees sheets published to their role
+  // (RLS enforces this too — this just keeps the UI consistent)
+  const myAudience: Audience | null = role === 'associate' ? 'associate' : role === 'counselor' || role === 'lead' ? 'counselor' : null
+  const visibleDocs = isAdmin ? docs : docs.filter(d => !d.audience || d.audience === myAudience)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -75,7 +84,7 @@ export function FeeDocumentsClient() {
     }
     const [{ data }, { data: depts }, { data: subSections }, { data: courses }] = await Promise.all([
       db.from('fee_documents')
-        .select('id, category, sub_category, level, title, file_url, file_name, file_size, is_active, created_at')
+        .select('id, category, sub_category, level, title, file_url, file_name, file_size, audience, is_active, created_at')
         .order('created_at', { ascending: false }),
       db.from('departments').select('id, name').eq('is_active', true).order('name'),
       db.from('department_sub_sections').select('department_id, name').eq('is_active', true).order('name'),
@@ -98,19 +107,20 @@ export function FeeDocumentsClient() {
   useEffect(() => { load() }, [load])
 
   // Browse options only list what actually has a fee sheet
-  const deptOptions = uniq(docs.map(d => d.category))
-  const subOptions = uniq(docs.filter(d => d.category === selDept).map(d => d.sub_category))
-  const levelOptions = uniq(docs.filter(d => d.category === selDept && d.sub_category === selSub).map(d => d.level))
+  const deptOptions = uniq(visibleDocs.map(d => d.category))
+  const subOptions = uniq(visibleDocs.filter(d => d.category === selDept).map(d => d.sub_category))
+  const levelOptions = uniq(visibleDocs.filter(d => d.category === selDept && d.sub_category === selSub).map(d => d.level))
 
   const ready = !!selDept && !!selSub && (levelOptions.length === 0 || !!selLevel)
   const results = ready
-    ? docs.filter(d =>
+    ? visibleDocs.filter(d =>
         d.category === selDept && d.sub_category === selSub &&
         (levelOptions.length === 0 || d.level === selLevel))
     : []
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.audience) { toast.error('Select who to publish this fee PDF to'); return }
     if (!form.category || !form.sub_category.trim()) { toast.error(`Select department and enter ${subLabel(form.category).toLowerCase()}`); return }
     if (!file) { toast.error('Choose the fee PDF'); return }
     setSaving(true)
@@ -122,6 +132,7 @@ export function FeeDocumentsClient() {
       if (upErr) throw new Error(upErr.message)
       const fileUrl = supabase.storage.from('student-documents').getPublicUrl(path).data.publicUrl
       const { error } = await db.from('fee_documents').insert({
+        audience: form.audience,
         category: form.category,
         sub_category: form.sub_category.trim(),
         level: form.level.trim() || null,
@@ -132,7 +143,7 @@ export function FeeDocumentsClient() {
         uploaded_by: user?.id ?? null,
       })
       if (error) throw new Error(error.message)
-      toast.success('Fee PDF uploaded')
+      toast.success(`Fee PDF published to ${AUDIENCE_LABEL[form.audience]}`)
       setForm(EMPTY_FORM); setFile(null); setUploadOpen(false)
       load()
     } catch (err: any) {
@@ -161,7 +172,7 @@ export function FeeDocumentsClient() {
 
   function openUpload() {
     // Pre-fill with whatever is selected in the browser above
-    setForm({ category: selDept, sub_category: selSub, level: selLevel, title: '' })
+    setForm({ audience: '', category: selDept, sub_category: selSub, level: selLevel, title: '' })
     setFile(null)
     setUploadOpen(true)
   }
@@ -191,7 +202,7 @@ export function FeeDocumentsClient() {
         <div className="flex items-center justify-center py-20">
           <div className="w-7 h-7 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
         </div>
-      ) : docs.length === 0 ? (
+      ) : visibleDocs.length === 0 ? (
         <div className="text-center py-16 border rounded-2xl bg-white">
           <FolderOpen className="w-10 h-10 mx-auto mb-3 text-gray-200" />
           <p className="font-semibold text-gray-500">No fee PDFs yet</p>
@@ -259,6 +270,16 @@ export function FeeDocumentsClient() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpload} className="space-y-3 mt-1">
+            {/* Publish to – decides whose login this PDF appears in */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-600">Publish to *</Label>
+              <select className={selectCls} value={form.audience} required
+                onChange={e => setForm(f => ({ ...f, audience: e.target.value as Audience | '' }))}>
+                <option value="">Select who can see this…</option>
+                {(Object.keys(AUDIENCE_LABEL) as Audience[]).map(a => <option key={a} value={a}>{AUDIENCE_LABEL[a]}</option>)}
+              </select>
+            </div>
+
             {/* Step 1 – Department */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-600">1. Department *</Label>
@@ -371,6 +392,9 @@ function DocRow({ d, isAdmin, busy, onToggle, onDelete }: {
         <p className="text-[11px] text-gray-500 truncate">
           {pathOf(d)}
           {d.file_size && <span className="text-gray-400"> · {d.file_size}</span>}
+          {isAdmin && (
+            <span className="text-blue-600 font-semibold"> · {d.audience ? AUDIENCE_LABEL[d.audience] : 'Everyone'}</span>
+          )}
           {!d.is_active && <span className="text-amber-600 font-bold"> · HIDDEN</span>}
         </p>
       </div>
@@ -380,7 +404,7 @@ function DocRow({ d, isAdmin, busy, onToggle, onDelete }: {
       </a>
       {isAdmin && (
         <div className="flex items-center shrink-0">
-          <button onClick={onToggle} disabled={busy} title={d.is_active ? 'Hide from associates' : 'Show to associates'}
+          <button onClick={onToggle} disabled={busy} title={d.is_active ? 'Hide' : 'Show'}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100">
             {d.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
           </button>

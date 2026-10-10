@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import {
   Search, Upload, CheckCircle2, Clock, KeyRound, X,
   Send, Plus, Paperclip, Bell, FileText, ShieldCheck,
-  ChevronRight, ArrowLeft, Eye, Trash2, Filter, Users,
+  ChevronRight, ArrowLeft, Eye, EyeOff, Copy, Trash2, Filter, Users,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -348,9 +348,12 @@ export function StudentPortalManager() {
       if (!res.ok) { toast.error(json.error); return }
       toast.success(selected.portal_active ? 'Password reset' : 'Portal access created')
       await load()
+      // `students` here is still the pre-load list, so patch the open student
+      // directly — the Access tab shows the new password straight away.
+      setSelected(prev => prev && prev.id === selected.id
+        ? { ...prev, portal_active: true, portal_username: prev.portal_username ?? prev.enrollment_number, portal_temp_password: pass }
+        : prev)
       setPass('')
-      const updated = students.find(s => s.id === selected.id)
-      if (updated) setSelected(updated)
     } catch { toast.error('Failed') }
     finally { setSavingCred(false) }
   }
@@ -932,16 +935,17 @@ export function StudentPortalManager() {
                     )}
                   </div>
 
+                  {selected.portal_username && (
+                    <PortalCredentials
+                      loginId={fmtEnroll(selected.portal_username) ?? ''}
+                      password={selected.portal_temp_password}
+                    />
+                  )}
+
                   <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
                     <p className="text-sm font-semibold text-gray-700">
                       {selected.portal_active ? 'Reset Password' : 'Create Portal Access'}
                     </p>
-                    {selected.portal_username && (
-                      <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                        <span className="text-xs text-gray-400">Username</span>
-                        <span className="text-sm font-mono font-medium text-gray-800">{fmtEnroll(selected.portal_username)}</span>
-                      </div>
-                    )}
                     <input
                       type="text"
                       placeholder="Set new password (min 6 chars)"
@@ -971,6 +975,51 @@ export function StudentPortalManager() {
             <p className="text-sm font-medium text-gray-500">Select a student</p>
             <p className="text-xs text-gray-400 mt-1">View updates, documents & access from here</p>
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The student's portal login, always on show, so staff never have to ask the
+ * student for it. The password is the one last set by staff or by the
+ * student from their portal profile.
+ */
+function PortalCredentials({ loginId, password }: { loginId: string; password: string | null }) {
+  const [shown, setShown] = useState(true)
+  function copy(text: string, what: string) {
+    navigator.clipboard.writeText(text).then(
+      () => toast.success(`${what} copied`),
+      () => toast.error('Could not copy'),
+    )
+  }
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+      <p className="text-sm font-semibold text-gray-700">Portal Login Details</p>
+      <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-400">Login ID</span>
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-mono font-medium text-gray-800">{loginId}</span>
+          <button onClick={() => copy(loginId, 'Login ID')} title="Copy login ID" className="text-gray-400 hover:text-gray-700">
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+        </span>
+      </div>
+      <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-400">Password</span>
+        {password ? (
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-mono font-medium text-gray-800">{shown ? password : '••••••••'}</span>
+            <button onClick={() => setShown(v => !v)} title={shown ? 'Hide' : 'Show'} className="text-gray-400 hover:text-gray-700">
+              {shown ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={() => copy(password, 'Password')} title="Copy password" className="text-gray-400 hover:text-gray-700">
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">Not on record — reset below to set one</span>
         )}
       </div>
     </div>

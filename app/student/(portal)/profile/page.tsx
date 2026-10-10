@@ -98,6 +98,8 @@ export default function ProfilePage() {
     const { error } = await supabase.auth.updateUser({ password: newPass })
     setChangingPass(false)
     if (error) { toast.error(error.message); return }
+    // Keep the copy staff see in the admin panel's Access tab in step.
+    if (student) await (supabase as any).from('students').update({ portal_temp_password: newPass }).eq('id', student.id)
     toast.success('Password changed successfully!')
     setOldPass(''); setNewPass(''); setConfirmPass('')
   }

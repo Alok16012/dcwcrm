@@ -7,12 +7,17 @@
  *   message   send text, then carry on to `next`
  *   question  send text with numbered options; the student's choice picks
  *             the branch. Waits for the reply.
+ *   ask       ask and save the answer — a choice, any text, a percentage, a
+ *             year, a city or a number of subjects — then carry on to `next`
+ *   goto      carry on from another step of the same flow (`target`)
  *   handoff   send text and hand the chat to a counsellor
  *   builtin   continue in the built-in admission script ('menu' asks
  *             10th/12th vs college; 'school' / 'college' start that flow)
  *
  * Stored in wa_flows.root as nested JSON, exactly as the builder edits it.
- * This module is pure, like the engine: no database, no WhatsApp.
+ * The row with kind 'script' is not one of these: it is the admission script
+ * itself (src/script.mjs). This module is pure, like the engine: no database,
+ * no WhatsApp.
  */
 
 import { normalize } from './nlu.mjs'
@@ -26,12 +31,12 @@ const MAX_SENDS = 8
 export function compileFlows(rows) {
   const out = []
   for (const r of rows ?? []) {
-    if (!r?.is_active || !r.root) continue
+    if (!r?.is_active || !r.root || r.kind === 'script') continue
     const nodes = new Map()
     const walk = n => {
       if (!n || typeof n !== 'object' || !n.id || nodes.has(n.id)) return
       nodes.set(n.id, n)
-      if (n.type === 'message') walk(n.next)
+      if (n.type === 'message' || n.type === 'ask') walk(n.next)
       if (n.type === 'question') for (const o of n.options ?? []) walk(o.next)
     }
     walk(r.root)
@@ -87,7 +92,8 @@ export function fill(text, name) {
 }
 
 function questionText(node, name) {
-  const list = (node.options ?? []).map((o, i) => `${KEYCAPS[i] ?? `${i + 1}.`} ${o.label}`).join('\n')
+  const choices = node.type === 'question' || (node.type === 'ask' && (node.answer ?? 'choice') === 'choice')
+  const list = choices ? (node.options ?? []).map((o, i) => `${KEYCAPS[i] ?? `${i + 1}.`} ${o.label}`).join('\n') : ''
   const q = fill(node.text, name)
   return list ? `${q}\n\n${list}` : q
 }
@@ -100,7 +106,7 @@ function questionText(node, name) {
  *   { end: 'handoff' }               hand the chat to a counsellor
  *   { end: 'builtin', target }       carry on in the built-in script
  */
-export function walk(node, { replies, name }) {
+export function walk(node, { replies, name, nodes }) {
   let n = node
   for (let sent = 0; n && sent < MAX_SENDS; sent++) {
     if (n.type === 'message') {
@@ -108,7 +114,11 @@ export function walk(node, { replies, name }) {
       n = n.next
       continue
     }
-    if (n.type === 'question') {
+    if (n.type === 'goto') {
+      n = nodes?.get(n.target) ?? null
+      continue
+    }
+    if (n.type === 'question' || n.type === 'ask') {
       replies.push(questionText(n, name))
       return { wait: n.id }
     }

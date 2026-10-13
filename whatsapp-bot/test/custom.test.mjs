@@ -112,3 +112,43 @@ test('pickBranch will not guess between two options', () => {
   assert.equal(pickBranch('online exam', opts)?.label, 'Online Exam')
   assert.equal(pickBranch('online exam nahi online', opts), null)
 })
+
+const ASK = {
+  id: 'f4', name: 'Callback', is_active: true, triggers: ['callback'], match_mode: 'exact',
+  root: {
+    id: 'a1', type: 'ask', answer: 'place', saveAs: 'City', text: 'Aap kis city se hain?',
+    next: {
+      id: 'a2', type: 'ask', answer: 'choice', saveAs: 'Call time', text: 'Call kab karein?',
+      options: [{ id: 'c1', label: 'Subah' }, { id: 'c2', label: 'Shaam' }],
+      next: {
+        id: 'q3', type: 'question', text: 'Fees ke baare me ya admission?',
+        options: [
+          { id: 'o1', label: 'Fees', next: { id: 'm4', type: 'message', text: 'Fee counselor batayega.', next: { id: 'j5', type: 'goto', target: 'h6' } } },
+          { id: 'o2', label: 'Admission', next: { id: 'h6', type: 'handoff', text: 'Counselor call karenge.' } },
+        ],
+      },
+    },
+  },
+}
+
+test('"Ask & save" steps save the answer and carry on; "jump to" continues elsewhere', async () => {
+  const { said, conv, events } = await chat(['callback', 'patna', '2', '1'], [ASK])
+  assert.deepEqual(said[0], ['Aap kis city se hain?'])
+  assert.match(said[1][0], /^Call kab karein\?\n\n1️⃣ Subah\n2️⃣ Shaam$/)
+  assert.deepEqual(said[3], ['Fee counselor batayega.', 'Counselor call karenge.'])
+  assert.equal(conv.status, 'handoff')
+  const h = events.find(e => e.type === 'lead.handoff')
+  assert.equal(h.fields.City, 'Patna, Bihar')
+  assert.equal(h.fields['Call time'], 'Shaam')
+})
+
+test('an "Ask & save" answer that cannot be read is asked once more, then left blank', async () => {
+  const { said, conv } = await chat(['callback', 'patna', 'pata nahi', 'abhi nahi'], [ASK])
+  assert.match(said[2][0], /^Please number bhej dijiye 🙏/)
+  assert.match(said[3][0], /^Fees ke baare me ya admission\?/)
+  assert.equal(conv.customAnswers['Call time'], 'Not answered')
+})
+
+test('the admission script row is not run as a trigger flow', () => {
+  assert.equal(compileFlows([{ ...WELCOME, kind: 'script' }]).length, 0)
+})

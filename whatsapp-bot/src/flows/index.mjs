@@ -2,10 +2,15 @@ import { college } from './college.mjs'
 import { school } from './school.mjs'
 import { normalize } from '../nlu.mjs'
 
+/**
+ * The flows the engine runs. src/script.mjs swaps in admin's version from the
+ * Flow Builder's "Admission script" (and back), so read them at call time.
+ */
 export const FLOWS = { college, school }
 
 /** The two doors into the bot, shown when the first message does not say. */
 export const INTENT = {
+  hello: 'Hi! 😊 Welcome to Distance Courses Wala (DCW). Main aapki admission me help karunga.',
   ask: 'Aap kis ke liye admission dekh rahe hain?',
   options: [
     { value: 'school', label: '10th / 12th (Open Schooling)' },
@@ -33,7 +38,8 @@ export function detectFlow(text) {
 
 export function pickIntent(text) {
   const t = normalize(text)
-  if (/^1[.)]?$/.test(t)) return 'school'
-  if (/^2[.)]?$/.test(t)) return 'college'
-  return detectFlow(text)
+  const num = t.match(/^(\d)[.)]?$/)
+  if (num) return INTENT.options[Number(num[1]) - 1]?.value ?? null
+  const label = INTENT.options.find(o => normalize(o.label) === t)
+  return label?.value ?? detectFlow(text)
 }

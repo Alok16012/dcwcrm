@@ -15,6 +15,7 @@
 import { setCustomKnowledge, customKnowledgeCount } from './faq.mjs'
 import { setAiSwitch } from './ai.mjs'
 import { compileFlows } from './custom.mjs'
+import { compileScript, applyScript, scriptActive } from './script.mjs'
 
 const REFRESH_MS = 60 * 1000
 /** Someone who wrote in this recently is already talking — do not cold-open them. */
@@ -61,19 +62,40 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
   let settings = { ...DEFAULTS }
   let nextSendAt = 0
   let busy = false
+  let scriptKey = null
+
+  /** Admin's admission script, or the built-in questions if it is off or broken. */
+  function useScript(row) {
+    const key = row ? JSON.stringify(row.root) : null
+    if (key === scriptKey) return
+    scriptKey = key
+    if (!row) { applyScript(null); return }
+    try {
+      applyScript(compileScript(row.root))
+      log.info('admission script loaded from the Flow Builder')
+    } catch (e) {
+      applyScript(null)
+      log.warn(`admission script not used (${e.message}) — using the built-in questions`)
+    }
+  }
 
   async function refresh() {
     const [s, k, f] = await Promise.all([
       db.from('wa_bot_settings').select('*').maybeSingle(),
       db.from('wa_knowledge').select('id, title, body, keywords, flow, is_active').eq('is_active', true),
-      db.from('wa_flows').select('id, name, triggers, match_mode, on_first_message, root, is_active').eq('is_active', true).order('created_at'),
+      // '*': `kind` arrives with migration 120, and a missing column must not
+      // take the other flows down with it.
+      db.from('wa_flows').select('*').eq('is_active', true).order('created_at'),
     ])
     if (s.error) log.warn(`settings load failed: ${s.error.message}`)
     else if (s.data) settings = { ...DEFAULTS, ...s.data }
     if (k.error) log.warn(`knowledge load failed: ${k.error.message}`)
     else setCustomKnowledge(k.data)
     if (f.error) log.warn(`flows load failed: ${f.error.message}`)
-    else config.customFlows = compileFlows(f.data)
+    else {
+      config.customFlows = compileFlows(f.data)
+      useScript(f.data.find(r => r.kind === 'script') ?? null)
+    }
 
     config.paused = envPaused || settings.paused
     setAiSwitch(settings.ai_enabled)
@@ -190,6 +212,6 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     },
     refresh,
     noteReply,
-    stats: () => ({ knowledge: customKnowledgeCount(), flows: config.customFlows?.length ?? 0, outreach: settings.outreach_enabled }),
+    stats: () => ({ knowledge: customKnowledgeCount(), flows: config.customFlows?.length ?? 0, script: scriptActive(), outreach: settings.outreach_enabled }),
   }
 }

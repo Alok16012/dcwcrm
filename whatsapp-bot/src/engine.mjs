@@ -27,7 +27,7 @@ import { detectPersona, say } from './tone.mjs'
 import { matchFaq, renderFaq, KNOWLEDGE } from './faq.mjs'
 import { FLOWS, INTENT, detectFlow, pickIntent } from './flows/index.mjs'
 import { leadFields, temperature } from './lead.mjs'
-import { matchTrigger, pickBranch, walk, questionText } from './custom.mjs'
+import { matchTrigger, pickBranch, walk, questionText, fill } from './custom.mjs'
 
 /** Options vague enough that they may only answer the question actually asked. */
 const GENERIC = new Set(['Not Sure', 'Other', 'Not Decided', 'Both', 'Available', 'Not Available', 'Later', 'Yes', 'No'])
@@ -61,6 +61,8 @@ function activeSteps(flow, answers) {
 }
 
 export function nextStep(flow, answers) {
+  // Admin's admission script walks the path the answers take (src/script.mjs).
+  if (flow.next) return flow.next(answers)
   return activeSteps(flow, answers).find(s => answers[s.slot] == null) ?? null
 }
 
@@ -69,6 +71,13 @@ function question(step, persona, answers) {
   if (!step.options) return q
   const list = step.options.map((o, i) => `${KEYCAPS[i] ?? `${i + 1}.`} ${o.label}`).join('\n')
   return `${q}\n\n${list}`
+}
+
+/** A step asked for the first time: with any message admin put before it. */
+function firstAsk(flow, step, persona, answers) {
+  const intro = flow.intro?.(step, persona, answers)
+  const q = question(step, persona, answers)
+  return intro ? `${intro}\n\n${q}` : q
 }
 
 function intentQuestion() {
@@ -126,14 +135,14 @@ function parseStep(step, text) {
  * "pata nahi" answers the current question and nothing else. Questions are
  * skipped entirely: "admission online hoga?" is not a mode preference.
  */
-function fillSlots(flow, answers, text, currentStepId) {
+function fillSlots(flow, answers, text, current) {
   // A question still tells us who is asking — "12th fail hu, NIOS se ho
   // jayega?" is a 12th, failed student — but not what they prefer: "admission
   // online hoga?" is asking about online, not choosing it.
   const asking = looksLikeQuestion(text)
   const filled = {}
   for (const step of flow.steps) {
-    if (!step.fill || step.id === currentStepId) continue
+    if (!step.fill || step.id === current?.id) continue
     if (asking && !step.fillFromQuestions) continue
     if (answers[step.slot] != null || filled[step.slot] != null) continue
     const merged = { ...answers, ...filled }
@@ -145,7 +154,7 @@ function fillSlots(flow, answers, text, currentStepId) {
 
   // A city is only taken from a sentence that is about where they live —
   // "Bihar Board se tha" names a board, not a home town.
-  if (answers.city == null && currentStepId !== 'city' && !asking) {
+  if (answers.city == null && current?.slot !== 'city' && !asking) {
     const t = normalize(text)
     const aboutHome = /\b(se hu|se hoon|se hun|se hai|from|rehta|rehti|rehte|city|shahar|ghar)\b/.test(t)
     const pl = aboutHome && !/\bboard\b/.test(t) ? findPlace(text) : null
@@ -305,7 +314,7 @@ export async function handle(conv, input, deps) {
       }
       const hello = c.awaitingIntent
         ? 'Please 1 ya 2 bhej dijiye 🙏'
-        : 'Hi! 😊 Welcome to Distance Courses Wala (DCW). Main aapki admission me help karunga.'
+        : fill(INTENT.hello, deps.name)
       c.awaitingIntent = true
       replies.push(`${hello}\n\n${intentQuestion()}`)
       return { conv: c, replies, events }
@@ -324,9 +333,10 @@ export async function handle(conv, input, deps) {
     if (faq) applyFaq(c, faq)
 
     const step = nextStep(flow, c.answers)
-    replies.push(flow.welcome(c.persona))
+    const welcome = flow.welcome(c.persona, deps.name)
+    if (welcome) replies.push(welcome)
     if (faq) replies.push(renderFaq(faq, c.persona))
-    if (step) replies.push(question(step, c.persona, c.answers))
+    if (step) replies.push(firstAsk(flow, step, c.persona, c.answers))
     else finish(c, replies, events, config)
     return { conv: c, replies, events }
   }
@@ -363,7 +373,7 @@ export async function handle(conv, input, deps) {
     }
     replies.push(answer ?? 'Ye point counselor aapke case ke saath verify karke batayega 🙏')
     const again = nextStep(flow, c.answers)
-    if (again) replies.push(`Ab bataiye —\n${question(again, c.persona, c.answers)}`)
+    if (again) replies.push(`Ab bataiye —\n${again === step ? question(again, c.persona, c.answers) : firstAsk(flow, again, c.persona, c.answers)}`)
     else finish(c, replies, events, config)
     pushUpdate(c, events, answersBefore)
     return { conv: c, replies, events }
@@ -390,7 +400,7 @@ export async function handle(conv, input, deps) {
   }
 
   // Other answers the same message carried.
-  Object.assign(c.answers, fillSlots(flow, c.answers, text, step.id))
+  Object.assign(c.answers, fillSlots(flow, c.answers, text, step))
 
   if (value == null) {
     c.attempts[step.id] = (c.attempts[step.id] ?? 0) + 1
@@ -413,7 +423,7 @@ export async function handle(conv, input, deps) {
 
   const next = nextStep(flow, c.answers)
   if (next) {
-    replies.push(`${ack(c)}\n\n${question(next, c.persona, c.answers)}`)
+    replies.push(`${ack(c)}\n\n${firstAsk(flow, next, c.persona, c.answers)}`)
     pushUpdate(c, events, answersBefore)
   } else {
     finish(c, replies, events, config)
@@ -442,16 +452,28 @@ function runCustom(c, text, { flows, replies, events, config, name, firstMessage
         start = opt.next
       }
     }
+    if (node?.type === 'ask') {
+      const value = readAsk(node, text)
+      // A missed answer is asked once more, then left blank — unless the
+      // message is something else entirely (a trigger, "counselor").
+      const skip = value == null && c.custom.missed && !matchTrigger(text, flows) && !wantsHuman(text) && !wantsRestart(text)
+      if (value != null || skip) {
+        if (node.saveAs?.trim()) c.customAnswers = { ...c.customAnswers, [node.saveAs.trim()]: value ?? 'Not answered' }
+        flow = f
+        start = node.next
+      }
+    }
     if (!flow) {
       const trig = matchTrigger(text, flows)
       if (trig) {
         flow = trig
         start = trig.root
-      } else if (node?.type === 'question' && !wantsHuman(text) && !wantsRestart(text) && !c.custom.missed) {
+      } else if ((node?.type === 'question' || node?.type === 'ask') && !wantsHuman(text) && !wantsRestart(text) && !c.custom.missed) {
         // One more go, then let the built-in script have the conversation —
         // a student stuck on a menu leaves.
         c.custom.missed = true
-        replies.push(`Please number bhej dijiye 🙏\n\n${questionText(node, name)}`)
+        const hint = node.type === 'ask' && (node.answer ?? 'choice') !== 'choice' ? 'Thoda aur clear bata dijiye' : 'Please number bhej dijiye'
+        replies.push(`${hint} 🙏\n\n${questionText(node, name)}`)
         return true
       } else {
         c.custom = null
@@ -468,7 +490,7 @@ function runCustom(c, text, { flows, replies, events, config, name, firstMessage
   c.custom = null
   c.customFlow = flow.name
   const before = replies.length
-  const r = walk(start, { replies, name })
+  const r = walk(start, { replies, name, nodes: flow.nodes })
 
   if (r.wait) {
     c.custom = { flowId: flow.id, nodeId: r.wait }
@@ -477,7 +499,7 @@ function runCustom(c, text, { flows, replies, events, config, name, firstMessage
     events.push({ type: 'lead.handoff', fields: customFields(c, true), department: c.flow ? FLOWS[c.flow].department(c.answers) : undefined })
     return true
   } else if (r.end === 'builtin') {
-    startBuiltin(c, r.target, replies, events, config)
+    startBuiltin(c, r.target, replies, events, config, name)
     return true
   } else if (replies.length === before) {
     // A branch admin left empty: say something rather than go quiet.
@@ -485,6 +507,14 @@ function runCustom(c, text, { flows, replies, events, config, name, firstMessage
   }
   if (c.customAnswers) events.push({ type: 'lead.update', fields: customFields(c, false), department: c.flow ? FLOWS[c.flow].department(c.answers) : undefined })
   return true
+}
+
+/** The answer to an admin "Ask & save" step, or null. */
+function readAsk(node, text) {
+  const answer = node.answer ?? 'choice'
+  if (answer === 'choice') return pickBranch(text, node.options ?? [])?.label ?? null
+  const v = parseStep({ kind: answer }, text)
+  return v == null ? null : String(v)
 }
 
 /** Lead fields for a chat in an admin-built flow. */
@@ -500,7 +530,7 @@ function customFields(c, handoff) {
 }
 
 /** Hand over from an admin flow to the built-in admission script. */
-function startBuiltin(c, target, replies, events, config) {
+function startBuiltin(c, target, replies, events, config, name) {
   c.status = 'bot'
   if (target !== 'school' && target !== 'college') {
     c.flow = null
@@ -513,9 +543,10 @@ function startBuiltin(c, target, replies, events, config) {
   const flow = FLOWS[target]
   events.push({ type: 'lead.ensure', fields: leadFields(c), department: flow.department(c.answers) })
   c.leadEnsured = true
-  replies.push(flow.welcome(c.persona))
+  const welcome = flow.welcome(c.persona, name)
+  if (welcome) replies.push(welcome)
   const step = nextStep(flow, c.answers)
-  if (step) replies.push(question(step, c.persona, c.answers))
+  if (step) replies.push(firstAsk(flow, step, c.persona, c.answers))
   else finish(c, replies, events, config)
 }
 
@@ -537,6 +568,6 @@ function pushUpdate(c, events, answersBefore) {
 
 function finish(c, replies, events, config) {
   c.status = 'handoff'
-  replies.push(handoffMessage(c, config))
+  replies.push(FLOWS[c.flow].end?.(c.persona, c.answers) || handoffMessage(c, config))
   events.push({ type: 'lead.handoff', fields: leadFields(c), department: FLOWS[c.flow].department(c.answers) })
 }

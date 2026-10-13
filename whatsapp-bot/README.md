@@ -62,6 +62,18 @@ Admin steers the bot from the CRM; the bot re-reads it every minute
   script. A trigger beats the built-in script; a flow question gets first look
   at the reply, is asked once more if the reply fits no option, then the
   script takes over. If two active flows share a trigger, the older one wins.
+  Besides branching questions there are "Ask & save" steps (a choice, any
+  text, a percentage, a year, a city or a number of subjects) and "Jump to"
+  steps, so branches can share the questions after them.
+- **Admission script** — the 10th/12th and college questions themselves
+  (`src/script.mjs`, migration 120): one wa_flows row of kind `script`,
+  seeded from the code by `src/flows/seed.mjs`, that admin edits in the same
+  builder. The bot compiles it into the shape the engine already runs, so
+  typed answers, several answers in one message, AI, FAQ replies and lead
+  temperature all still work; steps keep the built-in answer they fill
+  (`field`). Off, or a tree it cannot run (logged), and the built-in
+  questions from `src/flows/` come back. After changing the seed, regenerate
+  the migration: `node scripts/script-sql.mjs > ../supabase/migrations/120_whatsapp_admission_script.sql`.
 - **AI Knowledge** — answers admin writes. With keywords they are sent word
   for word when a message contains one (no AI); all active entries are also
   given to the AI as facts. They take priority over the built-in answers.

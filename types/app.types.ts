@@ -85,14 +85,15 @@ export interface LeadFilters {
   department_id?: string[]
   sub_section_id?: string[]
   city?: string
-  form?: string
+  /** Capture-form titles (metadata.form, or the form a repeat enquiry came through). */
+  forms?: string[]
   created_from?: string
   created_to?: string
   followup_from?: string
   followup_to?: string
   payment_status?: 'paid' | 'partial' | 'unpaid'
   import_batch_id?: string
-  mode?: 'attending' | 'non-attending' | 'regular' | 'distance' | 'online'
+  modes?: ('attending' | 'non-attending' | 'regular' | 'distance' | 'online')[]
 }
 
 export interface Profile {

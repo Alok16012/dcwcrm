@@ -1,6 +1,7 @@
 'use client'
 import { withBase } from '@/lib/base-path'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { DateRangeFilter, NO_DATE_RANGE, inDateRange, type DateRangeValue } from '@/components/shared/DateRangeFilter'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -115,6 +116,7 @@ export function AssociateManager({ lockedStatus, onReview }: {
   const [filterState, setFilterState] = useState('')
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [joinedRange, setJoinedRange] = useState<DateRangeValue>(NO_DATE_RANGE)
   const [coordFilter, setCoordFilter] = useState('all') // 'all' | coordinator name | 'unassigned'
   // Approved-tab performance filters
   const [filterActivity, setFilterActivity] = useState('')        // '' | active | inactive | hold
@@ -347,6 +349,7 @@ export function AssociateManager({ lockedStatus, onReview }: {
       (!filterState || a.state === filterState) &&
       (!filterDistrict || a.district === filterDistrict) &&
       (!filterStatus || a.status === filterStatus) &&
+      inDateRange(a.created_at, joinedRange) &&
       matchStats(a)
   })
 
@@ -368,13 +371,13 @@ export function AssociateManager({ lockedStatus, onReview }: {
 
   const statsFiltersOn = !!(filterActivity || filterAdmissions || filterActiveStudents || filterRevenue || sortBy)
   function clearFilters() {
-    setSearch(''); setFilterState(''); setFilterDistrict(''); setFilterStatus('')
+    setSearch(''); setFilterState(''); setFilterDistrict(''); setFilterStatus(''); setJoinedRange(NO_DATE_RANGE)
     setFilterActivity(''); setFilterAdmissions(''); setFilterActiveStudents(''); setFilterRevenue(''); setSortBy('')
   }
 
   // ── Pagination ──
   const filterKey = [search, filterState, filterDistrict, filterStatus, coordFilter, pageSize,
-    filterActivity, filterAdmissions, filterActiveStudents, filterRevenue, sortBy].join('|')
+    filterActivity, filterAdmissions, filterActiveStudents, filterRevenue, sortBy, JSON.stringify(joinedRange)].join('|')
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(pageState.key === filterKey ? pageState.page : 1, totalPages)
   const pageStart = (safePage - 1) * pageSize
@@ -558,6 +561,7 @@ export function AssociateManager({ lockedStatus, onReview }: {
           <option value="">All Districts</option>
           {allDistricts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
+        <DateRangeFilter label="Joined" value={joinedRange} onChange={setJoinedRange} className="h-8 text-xs" />
         {showStats && (
           <>
             <select value={filterActivity} onChange={e => setFilterActivity(e.target.value)}
@@ -598,7 +602,7 @@ export function AssociateManager({ lockedStatus, onReview }: {
             </select>
           </>
         )}
-        {(search || filterState || filterDistrict || filterStatus || statsFiltersOn) && (
+        {(search || filterState || filterDistrict || filterStatus || joinedRange.preset || statsFiltersOn) && (
           <button onClick={clearFilters} className="text-xs text-blue-600 hover:underline px-1">Clear</button>
         )}
       </div>

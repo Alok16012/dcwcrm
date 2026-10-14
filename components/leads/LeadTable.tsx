@@ -106,6 +106,53 @@ function SourceBadge({ lead }: { lead: Lead }) {
   )
 }
 
+/**
+ * A filter that takes several values at once: a dropdown of checkboxes that
+ * stays open while ticking, like Status.
+ */
+function MultiFilter({ label, options, value, onChange, width = 'w-56' }: {
+  label: string
+  options: { value: string; label: string }[]
+  value?: string[]
+  onChange: (v: string[] | undefined) => void
+  width?: string
+}) {
+  const sel = value ?? []
+  const toggle = (v: string) => {
+    const next = sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v]
+    onChange(next.length ? next : undefined)
+  }
+  const names = options.filter((o) => sel.includes(o.value)).map((o) => o.label)
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button title={names.join(', ') || undefined}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${sel.length ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+          {sel.length === 1 ? <span className="max-w-[140px] truncate">{names[0] ?? label}</span> : label}
+          {sel.length > 1 ? ` (${sel.length})` : ''}
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className={`${width} max-h-80`}>
+        {sel.length > 0 && (
+          <>
+            <DropdownMenuItem onClick={() => onChange(undefined)} className="text-xs text-blue-600">Clear selection</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {options.map((o) => (
+          <DropdownMenuItem key={o.value} closeOnClick={false} onClick={() => toggle(o.value)} className="flex items-center gap-2">
+            <div className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center ${sel.includes(o.value) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
+              {sel.includes(o.value) && <span className="text-white text-[10px]">✓</span>}
+            </div>
+            <span className="truncate">{o.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 // Label to show for a lead's status — custom leads display their free-text label
 function statusLabel(lead: Lead) {
   if (lead.status === 'custom') return lead.custom_status?.trim() || 'Custom'
@@ -182,7 +229,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
-  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length || filters.mode || filters.city || filters.followup_from || filters.followup_to || filters.form || filters.created_from || filters.created_to
+  const activeFilters = filters.status?.length || filters.source?.length || filters.assigned_to?.length || filters.course_id?.length || filters.modes?.length || filters.city || filters.followup_from || filters.followup_to || filters.forms?.length || filters.created_from || filters.created_to
 
   function toggleStatus(s: LeadStatus) {
     const cur = filters.status ?? []
@@ -353,7 +400,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
                 {(Object.entries(LEAD_STATUS_LABELS) as [LeadStatus, string][]).map(([k, v]) => (
-                  <DropdownMenuItem key={k} onClick={() => toggleStatus(k)} className="flex items-center gap-2">
+                  <DropdownMenuItem key={k} closeOnClick={false} onClick={() => toggleStatus(k)} className="flex items-center gap-2">
                     <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.status?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
                       {filters.status?.includes(k) && <span className="text-white text-[10px]">✓</span>}
                     </div>
@@ -373,7 +420,7 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-44">
                 {(Object.entries(LEAD_SOURCE_LABELS) as [LeadSource, string][]).map(([k, v]) => (
-                  <DropdownMenuItem key={k} onClick={() => toggleSource(k)} className="flex items-center gap-2">
+                  <DropdownMenuItem key={k} closeOnClick={false} onClick={() => toggleSource(k)} className="flex items-center gap-2">
                     <div className={`w-4 h-4 rounded border flex items-center justify-center ${filters.source?.includes(k) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
                       {filters.source?.includes(k) && <span className="text-white text-[10px]">✓</span>}
                     </div>
@@ -385,54 +432,29 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
 
             {/* Form / Campaign filter */}
             {forms.length > 0 && (
-              <Select value={filters.form ?? ''} onValueChange={(v) => { setFilters({ form: v || undefined }); onPageChange(1) }}>
-                <SelectTrigger className={`w-40 h-8 text-xs whitespace-nowrap ${filters.form ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                  <SelectValue placeholder="Form / Campaign" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All forms</SelectItem>
-                  {forms.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilter label="Form / Campaign" width="w-72" value={filters.forms}
+                options={forms.map((f) => ({ value: f, label: f }))}
+                onChange={(v) => { setFilters({ forms: v }); onPageChange(1) }} />
             )}
 
             {/* Assigned to filter */}
             {telecallers.length > 0 && (
-              <Select value={filters.assigned_to?.[0] ?? ''} onValueChange={(v) => { setFilters({ assigned_to: v ? [v] : undefined }); onPageChange(1) }}>
-                <SelectTrigger className={`w-32 h-8 text-xs whitespace-nowrap ${filters.assigned_to?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                  <SelectValue placeholder="Assigned to" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All assignees</SelectItem>
-                  {telecallers.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilter label="Assigned to" value={filters.assigned_to}
+                options={telecallers.map((t) => ({ value: t.id, label: t.full_name }))}
+                onChange={(v) => { setFilters({ assigned_to: v }); onPageChange(1) }} />
             )}
 
             {/* Course filter */}
             {courses.length > 0 && (
-              <Select value={filters.course_id?.[0] ?? ''} onValueChange={(v) => { setFilters({ course_id: v ? [v] : undefined }); onPageChange(1) }}>
-                <SelectTrigger className={`w-28 h-8 text-xs ${filters.course_id?.length ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                  <SelectValue placeholder="Course" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All courses</SelectItem>
-                  {courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilter label="Course" value={filters.course_id}
+                options={courses.map((c) => ({ value: c.id, label: c.name }))}
+                onChange={(v) => { setFilters({ course_id: v }); onPageChange(1) }} />
             )}
 
             {/* Mode filter */}
-            <Select value={filters.mode ?? ''} onValueChange={(v) => { setFilters({ mode: v as typeof filters.mode || undefined }); onPageChange(1) }}>
-              <SelectTrigger className={`w-28 h-8 text-xs ${filters.mode ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}`}>
-                <SelectValue placeholder="Mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All modes</SelectItem>
-                <SelectItem value="attending">Attending</SelectItem>
-                <SelectItem value="non-attending">Non-Attending</SelectItem>
-              </SelectContent>
-            </Select>
+            <MultiFilter label="Mode" width="w-44" value={filters.modes}
+              options={[{ value: 'attending', label: 'Attending' }, { value: 'non-attending', label: 'Non-Attending' }]}
+              onChange={(v) => { setFilters({ modes: v as typeof filters.modes }); onPageChange(1) }} />
 
             {/* Followup date filter */}
             <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">

@@ -107,11 +107,20 @@ export function LeadsClient() {
       ? `source.in.(${filters.source.join(',')}),metadata->>whatsapp_bot.eq.yes`
       : null
     if (filters.source?.length && !sourceClause) query = query.in('source', filters.source)
-    if (isAdmin && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
+    // Everyone who sees all leads (admin, backend…) can narrow them to one
+    // counsellor; a telecaller's list is already only their own.
+    if (!isTelecaller && filters.assigned_to?.length) query = query.in('assigned_to', filters.assigned_to)
     if (filters.course_id?.length) query = query.in('course_id', filters.course_id)
-    if (filters.form) query = query.eq('metadata->>form', filters.form)
+    // A lead that was already in the CRM keeps its first form in
+    // metadata.form; a later form submission lands in metadata.last_enquiry.
+    const formList = filters.forms?.length
+      ? filters.forms.map((f) => `"${f.replace(/["\\]/g, '\\$&')}"`).join(',')
+      : null
+    const formClause = formList
+      ? `metadata->>form.in.(${formList}),metadata->last_enquiry->>form.in.(${formList})`
+      : null
     if (filters.city) query = query.ilike('city', `%${filters.city}%`)
-    if (filters.mode) query = query.eq('mode', filters.mode)
+    if (filters.modes?.length) query = query.in('mode', filters.modes)
     // Created-date range. created_at is a timestamp, so make the "to" bound
     // inclusive of the whole selected day (up to 23:59:59).
     if (filters.created_from) query = query.gte('created_at', filters.created_from)
@@ -125,9 +134,10 @@ export function LeadsClient() {
       ? `full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%` +
         (withReferral ? `,referred_by.ilike.%${term}%,referred_by_phone.ilike.%${term}%` : '')
       : null
-    // Two OR groups must be ANDed; postgrest-js has no .and(), so nest it in .or().
-    if (sourceClause && searchClause) query = query.or(`and(or(${sourceClause}),or(${searchClause}))`)
-    else if (sourceClause || searchClause) query = query.or((sourceClause ?? searchClause)!)
+    // Several OR groups must be ANDed; postgrest-js has no .and(), so nest it in .or().
+    const groups = [sourceClause, formClause, searchClause].filter((g): g is string => Boolean(g))
+    if (groups.length === 1) query = query.or(groups[0])
+    else if (groups.length > 1) query = query.or(`and(${groups.map((g) => `or(${g})`).join(',')})`)
 
     return query
   }, [filters, currentProfile, sortDir, searchTerm])

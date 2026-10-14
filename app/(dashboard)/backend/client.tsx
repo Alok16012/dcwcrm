@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataTable } from '@/components/shared/DataTable'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { DateRangeFilter, NO_DATE_RANGE, rangeBounds, type DateRangeValue } from '@/components/shared/DateRangeFilter'
 import { createClient } from '@/lib/supabase/client'
 import { Textarea } from '@/components/ui/textarea'
 import { StudentForm } from '@/components/backend/StudentForm'
@@ -86,6 +87,8 @@ export function BackendListClient() {
   const [sessionFilter, setSessionFilter] = useState('')
   const [counsellorFilter, setCounsellorFilter] = useState('')
   const [modeFilter, setModeFilter] = useState('')
+  // Admission (enrollment) date: "how many admissions last month".
+  const [admittedRange, setAdmittedRange] = useState<DateRangeValue>(NO_DATE_RANGE)
   const [departmentFilter, setDepartmentFilter] = useState(deptParam || '')
   const [boardFilter, setBoardFilter] = useState('')
   const [sortBy, setSortBy] = useState<'' | 'dues_desc' | 'dues_asc' | 'paid_desc' | 'paid_asc'>('')
@@ -131,6 +134,7 @@ export function BackendListClient() {
         setSessionFilter(saved.session ?? '')
         setCounsellorFilter(saved.counsellor ?? '')
         setModeFilter(saved.mode ?? '')
+        if (saved.admitted?.preset) setAdmittedRange(saved.admitted)
         if (!deptParam) setDepartmentFilter(saved.department ?? '')
         setBoardFilter(saved.board ?? '')
         setSortBy(saved.sortBy ?? '')
@@ -147,10 +151,10 @@ export function BackendListClient() {
       sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
         search, status: statusFilter, payment: paymentFilter, course: courseFilter,
         session: sessionFilter, counsellor: counsellorFilter, mode: modeFilter,
-        department: departmentFilter, board: boardFilter, sortBy,
+        department: departmentFilter, board: boardFilter, sortBy, admitted: admittedRange,
       }))
     } catch { /* storage unavailable */ }
-  }, [filtersRestored, search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter, sortBy])
+  }, [filtersRestored, search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter, sortBy, admittedRange])
 
   function scrollTabs(dir: 'left' | 'right') {
     if (tabScrollRef.current) {
@@ -164,7 +168,8 @@ export function BackendListClient() {
       const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes, counselorRes] = await Promise.all([
         supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
         supabase.from('sessions').select('id, name').order('name'),
-        supabase.from('profiles').select('id, full_name').in('role', DCW_STAFF_ROLES).order('full_name'),
+        // Only the current team: staff who have left are switched off, not deleted.
+        supabase.from('profiles').select('id, full_name').in('role', DCW_STAFF_ROLES).eq('is_active', true).order('full_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
         supabase.from('profiles').select('id, full_name').in('role', DCW_STAFF_ROLES).eq('is_active', true).order('full_name'),
@@ -234,6 +239,9 @@ export function BackendListClient() {
       if (modeFilter) query = query.eq('mode', modeFilter)
       if (departmentFilter) query = query.eq('department_id', departmentFilter)
       if (boardFilter) query = query.eq('sub_section_id', boardFilter)
+      const admitted = rangeBounds(admittedRange)
+      if (admitted.from) query = query.gte('enrollment_date', admitted.from)
+      if (admitted.to) query = query.lte('enrollment_date', admitted.to)
       // PostgREST can't compare two columns (amount_paid vs total_fee), so only the
       // "> 0" half runs here; paid/partial are finished client-side in displayStudents.
       if (paymentFilter === 'unpaid') query = query.eq('amount_paid', 0)
@@ -250,7 +258,7 @@ export function BackendListClient() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter])
+  }, [search, statusFilter, paymentFilter, courseFilter, sessionFilter, counsellorFilter, modeFilter, departmentFilter, boardFilter, admittedRange])
 
   // Payment-wise ordering (paid amount or pending dues), else keep server order
   const displayStudents = useMemo(() => {
@@ -943,6 +951,12 @@ export function BackendListClient() {
             <SelectItem value="paid_asc">Paid: Low → High</SelectItem>
           </SelectContent>
         </Select>
+        <DateRangeFilter label="Admitted" value={admittedRange} onChange={setAdmittedRange} />
+        {admittedRange.preset && !loading && (
+          <span className="self-center text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5">
+            {displayStudents.length} admission{displayStudents.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
       {/* Bulk action bar */}

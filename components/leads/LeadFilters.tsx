@@ -115,8 +115,8 @@ export function LeadFilters() {
       <div className="grid grid-cols-2 gap-2">
         {forms.length > 0 && (
           <Select
-            value={filters.form ?? ''}
-            onValueChange={(v) => setFilters({ form: v || undefined })}
+            value={filters.forms?.[0] ?? ''}
+            onValueChange={(v) => setFilters({ forms: v ? [v] : undefined })}
           >
             <SelectTrigger className="h-8 text-xs col-span-2"><SelectValue placeholder="Form / Campaign" /></SelectTrigger>
             <SelectContent>

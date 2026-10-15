@@ -147,16 +147,29 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
       ...(pushName && !row.push_name ? { push_name: pushName } : {}),
     }
 
-    const silent =
+    let silent =
       config.paused ||
       (row.human_until && new Date(row.human_until).getTime() > now) ||
       fresh.every(it => now - sentAt(it.m) > MAX_AGE_MS)
 
+    // "New contacts only": the bot talks to people who were not in Leads yet
+    // and leaves everyone else to the counsellors. Decided once per chat, on
+    // the first message the bot sees with the setting on, and kept in state.
+    let contact = row.state?.contact
+    let leadId = row.lead_id
+    if (config.newContactsOnly && !silent && !contact) {
+      const c = await classifyContact(jid, row, phone ?? row.phone, pushName ?? row.push_name)
+      contact = c.contact
+      leadId = c.leadId ?? leadId
+    }
+    if (config.newContactsOnly && contact !== 'new') silent = true
+
     if (silent) {
       // Not answering this chat doesn't mean ignoring the student — they still
       // belong in the CRM's Leads table.
-      const leadId = await runCrmEvents({ jid, events: [], leadId: row.lead_id, phone: phone ?? row.phone, pushName: pushName ?? row.push_name })
-      await store.save(row.id, { ...patch, lead_id: leadId })
+      leadId = await runCrmEvents({ jid, events: [], leadId, phone: phone ?? row.phone, pushName: pushName ?? row.push_name })
+      const remember = contact && contact !== row.state?.contact ? { state: { ...(row.state ?? {}), contact } } : {}
+      await store.save(row.id, { ...patch, lead_id: leadId, ...remember })
       return
     }
 
@@ -172,7 +185,9 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
       answerQuestion: async a => { aiUsed = true; return ai.answerQuestion(a) },
     }
 
-    let state = row.state && Object.keys(row.state).length ? row.state : newConversation()
+    // A chat the bot only ever stayed silent in may hold just { contact }.
+    let state = row.state?.status ? row.state : { ...newConversation(), ...(row.state ?? {}) }
+    if (contact) state.contact = contact
     const replies = []
     const events = []
     for (const input of toInputs(fresh)) {
@@ -192,7 +207,6 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
       }
     }
 
-    let leadId = row.lead_id
     const effectivePhone = phone ?? row.phone
     leadId = await runCrmEvents({ jid, events, leadId, phone: effectivePhone, pushName: pushName ?? row.push_name })
 
@@ -204,6 +218,29 @@ export function makeBot({ wa, store, crm, config, log, ai = realAi, onStudentMes
       lead_temperature: handoff?.fields?.['Lead Temperature'] ?? row.lead_temperature,
       ...(replies.length ? { last_outbound_at: new Date().toISOString() } : {}),
     })
+  }
+
+  /**
+   * Is this a new contact? A chat the bot is already talking in carries on;
+   * otherwise a number that was in Leads before its first message here is an
+   * old contact. Returns contact null (ask again next message) when the phone
+   * number is not known yet.
+   */
+  async function classifyContact(jid, row, phone, pushName) {
+    if ((row.state?.turn ?? 0) > 0) return { contact: 'new' }
+    if (row.lead_id) return { contact: 'old' }
+    if (!phone) {
+      log.warn(`[${jid}] new-contacts-only: phone not resolved yet — staying silent for now`)
+      return { contact: null }
+    }
+    try {
+      const r = await crm.ensure({ phone, pushName, fields: { 'Chatbot Flow': 'Not chosen yet' } })
+      log.info(`[${jid}] ${r.duplicate ? 'old contact (already in Leads) — bot stays out' : 'new contact'}`)
+      return { contact: r.duplicate ? 'old' : 'new', leadId: r.lead_id }
+    } catch (e) {
+      log.error(`[${jid}] CRM: ${e.message}`)
+      return { contact: null }
+    }
   }
 
   /**

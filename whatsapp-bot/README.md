@@ -52,7 +52,11 @@ names and numbers never leave.
 Admin steers the bot from the CRM; the bot re-reads it every minute
 (`src/control.mjs`, tables from migration 113):
 
-- **Settings** — pause everywhere, AI on/off, and outreach limits.
+- **Settings** — pause everywhere, AI on/off, and outreach limits. "Talk to
+  new contacts only" (migration 121): on a chat's first message the bot asks
+  the CRM for the lead; a number already in Leads is an old contact and gets
+  no bot reply (still recorded and linked), a new one is answered. Chats the
+  bot was already in carry on. Kept per chat in `state.contact`.
   `BOT_PAUSED=true` on Railway still wins, so the brake works even if the CRM
   is down.
 - **Flow Builder** — admin's own flows (`src/custom.mjs`, migration 119): a

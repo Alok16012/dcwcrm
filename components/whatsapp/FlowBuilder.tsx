@@ -308,7 +308,7 @@ export default function FlowBuilder() {
               <p className="text-xs text-gray-500 mt-0.5">
                 The questions the bot asks to qualify a lead — 10th/12th and College. Runs on every chat no trigger flow catches,
                 and wherever a flow says &quot;Continue admission script&quot;.
-                {!script.is_active && <span className="text-amber-600 font-medium"> Off: the bot uses its original questions.</span>}
+                {!script.is_active && <span className="text-amber-600 font-medium"> Off: the bot still runs, with its original built-in questions (to stop the bot, pause it in Settings).</span>}
               </p>
             </button>
             <Switch checked={script.is_active} onCheckedChange={() => toggle(script)} />
@@ -405,10 +405,14 @@ function ScriptStart({ flow, set }: { flow: Flow; set: (p: Partial<Flow>) => voi
         <p className="flex gap-1.5"><Link2 className="w-3.5 h-3.5 shrink-0 mt-px text-violet-500" />
           Linked steps still understand typed answers (&quot;dasvi&quot;, &quot;12th fail&quot;, &quot;62%&quot;), and a question already
           answered in an earlier message is skipped.</p>
-        <label className="flex items-center justify-between gap-2 pt-1 text-gray-700">
-          Active <span className="text-gray-400">(off = the bot&apos;s original questions)</span>
+        <label className="flex items-center justify-between gap-2 pt-1 text-gray-700 font-medium">
+          Use these questions
           <Switch checked={flow.is_active} onCheckedChange={v => set({ is_active: Boolean(v) })} />
         </label>
+        <p className="text-[11px] text-gray-400">
+          Off: the bot keeps running with its original built-in questions. To stop the bot completely, use
+          Settings → &quot;Pause the bot everywhere&quot;.
+        </p>
       </div>
     </div>
   )

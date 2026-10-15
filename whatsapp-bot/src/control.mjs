@@ -24,6 +24,7 @@ const ACTIVE_CHAT_DAYS = 7
 const DEFAULTS = {
   paused: false,
   ai_enabled: true,
+  new_contacts_only: false,
   outreach_enabled: false,
   outreach_daily_limit: 30,
   outreach_start_hour: 10,
@@ -98,6 +99,7 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     }
 
     config.paused = envPaused || settings.paused
+    config.newContactsOnly = Boolean(settings.new_contacts_only)
     setAiSwitch(settings.ai_enabled)
   }
 

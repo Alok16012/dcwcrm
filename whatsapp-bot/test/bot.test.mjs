@@ -13,7 +13,7 @@ const OFF = { aiEnabled: () => false, classify: async () => null, extractField: 
 const JID = '919876543210@s.whatsapp.net'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-function rig({ config = {} } = {}) {
+function rig({ config = {}, duplicate = false } = {}) {
   const sent = []
   const crmCalls = []
   const rows = new Map()
@@ -42,7 +42,7 @@ function rig({ config = {} } = {}) {
     },
   }
   const crm = {
-    ensure: async a => { crmCalls.push({ action: 'ensure', ...a }); return { lead_id: 'lead-1', duplicate: false } },
+    ensure: async a => { crmCalls.push({ action: 'ensure', ...a }); return { lead_id: 'lead-1', duplicate } },
     update: async a => { crmCalls.push({ action: 'update', ...a }); return { ok: true } },
     handoff: async a => { crmCalls.push({ action: 'handoff', ...a }); return { ok: true } },
   }
@@ -152,4 +152,47 @@ test('extract unwraps captions, ignores reactions and bare stickers', () => {
   assert.equal(extract({ message: { reactionMessage: { text: '👍' } } }), null)
   assert.equal(extract({ message: { stickerMessage: {} } }), null)
   assert.deepEqual(extract({ message: { ephemeralMessage: { message: { conversation: '12th' } } } }), { text: '12th', media: null })
+})
+
+test('new contacts only: a number already in Leads gets no reply, now or later', async () => {
+  const r = rig({ config: { newContactsOnly: true }, duplicate: true })
+  await r.say('hi')
+  await sleep(120)
+  await r.say('admission chahiye')
+  await sleep(120)
+  assert.equal(r.sent.length, 0, 'bot stayed out')
+  const row = r.rows.get(JID)
+  assert.equal(row.state.contact, 'old')
+  assert.equal(row.lead_id, 'lead-1', 'still linked to the lead')
+  assert.equal(r.crmCalls.filter(c => c.action === 'ensure').length, 1, 'looked up once')
+})
+
+test('new contacts only: a number not in Leads is answered as usual', async () => {
+  const r = rig({ config: { newContactsOnly: true }, duplicate: false })
+  await r.say('12th fail hua')
+  await sleep(120)
+  assert.ok(r.sent.length > 0, 'bot replied')
+  assert.equal(r.rows.get(JID).state.contact, 'new')
+  assert.equal(r.rows.get(JID).state.answers.situation, 'Fail')
+})
+
+test('new contacts only: a chat the bot was already in carries on', async () => {
+  const r = rig({ duplicate: true })
+  await r.say('12th fail hua')
+  await sleep(120)
+  const before = r.sent.length
+  // Switch the setting on mid-conversation.
+  const on = rig({ config: { newContactsOnly: true }, duplicate: true })
+  on.rows.set(JID, structuredClone(r.rows.get(JID)))
+  await on.say('bihar board')
+  await sleep(120)
+  assert.ok(before > 0 && on.sent.length > 0, 'still answered')
+  assert.equal(on.rows.get(JID).state.contact, 'new')
+})
+
+test('with the setting off, old contacts are answered as before', async () => {
+  const r = rig({ duplicate: true })
+  await r.say('hi')
+  await sleep(120)
+  assert.ok(r.sent.length > 0)
 })

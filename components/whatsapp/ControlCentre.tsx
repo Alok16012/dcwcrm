@@ -22,6 +22,7 @@ import FlowBuilder from './FlowBuilder'
 interface Settings {
   paused: boolean
   ai_enabled: boolean
+  new_contacts_only: boolean
   outreach_enabled: boolean
   outreach_daily_limit: number
   outreach_start_hour: number
@@ -177,8 +178,13 @@ function SettingsPanel({ aiProvider }: { aiProvider: string | null }) {
       <Card title="Bot">
         <Toggle
           label="Pause the bot everywhere"
-          hint="Stays connected and keeps recording chats, but sends nothing — replies or outreach."
+          hint="Turns the bot fully off: it stays connected and keeps recording chats, but sends nothing — no replies, no outreach."
           checked={s.paused} onChange={v => set({ paused: v })}
+        />
+        <Toggle
+          label="Talk to new contacts only"
+          hint="The bot replies only to numbers that were not in Leads yet when they first message. Existing leads and old customers get no bot reply — their chats still show here and stay linked to their lead. Chats the bot is already in carry on."
+          checked={Boolean(s.new_contacts_only)} onChange={v => set({ new_contacts_only: v })}
         />
         <Toggle
           label="AI answers"

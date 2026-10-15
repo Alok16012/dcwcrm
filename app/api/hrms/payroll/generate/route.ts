@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'
 import { computePayroll, countAttendance } from '@/lib/hrms/payroll'
 import { writeAudit } from '@/lib/hrms/audit'
+import { cycleIncentive, cycleWindow } from '@/lib/payroll/cycle'
 
 /**
  * Generate (or refresh) payroll for a month from the attendance that is
@@ -16,7 +17,7 @@ export const runtime = 'nodejs'
 
 type Db = { from: (t: string) => any }
 
-const EMPLOYEE_COLS = 'id, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions'
+const EMPLOYEE_COLS = 'id, profile_id, salary_cycle_start_day, basic_salary, hra, allowances, incentive, pf_deduction, tds_deduction, other_deductions'
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient()
@@ -30,13 +31,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // employee_id scopes the run to one person — the employee page's "Generate
-  // Month" button sends it, along with the incentive verified for them.
-  let body: { month?: number; year?: number; employee_id?: string; incentive?: number }
+  // employee_id scopes the run to one person (the employee page's buttons).
+  // An `incentive` in the body is ignored: it used to be the page's current
+  // cycle, which landed one month's incentive in whatever month was generated.
+  let body: { month?: number; year?: number; employee_id?: string }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const month = Number(body.month), year = Number(body.year)
   const onlyEmployeeId = typeof body.employee_id === 'string' && body.employee_id ? body.employee_id : null
-  const verifiedIncentive = Number(body.incentive)
   if (!(month >= 1 && month <= 12) || !(year >= 2000 && year <= 2100)) {
     return NextResponse.json({ error: 'Valid month (1-12) and year are required' }, { status: 400 })
   }
@@ -79,11 +80,9 @@ export async function POST(req: NextRequest) {
   }
   const lockedBy = new Map<string, boolean>()
   const idByEmp = new Map<string, string>()
-  const incentiveByEmp = new Map<string, number>()
-  for (const p of (existing ?? []) as { id: string; employee_id: string; is_locked: boolean; incentive: number | null }[]) {
+  for (const p of (existing ?? []) as { id: string; employee_id: string; is_locked: boolean }[]) {
     lockedBy.set(p.employee_id, p.is_locked)
     idByEmp.set(p.employee_id, p.id)
-    incentiveByEmp.set(p.employee_id, Number(p.incentive ?? 0))
   }
 
   // Advances recovered this month: everything still pending, plus whatever was
@@ -115,12 +114,14 @@ export async function POST(req: NextRequest) {
     if (gap > 0) { unmarkedDays += gap; employeesWithGaps++ }
     const monthlySalary = Number(e.basic_salary ?? 0)
     const advanceRecovery = advanceByEmp.get(e.id) ?? 0
-    // Incentive already credited for this month wins over the employee's fixed amount
-    const existingIncentive = incentiveByEmp.get(e.id) ?? 0
-    const sentIncentive = onlyEmployeeId && Number.isFinite(verifiedIncentive) ? verifiedIncentive : 0
-    const incentive = Math.max(existingIncentive, sentIncentive) > 0
-      ? Math.max(existingIncentive, sentIncentive)
-      : Number(e.incentive ?? 0)
+    // Incentive earned inside THIS payroll month's salary cycle — admissions by
+    // enrollment date plus approved mentorship payments — the same window the
+    // Incentives page uses. Only with nothing earned does the employee's
+    // fixed incentive apply.
+    const earned = e.profile_id
+      ? (await cycleIncentive(db, e.profile_id, cycleWindow(month, year, Number(e.salary_cycle_start_day ?? 1)))).total
+      : 0
+    const incentive = earned > 0 ? earned : Number(e.incentive ?? 0)
 
     const b = computePayroll({
       monthlySalary,

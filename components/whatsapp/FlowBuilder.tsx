@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Play, MessageSquare, HelpCircle, Headset, Workflow, Plus, Trash2, Save, X, GitBranch, RotateCcw, Zap,
@@ -208,7 +208,10 @@ function db() {
 }
 
 /** What every step on the canvas needs to know about the flow it is in. */
-const FlowCtx = createContext<{ script: boolean; steps: FlowNode[] }>({ script: false, steps: [] })
+const FlowCtx = createContext<{ script: boolean; steps: FlowNode[]; fold: boolean }>({ script: false, steps: [], fold: false })
+
+/** Above this many steps a flow opens with its branches folded. */
+const FOLD_ABOVE = 12
 
 // =============================================================== panel ===
 
@@ -362,14 +365,27 @@ export default function FlowBuilder() {
 
 function Canvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => void }) {
   const set = (patch: Partial<Flow>) => onChange({ ...flow, ...patch })
-  const ctx = useMemo(() => ({ script: isScript(flow), steps: allNodes(flow.root) }), [flow])
+  const steps = useMemo(() => allNodes(flow.root), [flow.root])
+  // Decided once per opened flow, so adding steps doesn't fold what is open.
+  const [fold] = useState(() => isScript(flow) || steps.length > FOLD_ABOVE)
+  const ctx = useMemo(() => ({ script: isScript(flow), steps, fold }), [flow, steps, fold])
+
+  // A wide tree starts scrolled to its left edge, which leaves the start
+  // point off to the right, half cut. Open with the start point in view.
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = box.current
+    if (el) el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2)
+  }, [flow.id])
+
   return (
     <FlowCtx.Provider value={ctx}>
       <div
-        className="rounded-2xl border border-gray-200 bg-slate-50 p-4 sm:p-6 overflow-x-auto"
+        ref={box}
+        className="rounded-2xl border border-gray-200 bg-slate-50 p-4 sm:p-6 overflow-auto h-[calc(100vh-220px)] min-h-[480px]"
         style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '18px 18px' }}
       >
-        <div className="flex flex-col items-center min-w-fit">
+        <div className="flex flex-col items-center w-max min-w-full">
           {ctx.script ? <ScriptStart flow={flow} set={set} /> : <StartPoint flow={flow} set={set} />}
           <Slot node={flow.root} onChange={root => set({ root })} />
         </div>
@@ -622,8 +638,8 @@ function NodeView({ node, onChange }: { node: FlowNode; onChange: (n: FlowNode |
 function Branch({ option: o, index, onChange, onRemove }: {
   option: Option; index: number; onChange: (o: Option) => void; onRemove: (() => void) | null
 }) {
-  const { script } = useContext(FlowCtx)
-  const [open, setOpen] = useState(!script)
+  const { fold } = useContext(FlowCtx)
+  const [open, setOpen] = useState(!fold)
   const count = allNodes(o.next).length
   return (
     <div className="flex flex-col items-center">

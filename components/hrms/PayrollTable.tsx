@@ -51,6 +51,7 @@ interface PayrollTableProps {
   employeeCode?: string
   designation?: string
   department?: string
+  /** Unused: the server works out each month's incentive itself. */
   totalIncentives?: number
 }
 
@@ -65,7 +66,6 @@ export default function PayrollTable({
   employeeCode,
   designation,
   department,
-  totalIncentives 
 }: PayrollTableProps) {
   const [data, setData] = useState(initialData)
   const [confirmBulk, setConfirmBulk] = useState<'process' | 'paid' | null>(null)
@@ -242,7 +242,7 @@ export default function PayrollTable({
         const res = await fetch(withBase('/api/hrms/payroll/generate'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employee_id: employeeId, month, year, incentive: totalIncentives }),
+          body: JSON.stringify({ employee_id: employeeId, month, year }),
         })
         if (!res.ok) {
           const err = await res.json()
@@ -725,7 +725,7 @@ export default function PayrollTable({
         <ConfirmDialog
           open
           title="Generate Monthly Payroll"
-          description={`Generate draft salary slip for ${employeeName}? Any verified incentives (₹${totalIncentives}) linked to this profile will be injected into this payroll cycle.`}
+          description={`Generate draft salary slip for ${employeeName} for ${format(new Date(year, month - 1), 'MMM yyyy')}? Incentives earned in that month's salary cycle (admissions and approved mentorship) are added automatically.`}
           confirmLabel="Generate"
           onConfirm={handleGenerate}
           onCancel={() => setShowGenerate(false)}

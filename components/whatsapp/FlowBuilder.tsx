@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { toast } from 'sonner'
 import {
   Play, MessageSquare, HelpCircle, Headset, Workflow, Plus, Trash2, Save, X, GitBranch, RotateCcw, Zap,
-  ClipboardList, CornerDownRight, Link2, Lock, Send, ChevronDown, ChevronUp,
+  ClipboardList, CornerDownRight, Link2, Lock, Send, ChevronDown, ChevronUp, UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -229,6 +229,28 @@ export default function FlowBuilder() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // Same switch as Settings → "Talk to new contacts only" (migration 121).
+  const [newOnly, setNewOnly] = useState<boolean | null>(null)
+  useEffect(() => {
+    db().from('wa_bot_settings').select('new_contacts_only').maybeSingle()
+      .then(({ data, error }: any) => {
+        if (error) toast.error(error.message)
+        else setNewOnly(Boolean(data?.new_contacts_only))
+      })
+  }, [])
+
+  async function toggleNewOnly(v: boolean) {
+    setNewOnly(v)
+    const { data: { user } } = await db().auth.getUser()
+    const { error } = await db().from('wa_bot_settings')
+      .update({ new_contacts_only: v, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
+      .eq('id', true)
+    if (error) { setNewOnly(!v); toast.error(error.message); return }
+    toast.success(v
+      ? 'The bot now talks to new contacts only — picked up within a minute'
+      : 'The bot talks to everyone again — picked up within a minute')
+  }
+
   const script = flows.find(isScript)
   const custom = flows.filter(f => !isScript(f))
 
@@ -299,6 +321,37 @@ export default function FlowBuilder() {
 
   return (
     <div className="space-y-4">
+      {newOnly !== null && (
+        <div className={`rounded-2xl border bg-white p-5 shadow-sm ${newOnly ? 'border-emerald-300' : 'border-gray-200'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 ${newOnly ? 'bg-emerald-600' : 'bg-gray-400'}`}>
+              <UserPlus className="w-5 h-5" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900">
+                Talk to new contacts only
+                <span className={`ml-2 text-[11px] font-semibold rounded-full px-2 py-0.5 ${newOnly ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {newOnly ? 'On' : 'Off'}
+                </span>
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {newOnly
+                  ? 'The bot replies only to numbers that were not in Leads when they first message. Existing leads and old customers are left to the counsellors — their chats are still recorded and linked to their lead.'
+                  : 'The bot replies to everyone who messages, including existing leads and old customers. Turn on to have it start only with new contacts.'}
+                {' '}Chats the bot is already in carry on.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={newOnly ? 'outline' : 'default'}
+              onClick={() => toggleNewOnly(!newOnly)}
+            >
+              {newOnly ? 'Talk to everyone' : 'Start for new contacts only'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {script && (
         <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">

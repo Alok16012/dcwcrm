@@ -165,7 +165,7 @@ export function BackendListClient() {
   // Load filter options once
   useEffect(() => {
     async function loadOptions() {
-      const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes, counselorRes] = await Promise.all([
+      const [coursesRes, sessionsRes, counsellorsRes, deptRes, boardRes, counselorRes, assignedRes] = await Promise.all([
         supabase.from('courses').select('id, name').eq('is_active', true).order('name'),
         supabase.from('sessions').select('id, name').order('name'),
         // Only the current team: staff who have left are switched off, not deleted.
@@ -173,10 +173,16 @@ export function BackendListClient() {
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('department_sub_sections').select('id, name, department_id').order('name'),
         supabase.from('profiles').select('id, full_name').in('role', DCW_STAFF_ROLES).eq('is_active', true).order('full_name'),
+        supabase.from('students').select('assigned_counsellor').not('assigned_counsellor', 'is', null).range(0, 9999),
       ])
+      // The Counsellor filter lists only the active staff who are actually
+      // counsellor on a student — admin, finance etc. with none drop off.
+      const assigned = new Set(((assignedRes.data ?? []) as { assigned_counsellor: string }[]).map(r => r.assigned_counsellor))
       setCourses((coursesRes.data ?? []) as FilterOption[])
       setSessions((sessionsRes.data ?? []) as FilterOption[])
-      setCounsellors(((counsellorsRes.data ?? []) as { id: string; full_name: string }[]).map(p => ({ id: p.id, name: p.full_name })))
+      setCounsellors(((counsellorsRes.data ?? []) as { id: string; full_name: string }[])
+        .filter(p => assigned.has(p.id))
+        .map(p => ({ id: p.id, name: p.full_name })))
       setDepartments((deptRes.data ?? []) as FilterOption[])
       setCounselors(((counselorRes.data ?? []) as { id: string; full_name: string }[]).map(p => ({ id: p.id, name: p.full_name })))
       const allB = (boardRes.data ?? []) as BoardOption[]

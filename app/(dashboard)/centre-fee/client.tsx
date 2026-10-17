@@ -1,6 +1,9 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { DCW_STAFF_ROLES } from '@/lib/dcw-roles'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { DateRangeFilter, NO_DATE_RANGE, inDateRange, type DateRangeValue } from '@/components/shared/DateRangeFilter'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +12,7 @@ import { toast } from 'sonner'
 import {
   Search, Filter, Building2, IndianRupee, CheckCircle2, Clock,
   AlertCircle, ChevronDown, ChevronUp, Plus, Printer, RefreshCw,
-  User, CreditCard, Banknote, FileText, X, Eye, TrendingDown,
+  User, CreditCard, Banknote, FileText, X, Eye, TrendingDown, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 
 const fmt = (n: number | null | undefined) =>
@@ -35,7 +38,18 @@ interface Student {
   department: { name: string } | null
   sub_section: { name: string } | null
   session: { name: string } | null
+  status: string
+  mode: string | null
+  enrollment_date: string | null
+  department_id: string | null
+  sub_section_id: string | null
+  course_id: string | null
+  session_id: string | null
+  assigned_counsellor: string | null
 }
+
+interface FilterOption { id: string; name: string }
+interface BoardOption { id: string; name: string; department_id: string }
 
 interface CentreFeeRecord {
   id: string
@@ -206,7 +220,22 @@ export default function CentreFeeClient() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterBoard, setFilterBoard] = useState('')
+  // The same filters as the Students page; the cards and board summary
+  // above follow them, so "Open School" shows Open School's totals.
+  const [studentStatus, setStudentStatus] = useState('')
+  const [modeFilter, setModeFilter] = useState('')
+  const [courseFilter, setCourseFilter] = useState('')
+  const [sessionFilter, setSessionFilter] = useState('')
+  const [counsellorFilter, setCounsellorFilter] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState('')
+  const [boardFilter, setBoardFilter] = useState('')
+  const [admittedRange, setAdmittedRange] = useState<DateRangeValue>(NO_DATE_RANGE)
+  const [courses, setCourses] = useState<FilterOption[]>([])
+  const [sessions, setSessions] = useState<FilterOption[]>([])
+  const [counsellors, setCounsellors] = useState<FilterOption[]>([])
+  const [departments, setDepartments] = useState<FilterOption[]>([])
+  const [allBoards, setAllBoards] = useState<BoardOption[]>([])
+  const tabScrollRef = useRef<HTMLDivElement>(null)
 
   // Selected record state
   const [selected, setSelected] = useState<Row | null>(null)
@@ -233,9 +262,10 @@ export default function CentreFeeClient() {
     setLoading(true)
     const { data: students } = await db.from('students').select(`
       id, full_name, enrollment_number, phone, university_name, board_name,
+      status, mode, enrollment_date, department_id, sub_section_id, course_id, session_id, assigned_counsellor,
       course:courses(name), department:departments(name),
       sub_section:department_sub_sections(name), session:sessions(name)
-    `).order('full_name')
+    `).order('full_name').range(0, 9999)
 
     const { data: records } = await db.from('centre_fee_records').select('*')
 
@@ -248,32 +278,91 @@ export default function CentreFeeClient() {
 
   useEffect(() => { load() }, [load])
 
-  const boards = [...new Set(rows.map(r =>
-    r.record?.paid_to_board_name || r.student.department?.name || r.student.board_name || ''
-  ).filter(Boolean))].sort()
+  // Filter options, loaded once — the same lists the Students page uses.
+  useEffect(() => {
+    async function loadOptions() {
+      const [coursesRes, sessionsRes, deptRes, boardRes, staffRes, assignedRes] = await Promise.all([
+        db.from('courses').select('id, name').eq('is_active', true).order('name'),
+        db.from('sessions').select('id, name').order('name'),
+        db.from('departments').select('id, name').order('name'),
+        db.from('department_sub_sections').select('id, name, department_id').order('name'),
+        db.from('profiles').select('id, full_name').in('role', DCW_STAFF_ROLES).eq('is_active', true).order('full_name'),
+        db.from('students').select('assigned_counsellor').not('assigned_counsellor', 'is', null).range(0, 9999),
+      ])
+      setCourses(coursesRes.data ?? [])
+      setSessions(sessionsRes.data ?? [])
+      setDepartments(deptRes.data ?? [])
+      setAllBoards(boardRes.data ?? [])
+      const assigned = new Set(((assignedRes.data ?? []) as { assigned_counsellor: string }[]).map(r => r.assigned_counsellor))
+      setCounsellors(((staffRes.data ?? []) as { id: string; full_name: string }[])
+        .filter(p => assigned.has(p.id))
+        .map(p => ({ id: p.id, name: p.full_name })))
+    }
+    loadOptions()
+  }, [db])
 
-  const filtered = rows.filter(r => {
-    const name = r.student.full_name.toLowerCase()
-    const enr  = r.student.enrollment_number.toLowerCase()
-    const board = (r.record?.paid_to_board_name || r.student.department?.name || r.student.board_name || '').toLowerCase()
-    const s = search.toLowerCase()
-    const matchSearch = !search || name.includes(s) || enr.includes(s) || board.includes(s)
-    const status = r.record?.payment_status ?? 'none'
-    const matchStatus = !filterStatus || status === filterStatus
-    const matchBoard = !filterBoard || board.toLowerCase().includes(filterBoard.toLowerCase())
-    return matchSearch && matchStatus && matchBoard
+  const boards = useMemo(
+    () => departmentFilter ? allBoards.filter(b => b.department_id === departmentFilter) : allBoards,
+    [allBoards, departmentFilter])
+  // One chip per board name (the same board can sit under two departments).
+  const tabBoards = useMemo(() => {
+    const seen = new Set<string>()
+    return boards.filter(b => {
+      const key = b.name.toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [boards])
+
+  // Every filter except Board and the centre-fee status: what the board chips count.
+  const beforeBoard = rows.filter(r => {
+    const st = r.student
+    const q = search.toLowerCase()
+    const board = (r.record?.paid_to_board_name || st.department?.name || st.board_name || '').toLowerCase()
+    if (search && !st.full_name.toLowerCase().includes(q) && !(st.enrollment_number ?? '').toLowerCase().includes(q)
+      && !(st.phone ?? '').includes(q) && !board.includes(q)) return false
+    // Like Students: dropped and not-yet-approved students only when asked for.
+    if (studentStatus ? st.status !== studentStatus : st.status === 'dropped' || st.status === 'pending') return false
+    if (modeFilter && st.mode !== modeFilter) return false
+    if (courseFilter && st.course_id !== courseFilter) return false
+    if (sessionFilter && st.session_id !== sessionFilter) return false
+    if (counsellorFilter && st.assigned_counsellor !== counsellorFilter) return false
+    if (departmentFilter && st.department_id !== departmentFilter) return false
+    if (!inDateRange(st.enrollment_date, admittedRange)) return false
+    return true
   })
+  const boardCounts = beforeBoard.reduce((acc, r) => {
+    const name = allBoards.find(b => b.id === r.student.sub_section_id)?.name.toLowerCase().trim()
+    if (name) acc[name] = (acc[name] ?? 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
-  // Dashboard totals
-  const totalFee   = rows.reduce((s, r) => s + (r.record?.centre_fee ?? 0), 0)
-  const totalPaid  = rows.reduce((s, r) => s + (r.record?.amount_paid ?? 0), 0)
+  // Board chips match by name, so a board listed under two departments counts once.
+  const boardName = allBoards.find(b => b.id === boardFilter)?.name.toLowerCase().trim()
+  const scoped = !boardFilter ? beforeBoard : beforeBoard.filter(r =>
+    allBoards.find(b => b.id === r.student.sub_section_id)?.name.toLowerCase().trim() === boardName)
+
+  const filtered = scoped.filter(r => !filterStatus || (r.record?.payment_status ?? 'none') === filterStatus
+    || (filterStatus === 'pending' && !r.record))
+
+  // Dashboard totals — for whatever the filters select (everything when none are set)
+  const totalFee   = scoped.reduce((s, r) => s + (r.record?.centre_fee ?? 0), 0)
+  const totalPaid  = scoped.reduce((s, r) => s + (r.record?.amount_paid ?? 0), 0)
   const totalDue   = totalFee - totalPaid
-  const countPaid  = rows.filter(r => r.record?.payment_status === 'paid').length
-  const countPartial = rows.filter(r => r.record?.payment_status === 'partial').length
-  const countPending = rows.filter(r => !r.record || r.record.payment_status === 'pending').length
+  const countPaid  = scoped.filter(r => r.record?.payment_status === 'paid').length
+  const countPartial = scoped.filter(r => r.record?.payment_status === 'partial').length
+  const countPending = scoped.filter(r => !r.record || r.record.payment_status === 'pending').length
+  const anyFilter = Boolean(search || studentStatus || modeFilter || courseFilter || sessionFilter || counsellorFilter
+    || departmentFilter || boardFilter || admittedRange.preset)
+
+  function clearFilters() {
+    setSearch(''); setStudentStatus(''); setModeFilter(''); setCourseFilter(''); setSessionFilter('')
+    setCounsellorFilter(''); setDepartmentFilter(''); setBoardFilter(''); setAdmittedRange(NO_DATE_RANGE); setFilterStatus('')
+  }
 
   // Board-wise summary
-  const boardSummary = rows.reduce((acc, r) => {
+  const boardSummary = scoped.reduce((acc, r) => {
     const board = r.record?.paid_to_board_name || r.student.department?.name || r.student.board_name || 'Unassigned'
     if (!acc[board]) acc[board] = { fee: 0, paid: 0, count: 0 }
     acc[board].fee  += r.record?.centre_fee ?? 0
@@ -383,7 +472,10 @@ export default function CentreFeeClient() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Centre Fee</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Track payments made to boards & universities</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Track payments made to boards & universities
+            {anyFilter && <span className="text-blue-600 font-medium"> · totals for the {scoped.length} filtered student{scoped.length === 1 ? '' : 's'}</span>}
+          </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} className="gap-2">
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
@@ -401,7 +493,7 @@ export default function CentreFeeClient() {
       </div>
 
       {/* Board-wise Summary */}
-      {Object.keys(boardSummary).length > 1 && (
+      {Object.keys(boardSummary).length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Board / University Summary</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -421,35 +513,141 @@ export default function CentreFeeClient() {
         </div>
       )}
 
-      {/* Search & Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input placeholder="Search name, enrollment, board…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Filter className="w-3.5 h-3.5 text-gray-400" />
-          {[
-            { key: '', label: `All (${rows.length})` },
-            { key: 'paid',    label: `Paid (${countPaid})` },
-            { key: 'partial', label: `Partial (${countPartial})` },
-            { key: 'pending', label: `Pending (${countPending})` },
-          ].map(f => (
-            <button key={f.key} onClick={() => setFilterStatus(f.key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filterStatus === f.key ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-              {f.label}
+      {/* Board chips — like the Students page */}
+      <div className="flex items-center gap-2">
+        <button onClick={() => tabScrollRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}
+          className="flex-shrink-0 p-1.5 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div ref={tabScrollRef} className="flex items-center gap-2 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <button onClick={() => setBoardFilter('')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+              boardFilter === '' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-100' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}>
+            All Students
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${boardFilter === '' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{beforeBoard.length}</span>
+          </button>
+          {tabBoards.map(board => (
+            <button key={board.id} onClick={() => setBoardFilter(board.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                boardFilter === board.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-2 ring-indigo-100' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}>
+              {board.name}
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${boardFilter === board.id ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                {boardCounts[board.name.toLowerCase().trim()] ?? 0}
+              </span>
             </button>
           ))}
         </div>
-        {boards.length > 0 && (
-          <select
-            value={filterBoard} onChange={e => setFilterBoard(e.target.value)}
-            className="h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white"
-          >
-            <option value="">All Boards</option>
-            {boards.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
+        <button onClick={() => tabScrollRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}
+          className="flex-shrink-0 p-1.5 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Step 1: Department + Board */}
+      <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border">
+        <span className="text-xs font-semibold text-gray-500 self-center w-full mb-1">Step 1 — Department &amp; Board</span>
+        <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v ?? ''); setBoardFilter('') }}>
+          <SelectTrigger className="w-44 h-9">
+            <span className="text-sm truncate">{departments.find(d => d.id === departmentFilter)?.name ?? 'All Departments'}</span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Departments</SelectItem>
+            {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={boardFilter} onValueChange={(v) => setBoardFilter(v ?? '')}>
+          <SelectTrigger className="w-44 h-9">
+            <span className="text-sm truncate">{boards.find(b => b.id === boardFilter)?.name ?? allBoards.find(b => b.id === boardFilter)?.name ?? 'All Boards'}</span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Boards</SelectItem>
+            {boards.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {(departmentFilter || boardFilter) && (
+          <button onClick={() => { setDepartmentFilter(''); setBoardFilter('') }} className="text-xs text-red-500 hover:underline self-center ml-1">Clear</button>
         )}
+      </div>
+
+      {/* Step 2: the rest, as on Students */}
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Search name, phone, enrollment…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+        </div>
+        <Select value={studentStatus} onValueChange={(v) => setStudentStatus(v ?? '')}>
+          <SelectTrigger className="w-32 h-9">
+            <span className={`text-sm truncate ${studentStatus ? '' : 'text-muted-foreground'}`}>
+              {({ active: 'Active', completed: 'Completed', dropped: 'Dropped', on_hold: 'On Hold' } as Record<string, string>)[studentStatus] ?? 'Status'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="dropped">Dropped</SelectItem>
+            <SelectItem value="on_hold">On Hold</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={modeFilter} onValueChange={(v) => setModeFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${modeFilter ? '' : 'text-muted-foreground'}`}>
+              {({ attending: 'Attending', 'non-attending': 'Non-Attending' } as Record<string, string>)[modeFilter] ?? 'Mode'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Modes</SelectItem>
+            <SelectItem value="attending">Attending</SelectItem>
+            <SelectItem value="non-attending">Non-Attending</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${courseFilter ? '' : 'text-muted-foreground'}`}>{courses.find(c => c.id === courseFilter)?.name ?? 'Course'}</span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Courses</SelectItem>
+            {courses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={sessionFilter} onValueChange={(v) => setSessionFilter(v ?? '')}>
+          <SelectTrigger className="w-32 h-9">
+            <span className={`text-sm truncate ${sessionFilter ? '' : 'text-muted-foreground'}`}>{sessions.find(x => x.id === sessionFilter)?.name ?? 'Session'}</span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Sessions</SelectItem>
+            {sessions.map(x => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={counsellorFilter} onValueChange={(v) => setCounsellorFilter(v ?? '')}>
+          <SelectTrigger className="w-36 h-9">
+            <span className={`text-sm truncate ${counsellorFilter ? '' : 'text-muted-foreground'}`}>{counsellors.find(c => c.id === counsellorFilter)?.name ?? 'Counsellor'}</span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Counsellors</SelectItem>
+            {counsellors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <DateRangeFilter label="Admitted" value={admittedRange} onChange={setAdmittedRange} />
+        {anyFilter && (
+          <button onClick={clearFilters} className="text-xs text-red-500 hover:underline self-center ml-1">Clear all</button>
+        )}
+      </div>
+
+      {/* Centre fee status */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Filter className="w-3.5 h-3.5 text-gray-400" />
+        {[
+          { key: '', label: `All (${scoped.length})` },
+          { key: 'paid',    label: `Paid (${countPaid})` },
+          { key: 'partial', label: `Partial (${countPartial})` },
+          { key: 'pending', label: `Pending (${countPending})` },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilterStatus(f.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filterStatus === f.key ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Student List */}

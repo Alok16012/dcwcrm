@@ -31,7 +31,7 @@ const NAV = [
   { label: 'My Profile',     href: '/student/profile',     icon: User },
 ]
 
-export function StudentSidebar({ student }: { student: StudentInfo }) {
+export function StudentSidebar({ student, hideFees = false }: { student: StudentInfo; hideFees?: boolean }) {
   const pathname = usePathname()
   const { mobileSidebarOpen: mobileOpen, setMobileSidebarOpen: setMobileOpen } = useUIStore()
   const supabase = createClient()
@@ -70,7 +70,7 @@ export function StudentSidebar({ student }: { student: StudentInfo }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ label, href, icon: Icon }) => {
+        {NAV.filter(n => !(hideFees && n.href === '/student/accounts')).map(({ label, href, icon: Icon }) => {
           const active = pathname === href || (href !== '/student/dashboard' && pathname.startsWith(href))
           return (
             <Link

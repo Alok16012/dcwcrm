@@ -97,7 +97,7 @@ export default async function StudentDashboardPage() {
       id, full_name, enrollment_number, status,
       verification_status, exam_status, result_status, admission_progress,
       portal_active, admit_card_url,
-      total_fee, amount_paid, enrollment_date,
+      total_fee, amount_paid, enrollment_date, referred_by_associate,
       course:courses(name), department:departments(name)
     `)
     .eq('portal_user_id', user.id)
@@ -109,11 +109,13 @@ export default async function StudentDashboardPage() {
     id: string; full_name: string; enrollment_number: string; status: string;
     verification_status: string; exam_status: string; result_status: string;
     admission_progress: number; total_fee: number | null; amount_paid: number;
-    enrollment_date: string | null; portal_active: boolean; admit_card_url: string | null;
+    enrollment_date: string | null; referred_by_associate: string | null; portal_active: boolean; admit_card_url: string | null;
     course: { name: string } | null; department: { name: string } | null;
   }
 
   const pending = (s.total_fee ?? 0) - s.amount_paid
+  // Came through an associate: fees are settled with the associate, so none shown here.
+  const hideFees = Boolean(s.referred_by_associate)
 
   const db = supabase as any
   const [{ data: notifs }, { data: announcements }, { data: dispatches }] = await Promise.all([
@@ -224,7 +226,7 @@ export default async function StudentDashboardPage() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 ${hideFees ? "md:grid-cols-3" : "md:grid-cols-4"} gap-3`}>
         <StatusCard
           label="Verification"
           value={verCfg.label}
@@ -246,7 +248,7 @@ export default async function StudentDashboardPage() {
           color={resCfg.color} bg={resCfg.bg} border={resCfg.border}
           href={withBase("/student/admission")}
         />
-        <StatusCard
+        {!hideFees && <StatusCard
           label="Fee Dues"
           value={pending > 0 ? `₹${pending.toLocaleString('en-IN')}` : 'Clear'}
           icon={pending > 0 ? AlertCircle : CheckCircle2}
@@ -254,18 +256,18 @@ export default async function StudentDashboardPage() {
           bg={pending > 0 ? 'bg-red-50' : 'bg-emerald-50'}
           border={pending > 0 ? 'border-red-200' : 'border-emerald-200'}
           href={withBase("/student/accounts")}
-        />
+        />}
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className={`grid ${hideFees ? 'grid-cols-4' : 'grid-cols-5'} gap-3`}>
         {[
           { label: 'My Admission',    href: '/student/admission', icon: GraduationCap, color: 'text-blue-600',    bg: 'bg-blue-50',    hover: 'hover:bg-blue-100'    },
           { label: 'Accounts',        href: '/student/accounts',  icon: IndianRupee,   color: 'text-emerald-600', bg: 'bg-emerald-50', hover: 'hover:bg-emerald-100' },
           { label: 'Study Materials', href: '/student/materials', icon: BookOpen,      color: 'text-blue-600',  bg: 'bg-blue-50',  hover: 'hover:bg-blue-100'  },
           { label: 'Help & Support',  href: '/student/support',   icon: HelpCircle,    color: 'text-orange-600',  bg: 'bg-orange-50',  hover: 'hover:bg-orange-100'  },
           { label: 'My Profile',      href: '/student/profile',   icon: User,          color: 'text-indigo-600',  bg: 'bg-indigo-50',  hover: 'hover:bg-indigo-100'  },
-        ].map(({ label, href, icon: Icon, color, bg, hover }) => (
+        ].filter(a => !(hideFees && a.href === '/student/accounts')).map(({ label, href, icon: Icon, color, bg, hover }) => (
           <Link
             key={href}
             href={href}
@@ -369,7 +371,7 @@ export default async function StudentDashboardPage() {
       </div>
 
       {/* Fee Summary */}
-      {s.total_fee && (
+      {!hideFees && s.total_fee && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">

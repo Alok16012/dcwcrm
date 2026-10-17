@@ -12,7 +12,7 @@ export default async function StudentPortalLayout({ children }: { children: Reac
 
   const { data: student } = await supabase
     .from('students')
-    .select('id, full_name, enrollment_number, profile_photo_url, course:courses(name), portal_active')
+    .select('id, full_name, enrollment_number, profile_photo_url, course:courses(name), portal_active, referred_by_associate')
     .eq('portal_user_id', user.id)
     .single()
 
@@ -26,9 +26,13 @@ export default async function StudentPortalLayout({ children }: { children: Reac
     course_name: ((student as { course: { name: string } | null }).course)?.name ?? null,
   }
 
+  // A student who came through an associate pays the associate, not us, so the
+  // portal has no fee pages for them. Direct admissions keep Accounts.
+  const hideFees = Boolean((student as { referred_by_associate: string | null }).referred_by_associate)
+
   return (
     <div className="flex h-screen overflow-hidden app-bg">
-      <StudentSidebar student={studentInfo} />
+      <StudentSidebar student={studentInfo} hideFees={hideFees} />
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <StudentTopbar student={studentInfo} />
         <main className="flex-1 overflow-y-auto">
@@ -41,7 +45,7 @@ export default async function StudentPortalLayout({ children }: { children: Reac
           </footer>
         </main>
       </div>
-      <StudentBottomNav />
+      <StudentBottomNav hideFees={hideFees} />
     </div>
   )
 }

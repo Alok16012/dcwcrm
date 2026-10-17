@@ -12,7 +12,7 @@ const ITEMS = [
   { label: 'Materials', href: '/student/materials', icon: BookOpen },
 ]
 
-export function StudentBottomNav() {
+export function StudentBottomNav({ hideFees = false }: { hideFees?: boolean }) {
   const pathname = usePathname()
   const { setMobileSidebarOpen } = useUIStore()
 
@@ -25,7 +25,7 @@ export function StudentBottomNav() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex items-stretch justify-around px-1 pt-1.5 pb-1.5">
-        {ITEMS.map(({ label, href, icon: Icon }) => {
+        {ITEMS.filter(i => !(hideFees && i.href === '/student/accounts')).map(({ label, href, icon: Icon }) => {
           const active = isActive(href)
           return (
             <Link key={href} href={href} className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1">

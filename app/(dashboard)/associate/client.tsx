@@ -80,7 +80,7 @@ export default function AssociateClient() {
     }
 
     const STUDENT_FIELDS = `
-      id, full_name, total_fee, verification_status, exam_status, result_status,
+      id, full_name, total_fee, amount_paid, verification_status, exam_status, result_status,
       enrollment_number, portal_active, admit_card_url,
       sub_section:department_sub_sections(name),
       counsellor:profiles!students_assigned_counsellor_fkey(full_name)

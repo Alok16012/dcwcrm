@@ -11,7 +11,7 @@ export default async function UsersSettingsPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single() as any
   if (!['admin', 'backend'].includes(profile?.role ?? '')) redirect('/')
 
-  const [{ data: users }, { data: employees }, { data: associates }] = await Promise.all([
+  const [{ data: users }, { data: employees }, { data: associates, error: associatesError }] = await Promise.all([
     // Berojgar Bharat accounts are managed on its own Team page, not here.
     supabase.from('profiles').select('*')
       .not('role', 'in', `(${BB_ROLES.join(',')})`)
@@ -22,9 +22,11 @@ export default async function UsersSettingsPage() {
       .order('created_at', { ascending: false }),
     (supabase as any)
       .from('associates')
-      .select('id, name, email, phone, associate_code, status, current_city, current_state, wallet_balance, created_at, profile_id')
+      .select('id, name, email, phone, associate_code, status, current_city, current_state, wallet_balance, created_at, user_id')
       .order('created_at', { ascending: false }),
   ])
+
+  if (associatesError) console.error('settings/users: associates', associatesError.message)
 
   return <UsersSettingsClient users={users ?? []} employees={employees ?? []} associates={associates ?? []} />
 }

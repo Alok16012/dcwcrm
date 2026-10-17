@@ -56,7 +56,7 @@ interface AssociateRow {
   current_state: string | null
   wallet_balance: number
   created_at: string
-  profile_id: string | null
+  user_id: string | null
 }
 
 const ASSOC_STATUS: Record<string, { label: string; cls: string }> = {
@@ -262,7 +262,7 @@ export function UsersSettingsClient({
 
   async function handleAssocPassword() {
     if (!assocPasswordTarget || assocNewPassword.length < 8) { toast.error('Password must be at least 8 characters'); return }
-    const userId = assocPasswordTarget.profile_id
+    const userId = assocPasswordTarget.user_id
     if (!userId) { toast.error('No linked auth user found'); return }
     startTransition(async () => {
       try {

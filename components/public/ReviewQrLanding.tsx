@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { Star, ChevronLeft, Copy, Check, ExternalLink, PenLine, Sparkles } from 'lucide-react'
+import { Star, ChevronLeft, Copy, Check, ArrowUpRight, PenLine, ChevronRight, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { googleReviewLink, type PublicReviewPage, type ReviewCategory } from '@/lib/review-qr'
 
@@ -9,6 +9,8 @@ import { googleReviewLink, type PublicReviewPage, type ReviewCategory } from '@/
 // copies them, opens Google's review box, and shows where to tap.
 
 type Step = 'start' | 'category' | 'pick'
+
+const STAR = 'fill-[#FBBC04] text-[#FBBC04]'
 
 function shuffle<T>(list: T[]): T[] {
   const a = [...list]
@@ -48,11 +50,17 @@ function Stars({ size = 'w-9 h-9', animate = false }: { size?: string; animate?:
       {[0, 1, 2, 3, 4].map(i => (
         <Star
           key={i}
-          className={`${size} fill-amber-400 text-amber-400 drop-shadow-sm ${animate ? 'rqr-pop' : ''}`}
-          style={animate ? { animationDelay: `${i * 90}ms` } : undefined}
+          className={`${size} ${STAR} ${animate ? 'rqr-pop' : ''}`}
+          style={animate ? { animationDelay: `${i * 80}ms` } : undefined}
         />
       ))}
     </div>
+  )
+}
+
+function StepNo({ n }: { n: number }) {
+  return (
+    <span className="w-6 h-6 rounded-full bg-[#1a73e8] text-white text-xs font-semibold flex items-center justify-center shrink-0">{n}</span>
   )
 }
 
@@ -114,58 +122,68 @@ export function ReviewQrLanding({ page, preview = false }: { page: PublicReviewP
     openGoogle()
   }
 
+  const initial = page.business_name.trim().charAt(0).toUpperCase() || '★'
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
       <style>{`
-        @keyframes rqr-pop { 0% { transform: scale(0.3) rotate(-20deg); opacity: 0 } 70% { transform: scale(1.15) } 100% { transform: scale(1); opacity: 1 } }
-        .rqr-pop { animation: rqr-pop 420ms cubic-bezier(.2,.8,.3,1.2) both }
+        @keyframes rqr-pop { 0% { transform: scale(0.4); opacity: 0 } 70% { transform: scale(1.12) } 100% { transform: scale(1); opacity: 1 } }
+        .rqr-pop { animation: rqr-pop 380ms cubic-bezier(.2,.8,.3,1.2) both }
         @keyframes rqr-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
-        .rqr-up { animation: rqr-up 260ms ease-out both }
-        @keyframes rqr-tap { 0%,100% { transform: scale(1) } 50% { transform: scale(1.25) } }
-        .rqr-tap { animation: rqr-tap 1s ease-in-out infinite }
+        .rqr-up { animation: rqr-up 240ms ease-out both }
+        @keyframes rqr-fade { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+        .rqr-fade { animation: rqr-fade 220ms ease-out both }
+        @keyframes rqr-tap { 0%,100% { transform: scale(1) } 50% { transform: scale(1.3) } }
+        .rqr-tap { animation: rqr-tap 1.1s ease-in-out infinite }
       `}</style>
 
-      <div className="max-w-md mx-auto px-4 pb-10">
-        {/* Header */}
-        <div className="pt-8 pb-5 text-center">
-          <p className="text-[11px] font-bold tracking-[0.2em] text-amber-600 uppercase">Rate us on Google</p>
-          <h1 className="mt-1.5 text-2xl font-extrabold text-gray-900 leading-tight">{page.business_name}</h1>
-          {page.tagline && <p className="mt-1 text-sm text-gray-500">{page.tagline}</p>}
+      {/* Brand header */}
+      <div className="bg-[#0f172a] text-white">
+        <div className="max-w-md mx-auto px-5 pt-8 pb-14 text-center">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-white/10 ring-1 ring-white/20 flex items-center justify-center text-2xl font-bold">
+            {initial}
+          </div>
+          <h1 className="mt-3 text-xl font-semibold tracking-tight leading-snug">{page.business_name}</h1>
+          {page.tagline && <p className="mt-1 text-sm text-slate-300">{page.tagline}</p>}
         </div>
+      </div>
 
+      <div className="max-w-md mx-auto px-4 -mt-9 pb-10">
         {step === 'start' && (
-          <div className="bg-white rounded-3xl border border-amber-100 shadow-xl shadow-amber-100/60 p-6 text-center">
-            <Stars size="w-11 h-11" animate />
-            <p className="mt-5 text-lg font-bold text-gray-900">Aapka experience kaisa raha?</p>
-            <p className="mt-1 text-sm text-gray-500">Sirf 10 second — ek review humein bahut help karta hai 🙏</p>
+          <div className="rqr-fade bg-white rounded-2xl ring-1 ring-slate-200 shadow-lg shadow-slate-200/70 p-6 text-center">
+            <Stars size="w-10 h-10" animate />
+            <h2 className="mt-5 text-lg font-semibold">How was your experience?</h2>
+            <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
+              Your review helps others choose with confidence. It takes less than 30 seconds.
+            </p>
             <button
               onClick={start}
-              className="mt-6 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-extrabold text-lg py-4 shadow-lg shadow-orange-200 active:scale-[0.98] transition-transform"
+              className="mt-6 w-full rounded-xl bg-[#1a73e8] hover:bg-[#1765cc] text-white font-semibold text-base py-3.5 shadow-md shadow-blue-200 active:scale-[0.98] transition"
             >
-              ⭐⭐⭐⭐⭐ &nbsp;5 Star Review Do
+              Write a 5-Star Review
             </button>
-            <button onClick={openGoogle} className="mt-4 text-xs text-gray-400 underline underline-offset-2">
-              Apna review khud likhna hai? Seedha Google kholo
+            <button onClick={openGoogle} className="mt-3 w-full py-2 text-sm font-medium text-slate-500 hover:text-slate-700">
+              I&apos;d rather write my own
             </button>
           </div>
         )}
 
         {step === 'category' && (
-          <div>
-            <button onClick={() => setStep('start')} className="flex items-center gap-1 text-sm text-gray-500 mb-3">
+          <div className="rqr-fade bg-white rounded-2xl ring-1 ring-slate-200 shadow-lg shadow-slate-200/70 p-5">
+            <button onClick={() => setStep('start')} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 -ml-1 mb-3">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
-            <p className="text-base font-bold text-gray-900">Kis baare mein review dena hai?</p>
-            <p className="text-xs text-gray-500 mt-0.5 mb-4">Ek option chuniye</p>
-            <div className="grid grid-cols-2 gap-3">
+            <h2 className="text-base font-semibold">What would you like to review?</h2>
+            <p className="text-sm text-slate-500 mt-0.5 mb-4">Choose a topic</p>
+            <div className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200 overflow-hidden">
               {categories.map(c => (
                 <button
                   key={c.id}
                   onClick={() => pickCategory(c)}
-                  className="rounded-2xl bg-white border border-gray-200 px-3 py-4 text-sm font-semibold text-gray-800 shadow-sm active:scale-[0.97] active:bg-amber-50 hover:border-amber-300 transition text-left"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 active:bg-blue-50 transition"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-500 mb-1.5" />
                   {c.name}
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                 </button>
               ))}
             </div>
@@ -173,91 +191,87 @@ export function ReviewQrLanding({ page, preview = false }: { page: PublicReviewP
         )}
 
         {step === 'pick' && category && (
-          <div>
+          <div className="rqr-fade bg-white rounded-2xl ring-1 ring-slate-200 shadow-lg shadow-slate-200/70 p-5">
             <button
               onClick={() => setStep(categories.length > 1 ? 'category' : 'start')}
-              className="flex items-center gap-1 text-sm text-gray-500 mb-3"
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 -ml-1 mb-3"
             >
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
-            <p className="text-base font-bold text-gray-900">{category.name}</p>
-            <p className="text-xs text-gray-500 mt-0.5 mb-4">Jo review aapko sahi lage us par tap kijiye — chahein to badal bhi sakte hain</p>
+            <h2 className="text-base font-semibold">{category.name}</h2>
+            <p className="text-sm text-slate-500 mt-0.5 mb-4">Tap the review that matches your experience. You can edit it before posting.</p>
             <div className="space-y-2.5">
               {options.map((r, i) => (
                 <button
                   key={i}
                   onClick={() => { setText(r); setCopied(false) }}
-                  className="w-full text-left rounded-2xl bg-white border border-gray-200 px-4 py-3.5 shadow-sm active:scale-[0.99] hover:border-amber-300 transition"
+                  className="w-full text-left rounded-xl ring-1 ring-slate-200 bg-white px-4 py-3.5 hover:ring-[#1a73e8]/50 hover:bg-blue-50/40 active:scale-[0.99] transition"
                 >
                   <div className="flex gap-0.5 mb-1.5">
-                    {[0, 1, 2, 3, 4].map(s => <Star key={s} className="w-3 h-3 fill-amber-400 text-amber-400" />)}
+                    {[0, 1, 2, 3, 4].map(s => <Star key={s} className={`w-3.5 h-3.5 ${STAR}`} />)}
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{r}</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{r}</p>
                 </button>
               ))}
               <button
                 onClick={() => { setText(''); setCopied(false) }}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 px-4 py-3 text-sm font-semibold text-gray-500"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
               >
-                <PenLine className="w-4 h-4" /> Apne shabdon mein likhein
+                <PenLine className="w-4 h-4" /> Write in my own words
               </button>
             </div>
           </div>
         )}
 
-        <p className="mt-10 text-center text-[10px] text-gray-300">Powered by Blinks AI</p>
+        <p className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+          <ShieldCheck className="w-3.5 h-3.5" /> Your review is posted on Google from your own account.
+        </p>
       </div>
 
       {/* Bottom sheet: the chosen words + how to finish on Google */}
       {text != null && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setText(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50" onClick={() => setText(null)}>
           <div
-            className="rqr-up w-full max-w-md bg-white rounded-t-3xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+            className="rqr-up w-full max-w-md bg-white rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="mx-auto w-10 h-1 rounded-full bg-gray-200 mb-4" />
-            <p className="text-sm font-bold text-gray-900 mb-2">Aapka review</p>
+            <div className="mx-auto w-10 h-1 rounded-full bg-slate-200 mb-4" />
+            <p className="text-sm font-semibold mb-2">Your review</p>
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
               rows={4}
-              placeholder="Yahan apna review likhiye…"
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-amber-300"
+              placeholder="Share a few words about your experience…"
+              className="w-full rounded-xl ring-1 ring-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
             />
 
-            <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-100 p-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 mb-2">Google par bas 3 kaam</p>
-              <ol className="space-y-2 text-sm text-gray-700">
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
-                  <span className="flex items-center gap-1">5th star par tap karein
+            <div className="mt-4 rounded-xl bg-slate-50 ring-1 ring-slate-200 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">On the Google page</p>
+              <ol className="space-y-2.5 text-sm text-slate-700">
+                <li className="flex items-center gap-2.5">
+                  <StepNo n={1} />
+                  <span className="flex items-center flex-wrap gap-1">Tap the fifth star
                     <span className="flex ml-1">
-                      {[0, 1, 2, 3].map(s => <Star key={s} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />)}
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 rqr-tap" />
+                      {[0, 1, 2, 3].map(s => <Star key={s} className={`w-4 h-4 ${STAR}`} />)}
+                      <Star className={`w-4 h-4 ${STAR} rqr-tap`} />
                     </span>
                   </span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
-                  Box par long-press karke <b>Paste</b> karein
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-[11px] font-bold flex items-center justify-center shrink-0">3</span>
-                  <b>Post</b> par tap karein — ho gaya! 🎉
-                </li>
+                <li className="flex items-center gap-2.5"><StepNo n={2} /><span>Press and hold the text box, then tap <b className="font-semibold">Paste</b></span></li>
+                <li className="flex items-center gap-2.5"><StepNo n={3} /><span>Tap <b className="font-semibold">Post</b></span></li>
               </ol>
             </div>
 
             <button
               onClick={copyAndGo}
               disabled={!text.trim()}
-              className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-extrabold text-base py-4 shadow-lg shadow-orange-200 active:scale-[0.98] transition-transform disabled:opacity-50"
+              className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-[#1a73e8] hover:bg-[#1765cc] text-white font-semibold text-base py-3.5 shadow-md shadow-blue-200 active:scale-[0.98] transition disabled:opacity-50"
             >
               {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-              Copy karo &amp; Google kholo
-              <ExternalLink className="w-4 h-4 opacity-80" />
+              Copy &amp; Continue to Google
+              <ArrowUpRight className="w-4 h-4 opacity-80" />
             </button>
-            <button onClick={() => setText(null)} className="mt-2 w-full py-2 text-sm text-gray-400">Doosra review chunein</button>
+            <button onClick={() => setText(null)} className="mt-2 w-full py-2 text-sm font-medium text-slate-500">Choose a different review</button>
           </div>
         </div>
       )}

@@ -48,8 +48,9 @@ export async function proxy(request: NextRequest) {
   // here rather than trusted to the UI.
   const isBbRoute        = pathname.startsWith('/bb')
   // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
-  // forms (Meta ads landing pages at /f/{slug}) + walk-in registration page
-  const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/')
+  // forms (Meta ads landing pages at /f/{slug}) + Review QR pages customers
+  // reach by scanning (/r/{slug}) + walk-in registration page
+  const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/') || pathname.startsWith('/r/')
   const isWalkinRoute    = pathname === '/walkin'
   // Public associate registration link shared on WhatsApp
   const isJoinRoute      = pathname === '/join'

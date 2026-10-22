@@ -58,6 +58,66 @@ export function slugify(text: string): string {
 
 export const newId = () => Math.random().toString(36).slice(2, 10)
 
+/** Copies text to the clipboard, with a fallback for browsers that block the Clipboard API. */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
+/**
+ * Saves a generated image (QR code, poster). A plain `<a download>` click
+ * does nothing on an iPhone home-screen app (iOS does not support downloads
+ * in standalone mode at all), so on a phone this opens the share sheet
+ * instead — "Save Image" there saves straight to Photos. Desktop browsers
+ * get a normal file download.
+ */
+export async function saveImage(blob: Blob, filename: string, shareTitle: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const file = new File([blob], filename, { type: blob.type })
+  const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean }
+  if (nav.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: shareTitle })
+      return 'shared'
+    } catch (e) {
+      if ((e as { name?: string } | null)?.name === 'AbortError') return 'cancelled'
+      // Share failed for some other reason (e.g. desktop Safari claims support
+      // but errors) — fall through to a normal download.
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30000)
+  return 'downloaded'
+}
+
+/** Opens a URL in a new tab, falling back to navigating the current one if the popup is blocked. */
+export function openInNewTab(url: string): void {
+  const win = window.open(url, '_blank', 'noopener')
+  if (!win) window.location.href = url
+}
+
 /**
  * Starter reviews for an education business, to edit or replace. Kept varied
  * on purpose: many identical reviews get filtered out by Google.

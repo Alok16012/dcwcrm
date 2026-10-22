@@ -83,7 +83,7 @@ export default function PayrollTable({
   const router = useRouter()
   const supabase = createClient()
 
-  const updatePayrollField = (id: string, field: 'hra' | 'allowances' | 'incentive', value: number) => {
+  const updatePayrollField = (id: string, field: 'hra' | 'allowances' | 'incentive' | 'leave_deduction' | 'advance_deduction', value: number) => {
     setData((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r
@@ -100,12 +100,17 @@ export default function PayrollTable({
       try {
         const { error } = await supabase
           .from('payroll')
-          .update({ 
-            hra: row.hra, 
-            allowances: row.allowances, 
-            incentive: row.incentive, 
-            gross: row.gross, 
-            net: row.net 
+          .update({
+            hra: row.hra,
+            allowances: row.allowances,
+            incentive: row.incentive,
+            // LOP and Advance deduction auto-calculate on Generate/Recalculate
+            // (attendance and pending advances); admin can override them here,
+            // and the override sticks until the row is recalculated again.
+            leave_deduction: row.leave_deduction,
+            advance_deduction: row.advance_deduction ?? 0,
+            gross: row.gross,
+            net: row.net
           } as never)
           .eq('id', row.id)
         if (error) throw error
@@ -522,8 +527,8 @@ export default function PayrollTable({
               <th className="px-3 py-2 text-center">Attendance</th>
               <th className="px-3 py-2 text-right">PF</th>
               <th className="px-3 py-2 text-right">TDS</th>
-              <th className="px-3 py-2 text-right">LOP Ded.</th>
-              <th className="px-3 py-2 text-right" title="Advance salary recovered">Adv.</th>
+              <th className="px-3 py-2 text-right" title="Auto-calculated from attendance — editable while in draft">LOP Ded.</th>
+              <th className="px-3 py-2 text-right" title="Auto-calculated from pending advances — editable while in draft">Adv.</th>
               <th className="px-3 py-2 text-right font-semibold">Net</th>
               <th className="px-3 py-2 text-center">Status</th>
               <th className="px-3 py-2 text-center">Actions</th>
@@ -607,8 +612,34 @@ export default function PayrollTable({
                 </td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.pf)}</td>
                 <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.tds)}</td>
-                <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.leave_deduction)}</td>
-                <td className="px-3 py-2 text-right text-xs text-red-600">-{fmt(row.advance_deduction ?? 0)}</td>
+                <td className="px-3 py-2 text-right">
+                  {isAdmin && row.generated !== false && row.status === 'draft' ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-7 w-20 text-right text-xs text-red-600"
+                      value={row.leave_deduction}
+                      onChange={(e) => updatePayrollField(row.id, 'leave_deduction', Number(e.target.value))}
+                      onBlur={() => savePayrollRow(row)}
+                    />
+                  ) : (
+                    <span className="text-xs text-red-600">-{fmt(row.leave_deduction)}</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {isAdmin && row.generated !== false && row.status === 'draft' ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-7 w-20 text-right text-xs text-red-600"
+                      value={row.advance_deduction ?? 0}
+                      onChange={(e) => updatePayrollField(row.id, 'advance_deduction', Number(e.target.value))}
+                      onBlur={() => savePayrollRow(row)}
+                    />
+                  ) : (
+                    <span className="text-xs text-red-600">-{fmt(row.advance_deduction ?? 0)}</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right font-bold text-green-700">{fmt(row.net)}</td>
                 <td className="px-3 py-2 text-center">
                   {row.generated === false ? (

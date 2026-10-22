@@ -23,13 +23,30 @@ const PAGE_TITLES: Record<string, string> = {
   '/student/profile':   'My Profile',
 }
 
+// The /student/support page has its own tabs (Notifications, Tickets, Dispatch…).
+// When the bell links there with ?tab=notifications, show that tab's name here
+// instead of the generic 'Help & Support'.
+const SUPPORT_TAB_TITLES: Record<string, string> = {
+  notifications: 'Notifications',
+  announcements: 'Announcements',
+  dispatch: 'Dispatch',
+  tickets: 'My Tickets',
+  faqs: 'FAQs',
+}
+
 export function StudentTopbar({ student }: { student: StudentInfo }) {
   const supabase = createClient()
   const pathname = usePathname()
   const { setMobileSidebarOpen } = useUIStore()
   const [unreadCount, setUnreadCount] = useState(0)
 
-  const title = PAGE_TITLES[pathname] ?? 'Portal'
+  const [supportTab, setSupportTab] = useState<string | null>(null)
+  useEffect(() => {
+    const next = pathname === '/student/support' ? (new URLSearchParams(window.location.search).get('tab') ?? 'notifications') : null
+    void Promise.resolve().then(() => setSupportTab(next))
+  }, [pathname])
+
+  const title = (supportTab && SUPPORT_TAB_TITLES[supportTab]) || PAGE_TITLES[pathname] || 'Portal'
   const initials = student.full_name
     .split(' ')
     .map(w => w[0])
@@ -69,7 +86,7 @@ export function StudentTopbar({ student }: { student: StudentInfo }) {
 
       <div className="flex items-center gap-2">
         <Link
-          href="/student/support"
+          href="/student/support?tab=notifications"
           className="relative w-9 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
         >
           <Bell className="h-[18px] w-[18px]" />

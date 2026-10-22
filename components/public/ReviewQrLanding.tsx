@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Star, ChevronLeft, Copy, Check, ArrowUpRight, PenLine, ChevronRight, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { googleReviewLink, type PublicReviewPage, type ReviewCategory } from '@/lib/review-qr'
+import { copyToClipboard, googleReviewLink, type PublicReviewPage, type ReviewCategory } from '@/lib/review-qr'
 
 // What a customer sees after scanning a Review QR. Google never lets a page
 // fill in the stars, so this page does everything else: picks the words,
@@ -19,29 +19,6 @@ function shuffle<T>(list: T[]): T[] {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    // Older in-app browsers: fall back to a hidden textarea.
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.setAttribute('readonly', '')
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand('copy')
-      document.body.removeChild(ta)
-      return ok
-    } catch {
-      return false
-    }
-  }
 }
 
 function Stars({ size = 'w-9 h-9', animate = false }: { size?: string; animate?: boolean }) {
@@ -117,7 +94,7 @@ export function ReviewQrLanding({ page, preview = false }: { page: PublicReviewP
 
   async function copyAndGo() {
     if (text == null) return
-    const ok = await copyText(text.trim())
+    const ok = await copyToClipboard(text.trim())
     if (ok) { setCopied(true); track('copy') }
     openGoogle()
   }

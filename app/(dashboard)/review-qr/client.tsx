@@ -17,8 +17,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ReviewQrLanding } from '@/components/public/ReviewQrLanding'
 import { createClient } from '@/lib/supabase/client'
 import {
-  SAMPLE_CATEGORIES, googleReviewLink, isGoogleReviewValue, newId, publicReviewUrl, slugify,
-  type ReviewCategory, type ReviewQrPage,
+  SAMPLE_CATEGORIES, copyToClipboard, googleReviewLink, isGoogleReviewValue, newId, openInNewTab,
+  publicReviewUrl, saveImage, slugify, type ReviewCategory, type ReviewQrPage,
 } from '@/lib/review-qr'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -39,17 +39,8 @@ const emptyDraft = (): Draft => ({
 
 const QR_OPTS = { errorCorrectionLevel: 'H' as const, margin: 2, color: { dark: '#111827', light: '#ffffff' } }
 
-function download(href: string, name: string) {
-  const a = document.createElement('a')
-  a.href = href
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
-
 /** A print-ready A5 card: business name, five stars, the QR and three steps. */
-async function posterDataUrl(url: string, business: string, tagline: string | null): Promise<string> {
+async function posterBlob(url: string, business: string, tagline: string | null): Promise<Blob> {
   const W = 1240, H = 1754 // A5 at 150 dpi
   const c = document.createElement('canvas')
   c.width = W; c.height = H
@@ -101,7 +92,7 @@ async function posterDataUrl(url: string, business: string, tagline: string | nu
     g.fillStyle = '#ffffff'; g.font = font(700, 32); g.fillText(String(i + 1), x, 1651)
     g.fillStyle = '#334155'; g.font = font(600, 32); g.fillText(label, x, 1712)
   })
-  return c.toDataURL('image/png')
+  return new Promise<Blob>((resolve, reject) => c.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'))
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -276,20 +267,48 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
 
 function QrPanel({ page, url }: { page: ReviewQrPage; url: string }) {
   const [png, setPng] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'poster' | 'png' | 'svg' | null>(null)
   useEffect(() => { QRCode.toDataURL(url, { ...QR_OPTS, width: 1024 }).then(setPng, () => {}) }, [url])
   const file = slugify(page.business_name) || 'review'
 
+  async function afterSave(result: Awaited<ReturnType<typeof saveImage>>) {
+    if (result === 'downloaded') toast.success('Downloaded')
+    // 'shared' and 'cancelled' need no toast — the share sheet already told the story.
+  }
+
   async function downloadSvg() {
-    const svg = await QRCode.toString(url, { ...QR_OPTS, type: 'svg', width: 1024 })
-    download(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), `${file}-review-qr.svg`)
+    setBusy('svg')
+    try {
+      const svg = await QRCode.toString(url, { ...QR_OPTS, type: 'svg', width: 1024 })
+      await afterSave(await saveImage(new Blob([svg], { type: 'image/svg+xml' }), `${file}-review-qr.svg`, page.business_name))
+    } catch { toast.error('Could not create the QR code') }
+    finally { setBusy(null) }
+  }
+
+  async function downloadPng() {
+    if (!png) return
+    setBusy('png')
+    try {
+      const blob = await (await fetch(png)).blob()
+      await afterSave(await saveImage(blob, `${file}-review-qr.png`, page.business_name))
+    } catch { toast.error('Could not save the QR code') }
+    finally { setBusy(null) }
+  }
+
+  async function copyLink() {
+    const ok = await copyToClipboard(url)
+    if (ok) toast.success('Link copied')
+    else toast.error('Could not copy — please copy it manually')
   }
 
   async function downloadPoster() {
-    setBusy(true)
-    try { download(await posterDataUrl(url, page.business_name, page.tagline), `${file}-review-poster.png`) }
+    setBusy('poster')
+    try {
+      const blob = await posterBlob(url, page.business_name, page.tagline)
+      await afterSave(await saveImage(blob, `${file}-review-poster.png`, page.business_name))
+    }
     catch { toast.error('Could not create the poster') }
-    finally { setBusy(false) }
+    finally { setBusy(null) }
   }
 
   return (
@@ -307,22 +326,27 @@ function QrPanel({ page, url }: { page: ReviewQrPage; url: string }) {
       </div>
 
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Button onClick={downloadPoster} disabled={busy} className="bg-[#1a73e8] hover:bg-[#1765cc]">
-          {busy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ImageIcon className="w-4 h-4 mr-1" />} Print Poster
+        <Button onClick={downloadPoster} disabled={!!busy} className="bg-[#1a73e8] hover:bg-[#1765cc]">
+          {busy === 'poster' ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ImageIcon className="w-4 h-4 mr-1" />} Print Poster
         </Button>
-        <Button variant="outline" onClick={() => png && download(png, `${file}-review-qr.png`)} disabled={!png}>
-          <Download className="w-4 h-4 mr-1" /> QR PNG
+        <Button variant="outline" onClick={downloadPng} disabled={!png || !!busy}>
+          {busy === 'png' ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />} QR PNG
         </Button>
-        <Button variant="outline" onClick={downloadSvg}><FileCode2 className="w-4 h-4 mr-1" /> QR SVG</Button>
+        <Button variant="outline" onClick={downloadSvg} disabled={!!busy}>
+          {busy === 'svg' ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileCode2 className="w-4 h-4 mr-1" />} QR SVG
+        </Button>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(url); toast.success('Link copied') }}>
+        <Button variant="ghost" size="sm" onClick={copyLink}>
           <Copy className="w-3.5 h-3.5 mr-1" /> Copy link
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => window.open(url, '_blank')}>
+        <Button variant="ghost" size="sm" onClick={() => openInNewTab(url)}>
           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open page
         </Button>
       </div>
+      <p className="mt-2 text-[11px] text-gray-400 text-center sm:hidden">
+        On your phone, saving opens the share sheet — choose <b>Save Image</b> to add it to Photos.
+      </p>
       <p className="mt-3 text-[11px] text-gray-400 text-center">
         Print Poster: a ready-to-print A5 card. SVG: for print shops and large formats; stays sharp at any size.
       </p>

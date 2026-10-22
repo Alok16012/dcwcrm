@@ -36,6 +36,13 @@ export default function SupportPage() {
   const [enrollmentNumber, setEnrollmentNumber] = useState<string>('')
   const [mentor, setMentor] = useState<Mentor | null>(null)
   const [tab, setTab] = useState<'notifications' | 'tickets' | 'dispatch' | 'faqs' | 'announcements'>('notifications')
+  // The notification bell links here with ?tab=… so it opens straight to
+  // the right tab instead of always landing on the generic Help & Support page.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    if (!requested || !['notifications', 'tickets', 'dispatch', 'faqs', 'announcements'].includes(requested)) return
+    void Promise.resolve().then(() => setTab(requested as typeof tab))
+  }, [])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -124,11 +131,19 @@ export default function SupportPage() {
     { key: 'faqs', label: 'FAQs', icon: HelpCircle, badge: 0 },
   ] as const
 
+  const HEADINGS: Record<typeof tab, { title: string; subtitle: string }> = {
+    notifications: { title: 'Notifications', subtitle: 'Updates about your admission, fees, exams and dispatch' },
+    announcements: { title: 'Announcements', subtitle: 'News and updates from Distance Courses Wala' },
+    dispatch: { title: 'Dispatch', subtitle: 'Track documents and kits sent to you' },
+    tickets: { title: 'My Tickets', subtitle: 'Your support requests and replies from our team' },
+    faqs: { title: 'FAQs', subtitle: 'Answers to common questions' },
+  }
+
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Help & Support</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Track dispatches, raise tickets, view FAQs and announcements</p>
+        <h1 className="text-xl font-bold text-gray-900">{HEADINGS[tab].title}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{HEADINGS[tab].subtitle}</p>
       </div>
 
       {/* Contact cards */}

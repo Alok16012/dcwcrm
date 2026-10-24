@@ -17,7 +17,7 @@ export type LeadStatus =
 
 export type LeadSource =
   | 'website' | 'walk_in' | 'referral' | 'whatsapp'
-  | 'phone' | 'excel_import' | 'social_media' | 'meta_ads' | 'ivr'
+  | 'phone' | 'excel_import' | 'social_media' | 'meta_ads' | 'google_ads' | 'ivr'
   | 'associate' | 'other'
 
 export type ActivityType =
@@ -363,6 +363,7 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   excel_import: 'Excel Import',
   social_media: 'Social Media',
   meta_ads: 'Meta Ads',
+  google_ads: 'Google Ads',
   ivr: 'IVR Call',
   associate: 'Associate',
   other: 'Other',
@@ -378,6 +379,7 @@ export const LEAD_SOURCE_COLORS: Record<LeadSource, string> = {
   excel_import: 'bg-gray-50 text-gray-600 border-gray-200',
   social_media: 'bg-pink-50 text-pink-700 border-pink-200',
   meta_ads: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  google_ads: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   ivr: 'bg-teal-50 text-teal-700 border-teal-200',
   associate: 'bg-orange-50 text-orange-700 border-orange-200',
   other: 'bg-gray-50 text-gray-600 border-gray-200',

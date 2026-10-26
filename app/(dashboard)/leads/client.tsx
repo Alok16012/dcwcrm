@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Users, TrendingUp, CheckCircle, Clock } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Users, TrendingUp, CheckCircle, Clock, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LeadTable } from '@/components/leads/LeadTable'
@@ -213,11 +214,21 @@ export function LeadsClient() {
           <h1 className="text-xl font-bold text-gray-900">Leads</h1>
           <p className="text-xs text-gray-400 mt-0.5">Manage and track all your leads</p>
         </div>
-        <Button onClick={() => setShowForm(true)} size="sm" className="gap-1.5 h-9">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Lead</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {(currentProfile?.role === 'admin' || currentProfile?.role === 'backend') && (
+            <Link href="/leads/distribution">
+              <Button variant="outline" size="sm" className="gap-1.5 h-9">
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Control Centre</span>
+              </Button>
+            </Link>
+          )}
+          <Button onClick={() => setShowForm(true)} size="sm" className="gap-1.5 h-9">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Lead</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

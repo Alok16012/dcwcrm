@@ -76,6 +76,99 @@ async function pickRoundRobinAssignee(
   )
 }
 
+interface LeadTeam {
+  id: string
+  name: string
+  department_id: string | null
+  member_ids: string[]
+  forms: string[]
+  sources: string[]
+  is_default: boolean
+}
+
+const norm = (v: string) => v.trim().toLowerCase()
+
+/**
+ * The lead team (migration 123) that owns a lead with this form and source:
+ * the first active team, in its set order, listing the form or the source;
+ * failing that, the default team. Null when there are no teams (or the
+ * table isn't there yet) — the lead then goes to everyone, as before.
+ */
+async function matchLeadTeam(
+  supabase: SupabaseClient,
+  form: string | undefined,
+  source: string
+): Promise<LeadTeam | null> {
+  const { data, error } = await supabase
+    .from('lead_teams')
+    .select('id, name, department_id, member_ids, forms, sources, is_default')
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('created_at')
+  if (error || !data) return null
+  const teams = data as LeadTeam[]
+  const f = form ? norm(form) : ''
+  return teams.find(t =>
+    (f && (t.forms ?? []).some(x => norm(x) === f)) || (t.sources ?? []).includes(source)
+  ) ?? teams.find(t => t.is_default) ?? null
+}
+
+/** The team member with the fewest leads this team routed today (IST). */
+async function pickTeamAssignee(
+  supabase: SupabaseClient,
+  team: LeadTeam
+): Promise<{ id: string; full_name: string } | null> {
+  if (!team.member_ids?.length) return null
+  const { data: agents } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', team.member_ids)
+    .eq('is_active', true)
+    .order('id')
+  if (!agents || agents.length === 0) return null
+
+  const nowIst = new Date(Date.now() + 5.5 * 3600 * 1000)
+  const dayStartIst = new Date(Date.UTC(
+    nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()
+  ) - 5.5 * 3600 * 1000)
+
+  const { data: todaysLeads } = await supabase
+    .from('leads')
+    .select('assigned_to')
+    .eq('metadata->>lead_team_id', team.id)
+    .gte('assigned_at', dayStartIst.toISOString())
+    .not('assigned_to', 'is', null)
+
+  const counts = new Map<string, number>(agents.map((a: { id: string }) => [a.id, 0]))
+  for (const l of todaysLeads ?? []) {
+    const id = (l as { assigned_to: string | null }).assigned_to
+    if (id && counts.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return agents.reduce((best: { id: string; full_name: string }, a: { id: string; full_name: string }) =>
+    (counts.get(a.id) ?? 0) < (counts.get(best.id) ?? 0) ? a : best
+  )
+}
+
+/**
+ * Who gets a lead nobody named an owner for: the matching team's members
+ * if a team claims it, otherwise every active counsellor. A team with no
+ * active members falls back to everyone rather than leaving the lead unowned.
+ */
+async function chooseAssignee(
+  supabase: SupabaseClient,
+  source: string,
+  metadata: Record<string, unknown> | undefined
+): Promise<{ winner: { id: string; full_name: string } | null; team: LeadTeam | null }> {
+  const form = (metadata as { form?: unknown } | undefined)?.form
+  const team = await matchLeadTeam(supabase, typeof form === 'string' ? form : undefined, source)
+  if (team) {
+    const winner = await pickTeamAssignee(supabase, team)
+    if (winner) return { winner, team }
+    console.warn(`ingestLead: lead team "${team.name}" has no active members — using everyone`)
+  }
+  return { winner: await pickRoundRobinAssignee(supabase, source), team: null }
+}
+
 /**
  * The same person submitting again (form double-submit, a second ad click, a
  * walk-in after an enquiry) must not become a second lead handed to a second
@@ -113,12 +206,18 @@ async function recordRepeatEnquiry(
 
   if (!assigneeId) {
     try {
-      const winner = input.assignTo ?? await pickRoundRobinAssignee(supabase, source)
+      const picked = input.assignTo
+        ? { winner: input.assignTo, team: null }
+        : await chooseAssignee(supabase, source, input.metadata)
+      const winner = picked.winner
       if (winner) {
         assigneeId = winner.id
         assigneeName = winner.full_name
         update.assigned_to = winner.id
         update.assigned_at = now
+        if (picked.team) {
+          update.metadata = { ...(update.metadata as Record<string, unknown>), lead_team_id: picked.team.id, lead_team: picked.team.name }
+        }
       }
     } catch (e) {
       console.error('ingestLead repeat auto-assign failed:', e)
@@ -185,14 +284,17 @@ export async function ingestLead(
   }
 
   // ── Assign: an explicit owner (IVR — the counsellor who took the call) wins;
-  // otherwise round-robin across the team.
+  // otherwise round-robin inside the lead team that owns this form/source,
+  // or across everyone when no team claims it.
   let assignedTo: string | null = input.assignTo?.id ?? null
   let assigneeName: string | null = input.assignTo?.full_name ?? null
+  let team: LeadTeam | null = null
   if (!input.assignTo) {
     try {
-      const winner = await pickRoundRobinAssignee(supabase, source)
-      assignedTo = winner?.id ?? null
-      assigneeName = winner?.full_name ?? null
+      const picked = await chooseAssignee(supabase, source, input.metadata)
+      assignedTo = picked.winner?.id ?? null
+      assigneeName = picked.winner?.full_name ?? null
+      team = picked.team
     } catch (e) {
       console.error('ingestLead auto-assign failed, lead will be unassigned:', e)
     }
@@ -209,7 +311,10 @@ export async function ingestLead(
     ...(input.referred_by ? { referred_by: input.referred_by } : {}),
     ...(input.referred_by_phone ? { referred_by_phone: input.referred_by_phone } : {}),
     status: 'new',
-    metadata: input.metadata ?? {},
+    metadata: team
+      ? { ...(input.metadata ?? {}), lead_team_id: team.id, lead_team: team.name }
+      : (input.metadata ?? {}),
+    ...(team?.department_id ? { department_id: team.department_id } : {}),
     assigned_to: assignedTo,
     assigned_at: assignedTo ? new Date().toISOString() : null,
   }).select('id').single()
@@ -227,7 +332,9 @@ export async function ingestLead(
       await supabase.from('lead_activities').insert({
         lead_id: leadId,
         activity_type: 'created',
-        new_value: assigneeName ? `Auto-assigned to ${assigneeName}` : 'new',
+        new_value: assigneeName
+          ? `Auto-assigned to ${assigneeName}${team ? ` (${team.name} team)` : ''}`
+          : 'new',
       })
       if (assignedTo) {
         await supabase.from('notifications').insert({

@@ -1,11 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { User, Phone, Mail, MapPin, GraduationCap, Users, Lock, Save, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
+import { User, Phone, Mail, MapPin, GraduationCap, Users, Lock, Save, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { ChangePasswordWithOtp } from '@/components/student/ChangePasswordWithOtp'
 
 interface StudentProfile {
   id: string
@@ -39,14 +40,6 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<'personal' | 'course' | 'contact' | 'security'>('personal')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<Partial<StudentProfile>>({})
-
-  // Password change
-  const [oldPass, setOldPass] = useState('')
-  const [newPass, setNewPass] = useState('')
-  const [confirmPass, setConfirmPass] = useState('')
-  const [showOld, setShowOld] = useState(false)
-  const [showNew, setShowNew] = useState(false)
-  const [changingPass, setChangingPass] = useState(false)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -89,19 +82,6 @@ export default function ProfilePage() {
     if (error) { toast.error(error.message); return }
     toast.success('Contact information updated')
     load()
-  }
-
-  async function changePassword() {
-    if (!newPass || newPass.length < 6) { toast.error('Password must be at least 6 characters'); return }
-    if (newPass !== confirmPass) { toast.error('Passwords do not match'); return }
-    setChangingPass(true)
-    const { error } = await supabase.auth.updateUser({ password: newPass })
-    setChangingPass(false)
-    if (error) { toast.error(error.message); return }
-    // Keep the copy staff see in the admin panel's Access tab in step.
-    if (student) await (supabase as any).from('students').update({ portal_temp_password: newPass }).eq('id', student.id)
-    toast.success('Password changed successfully!')
-    setOldPass(''); setNewPass(''); setConfirmPass('')
   }
 
   function fmtEnroll(n: string) {
@@ -245,48 +225,7 @@ export default function ProfilePage() {
       )}
 
       {/* Security */}
-      {tab === 'security' && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Lock className="h-4 w-4 text-blue-500" /> Change Password</h3>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs font-medium text-gray-600">New Password</Label>
-              <div className="relative">
-                <Input
-                  className="h-9 text-sm pr-10"
-                  type={showNew ? 'text' : 'password'}
-                  placeholder="Min. 6 characters"
-                  value={newPass}
-                  onChange={e => setNewPass(e.target.value)}
-                />
-                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" onClick={() => setShowNew(v => !v)}>
-                  {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs font-medium text-gray-600">Confirm Password</Label>
-              <Input
-                className="h-9 text-sm"
-                type="password"
-                placeholder="Repeat new password"
-                value={confirmPass}
-                onChange={e => setConfirmPass(e.target.value)}
-              />
-              {confirmPass && newPass !== confirmPass && (
-                <p className="text-xs text-red-500">Passwords do not match</p>
-              )}
-            </div>
-            <Button onClick={changePassword} disabled={changingPass || !newPass || newPass !== confirmPass} className="w-full h-9 text-sm">
-              <Lock className="h-3.5 w-3.5 mr-1.5" />
-              {changingPass ? 'Changing...' : 'Change Password'}
-            </Button>
-          </div>
-          <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3 text-xs text-yellow-700">
-            After changing your password, you will need to log in again with the new password. Your login ID (enrollment number) remains the same.
-          </div>
-        </div>
-      )}
+      {tab === 'security' && <ChangePasswordWithOtp />}
     </div>
   )
 }

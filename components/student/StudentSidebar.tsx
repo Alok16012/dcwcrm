@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, GraduationCap, Wallet, BookOpen,
-  HelpCircle, User, LogOut, Gift, Package, Award, MonitorPlay,
+  HelpCircle, User, LogOut, Gift, Package, Award, MonitorPlay, Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -26,6 +26,7 @@ const NAV = [
   { label: 'Study Materials',href: '/student/materials',   icon: BookOpen },
   { label: 'Dispatch',       href: '/student/dispatch',    icon: Package },
   { label: 'Mentorship',     href: '/student/mentorship',  icon: Award },
+  { label: 'Notifications',  href: '/student/notifications', icon: Bell },
   { label: 'Help & Support', href: '/student/support',     icon: HelpCircle },
   { label: 'Refer & Earn',   href: '/student/refer',       icon: Gift },
   { label: 'My Profile',     href: '/student/profile',     icon: User },

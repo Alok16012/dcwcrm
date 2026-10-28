@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { HelpCircle, Send, Bell, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock, Paperclip, PhoneCall } from 'lucide-react'
+import { HelpCircle, Send, ChevronDown, ChevronUp, Package, MessageSquare, Phone, AlertCircle, CheckCircle2, Clock, PhoneCall } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,18 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 
 interface Ticket { id: string; subject: string; message: string; status: string; priority: string; admin_reply: string | null; created_at: string }
-interface Notification { id: string; title: string; message: string; type: string; is_read: boolean; created_at: string; file_url?: string | null; category?: string | null }
 interface Announcement { id: string; title: string; body: string; type: string; created_at: string }
 interface FAQ { id: string; question: string; answer: string; category: string }
 interface Dispatch { id: string; document_type: string; courier: string | null; tracking_number: string | null; status: string; dispatch_date: string | null; expected_delivery: string | null }
 interface Mentor { full_name: string; phone: string | null }
-
-const notifTypeColor: Record<string, string> = {
-  info: 'border-blue-200 bg-blue-50',
-  success: 'border-green-200 bg-green-50',
-  warning: 'border-yellow-200 bg-yellow-50',
-  alert: 'border-red-200 bg-red-50',
-}
 
 const ticketStatusColor: Record<string, string> = {
   open: 'bg-blue-100 text-blue-700',
@@ -35,15 +28,16 @@ export default function SupportPage() {
   const [studentId, setStudentId] = useState<string | null>(null)
   const [enrollmentNumber, setEnrollmentNumber] = useState<string>('')
   const [mentor, setMentor] = useState<Mentor | null>(null)
-  const [tab, setTab] = useState<'notifications' | 'tickets' | 'dispatch' | 'faqs' | 'announcements'>('notifications')
-  // The notification bell links here with ?tab=… so it opens straight to
-  // the right tab instead of always landing on the generic Help & Support page.
+  const router = useRouter()
+  const [tab, setTab] = useState<'tickets' | 'dispatch' | 'faqs' | 'announcements'>('announcements')
+  // Links can open a tab directly with ?tab=…. Notifications have their own
+  // page now; old ?tab=notifications links go there.
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get('tab')
-    if (!requested || !['notifications', 'tickets', 'dispatch', 'faqs', 'announcements'].includes(requested)) return
+    if (requested === 'notifications') { router.replace('/student/notifications'); return }
+    if (!requested || !['tickets', 'dispatch', 'faqs', 'announcements'].includes(requested)) return
     void Promise.resolve().then(() => setTab(requested as typeof tab))
-  }, [])
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  }, [router])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [dispatches, setDispatches] = useState<Dispatch[]>([])
@@ -72,14 +66,12 @@ export default function SupportPage() {
       if (m) setMentor(m as Mentor)
     }
 
-    const [notif, annc, tick, faq, disp] = await Promise.all([
-      db.from('student_notifications').select('*').eq('student_id', s.id).order('created_at', { ascending: false }).limit(20),
+    const [annc, tick, faq, disp] = await Promise.all([
       db.from('student_announcements').select('id, title, body, type, created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(10),
       db.from('student_support_tickets').select('id, subject, message, status, priority, admin_reply, created_at').eq('student_id', s.id).order('created_at', { ascending: false }),
       db.from('student_faqs').select('id, question, answer, category').eq('is_active', true).order('sort_order'),
       db.from('student_dispatches').select('id, document_type, courier, tracking_number, status, dispatch_date, expected_delivery').eq('enrollment_number', s.enrollment_number).order('created_at', { ascending: false }),
     ])
-    setNotifications((notif.data ?? []) as Notification[])
     setAnnouncements((annc.data ?? []) as Announcement[])
     setTickets((tick.data ?? []) as Ticket[])
     setFaqs((faq.data ?? []) as FAQ[])
@@ -87,13 +79,6 @@ export default function SupportPage() {
   }, [supabase])
 
   useEffect(() => { load() }, [load])
-
-  async function markAllRead() {
-    if (!studentId) return
-    await (supabase as any).from('student_notifications').update({ is_read: true }).eq('student_id', studentId).eq('is_read', false)
-    setNotifications(n => n.map(x => ({ ...x, is_read: true })))
-    toast.success('All marked as read')
-  }
 
   async function submitTicket() {
     if (!studentId || !ticketForm.subject || !ticketForm.message) {
@@ -124,7 +109,6 @@ export default function SupportPage() {
   }
 
   const TABS = [
-    { key: 'notifications', label: 'Notifications', icon: Bell, badge: notifications.filter(n => !n.is_read).length },
     { key: 'announcements', label: 'Announcements', icon: AlertCircle, badge: 0 },
     { key: 'dispatch', label: 'Dispatch', icon: Package, badge: 0 },
     { key: 'tickets', label: 'My Tickets', icon: MessageSquare, badge: tickets.filter(t => t.status === 'resolved' && t.admin_reply).length },
@@ -132,7 +116,6 @@ export default function SupportPage() {
   ] as const
 
   const HEADINGS: Record<typeof tab, { title: string; subtitle: string }> = {
-    notifications: { title: 'Notifications', subtitle: 'Updates about your admission, fees, exams and dispatch' },
     announcements: { title: 'Announcements', subtitle: 'News and updates from Distance Courses Wala' },
     dispatch: { title: 'Dispatch', subtitle: 'Track documents and kits sent to you' },
     tickets: { title: 'My Tickets', subtitle: 'Your support requests and replies from our team' },
@@ -213,50 +196,6 @@ export default function SupportPage() {
           </button>
         ))}
       </div>
-
-      {/* Notifications tab */}
-      {tab === 'notifications' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">{notifications.filter(n => !n.is_read).length} unread</p>
-            {notifications.some(n => !n.is_read) && (
-              <Button variant="outline" size="sm" className="text-xs h-7" onClick={markAllRead}>Mark all read</Button>
-            )}
-          </div>
-          {!notifications.length ? (
-            <div className="bg-white rounded-2xl border p-10 text-center text-gray-400">No notifications yet</div>
-          ) : notifications.map(n => (
-            <div key={n.id} className={`border rounded-2xl p-4 ${notifTypeColor[n.type] ?? 'bg-gray-50 border-gray-100'} ${!n.is_read ? 'ring-1 ring-blue-200' : ''}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`text-sm font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</p>
-                    {n.category && (
-                      <span className="text-[10px] px-2 py-0.5 bg-white/70 border border-gray-200 rounded-full text-gray-500 font-medium">{n.category}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{n.message}</p>
-                  {n.file_url && (
-                    <a
-                      href={n.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 font-medium hover:text-blue-800 hover:underline underline-offset-2"
-                    >
-                      <Paperclip className="h-3 w-3" />
-                      View attachment
-                    </a>
-                  )}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs text-gray-400">{new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
-                  {!n.is_read && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mt-1" />}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Announcements tab */}
       {tab === 'announcements' && (

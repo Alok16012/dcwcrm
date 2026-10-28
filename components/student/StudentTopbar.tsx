@@ -20,14 +20,14 @@ const PAGE_TITLES: Record<string, string> = {
   '/student/accounts':  'Accounts',
   '/student/materials': 'Study Materials',
   '/student/support':   'Help & Support',
+  '/student/notifications': 'Notifications',
   '/student/profile':   'My Profile',
 }
 
-// The /student/support page has its own tabs (Notifications, Tickets, Dispatch…).
-// When the bell links there with ?tab=notifications, show that tab's name here
-// instead of the generic 'Help & Support'.
+// The /student/support page has its own tabs (Announcements, Tickets, Dispatch…).
+// When a link opens it with ?tab=…, show that tab's name here instead of the
+// generic 'Help & Support'.
 const SUPPORT_TAB_TITLES: Record<string, string> = {
-  notifications: 'Notifications',
   announcements: 'Announcements',
   dispatch: 'Dispatch',
   tickets: 'My Tickets',
@@ -42,11 +42,12 @@ export function StudentTopbar({ student }: { student: StudentInfo }) {
 
   const [supportTab, setSupportTab] = useState<string | null>(null)
   useEffect(() => {
-    const next = pathname === '/student/support' ? (new URLSearchParams(window.location.search).get('tab') ?? 'notifications') : null
+    const next = pathname === '/student/support' ? (new URLSearchParams(window.location.search).get('tab')) : null
     void Promise.resolve().then(() => setSupportTab(next))
   }, [pathname])
 
-  const title = (supportTab && SUPPORT_TAB_TITLES[supportTab]) || PAGE_TITLES[pathname] || 'Portal'
+  const title = (supportTab && SUPPORT_TAB_TITLES[supportTab]) || PAGE_TITLES[pathname]
+    || (pathname.startsWith('/student/learning') ? 'My Learning' : 'Portal')
   const initials = student.full_name
     .split(' ')
     .map(w => w[0])
@@ -64,7 +65,10 @@ export function StudentTopbar({ student }: { student: StudentInfo }) {
       setUnreadCount(count ?? 0)
     }
     fetchUnread()
-  }, [student.id, supabase])
+    // The notifications page fires this after marking items read.
+    window.addEventListener('student-notifications-changed', fetchUnread)
+    return () => window.removeEventListener('student-notifications-changed', fetchUnread)
+  }, [student.id, supabase, pathname])
 
   return (
     <header className="h-14 bg-white/75 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-3 md:px-6 shrink-0 z-20">
@@ -86,7 +90,8 @@ export function StudentTopbar({ student }: { student: StudentInfo }) {
 
       <div className="flex items-center gap-2">
         <Link
-          href="/student/support?tab=notifications"
+          href="/student/notifications"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           className="relative w-9 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
         >
           <Bell className="h-[18px] w-[18px]" />

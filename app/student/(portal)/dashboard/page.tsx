@@ -294,7 +294,7 @@ export default async function StudentDashboardPage() {
                 <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{unreadCount}</span>
               )}
             </div>
-            <Link href="/student/support" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
+            <Link href="/student/notifications" className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
               See all <ArrowRight className="h-3 w-3" />
             </Link>
           </div>

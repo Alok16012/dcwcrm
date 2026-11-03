@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { createServerClient, getCurrentUser, getCurrentProfile } from '@/lib/supabase/server'
 import DashboardClient from '../dashboard-client'
+import { isFestive } from '@/components/dashboard/festival'
 import type { UserRole } from '@/types/app.types'
 
 export default async function DashboardPage() {
@@ -219,6 +220,7 @@ export default async function DashboardPage() {
       userName={profile?.full_name ?? ''}
       role={(profile?.role ?? 'admin') as UserRole}
       moduleRights={profile?.module_rights ?? []}
+      festive={isFestive()}
     />
   )
 }

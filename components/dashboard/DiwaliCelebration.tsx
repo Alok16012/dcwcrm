@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { isFestive, todayIST } from './festival'
 
 /**
  * Diwali greeting on the dashboard: rockets go up and burst into fireworks,
@@ -10,15 +11,11 @@ import { X } from 'lucide-react'
  * It never blocks the dashboard — the canvas ignores clicks.
  */
 
-// Dhanteras (6 Nov) to Bhai Dooj (11 Nov) 2026, with a couple of days either side
-const FESTIVAL_START = '2026-11-03'
-const FESTIVAL_END = '2026-11-12'
 const SHOW_MS = 9000
 const STORAGE_KEY = 'dcw-diwali-shown'
 
 const COLORS = ['#ffd166', '#ff6b35', '#ef476f', '#06d6a0', '#4cc9f0', '#f72585', '#ffbe0b', '#fb5607', '#ffffff']
 
-const todayIST = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
 
 interface Rocket { x: number; y: number; vx: number; vy: number; targetY: number; color: string; trail: { x: number; y: number }[] }
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; decay: number; color: string; size: number }
@@ -30,7 +27,7 @@ function readSeen(): string | null {
 // Loaded with ssr:false (see dashboard-client), so window/localStorage are safe here
 export default function DiwaliCelebration({ name }: { name?: string }) {
   const [today] = useState(todayIST)
-  const inWindow = today >= FESTIVAL_START && today <= FESTIVAL_END
+  const inWindow = isFestive(today)
   // Plays by itself once a day per browser
   const [playing, setPlaying] = useState(() => inWindow && readSeen() !== today)
   const canvasRef = useRef<HTMLCanvasElement>(null)

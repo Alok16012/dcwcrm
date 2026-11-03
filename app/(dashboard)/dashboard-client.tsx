@@ -11,6 +11,7 @@ import type { UserRole } from '@/types/app.types'
 
 // Browser-only: it reads the date and localStorage to decide whether to play
 const DiwaliCelebration = dynamic(() => import('@/components/dashboard/DiwaliCelebration'), { ssr: false })
+import { FestiveBackdrop, FestiveGarlands, FestiveDiya, FestiveStyles } from '@/components/dashboard/FestiveDecor'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
@@ -84,6 +85,8 @@ interface DashboardClientProps {
   userName?: string
   role?: UserRole
   moduleRights?: string[]
+  /** Inside the Diwali window — decided on the server so nothing flashes */
+  festive?: boolean
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -147,7 +150,7 @@ export default function DashboardClient({
   followupsToday, interestedStats, incentiveHistory = [],
   isLead = false, docReceivedCount = 0, expectedEnrollmentCount = 0, departmentStats = [],
   todaysCollection = 0, todaysCollectionCount = 0,
-  userName = '', role = 'admin', moduleRights = [],
+  userName = '', role = 'admin', moduleRights = [], festive = false,
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [myTasks, setMyTasks] = useState<any[]>([])
@@ -167,7 +170,19 @@ export default function DashboardClient({
   const monthInterested = interestedStats.reduce((s, r) => s + r.interested_month, 0)
 
   return (
-    <div className="space-y-4">
+    // During the festival the wrapper stretches to the edges of the content
+    // area (undoing the layout's padding) so the torans hang from the real
+    // corners, and pads back in so the cards stay clear of the strands.
+    // min-h fills the visible content area (less the top bar and footer), so the
+    // wash reaches the bottom and the diya has empty space to sit in.
+    <div className={`space-y-4 ${festive ? 'relative isolate md:-mx-6 md:-mt-6 md:px-12 lg:px-16 md:pt-14 lg:pt-16 md:pb-2 md:min-h-[calc(100vh-7rem)]' : ''}`}>
+      {festive && (
+        <>
+          <FestiveStyles />
+          <FestiveBackdrop />
+          <FestiveGarlands />
+        </>
+      )}
       <DiwaliCelebration name={userName} />
       <MobileHome
         name={userName} role={role} moduleRights={moduleRights} isLead={isLead}
@@ -613,6 +628,7 @@ export default function DashboardClient({
           </div>
         </div>
       )}
+      {festive && <FestiveDiya />}
     </div>
   )
 }

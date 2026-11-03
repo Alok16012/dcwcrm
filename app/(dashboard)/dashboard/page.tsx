@@ -5,6 +5,24 @@ import DashboardClient from '../dashboard-client'
 import { isFestive } from '@/components/dashboard/festival'
 import type { UserRole } from '@/types/app.types'
 
+/**
+ * Every row of a query, read in 1000-row pages. Supabase returns at most 1000
+ * rows per request, so a plain select silently drops the rest — the admin's
+ * "Fee Collected" and "Outstanding" were summing only the first 1000 payments
+ * and students. `build` must return a fresh query with a stable order.
+ */
+async function fetchAll<T>(build: () => any): Promise<{ data: T[] }> {
+  const PAGE = 1000
+  let all: T[] = []
+  for (let from = 0; from < 100_000; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1)
+    if (error || !data) break
+    all = all.concat(data as T[])
+    if (data.length < PAGE) break
+  }
+  return { data: all }
+}
+
 export default async function DashboardPage() {
   const [supabase, user, profile] = await Promise.all([createServerClient(), getCurrentUser(), getCurrentProfile()])
 
@@ -48,7 +66,7 @@ export default async function DashboardPage() {
     ? (telecallerStudentIds.length > 0
         ? supabase.from('payments').select('amount').in('student_id', telecallerStudentIds).gte('payment_date', monthStart).lte('payment_date', monthEnd)
         : supabase.from('payments').select('amount').eq('recorded_by', user!.id).gte('payment_date', monthStart).lte('payment_date', monthEnd))
-    : supabase.from('payments').select('amount')
+    : fetchAll<{ amount: number }>(() => supabase.from('payments').select('amount').order('id'))
 
   const droppedStudentsQuery = applyScope(
     supabase.from('students').select('*', { count: 'exact', head: true }).eq('status', 'dropped'),
@@ -83,7 +101,7 @@ export default async function DashboardPage() {
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd), 'leads'),
     paymentsQuery,
-    applyScope(supabase.from('students').select('total_fee, amount_paid'), 'students'),
+    fetchAll<{ total_fee: number | null; amount_paid: number | null }>(() => applyScope(supabase.from('students').select('total_fee, amount_paid').order('id'), 'students')),
     applyScope(supabase.from('students').select('*', { count: 'exact', head: true }), 'students'),
     droppedStudentsQuery,
     apptScope(supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('scheduled_date', todayApptDate).neq('status', 'cancelled')).then((r: any) => ({ count: r.count })),
@@ -92,7 +110,7 @@ export default async function DashboardPage() {
     apptScope(supabase.from('appointments').select('*, lead:leads(id, full_name, phone), host:profiles!appointments_host_id_fkey(id, full_name)').eq('status', 'scheduled').gte('scheduled_date', todayApptDate).lte('scheduled_date', addDays(now, 7)).order('scheduled_date').order('scheduled_time').limit(5)),
     applyScope(supabase.from('leads').select('id, full_name, phone, assigned_to, profiles!assigned_to ( full_name )'), 'leads').eq('next_followup_date', todayDate),
     supabase.from('profiles').select('id, full_name').in('role', ['lead', 'telecaller', 'counselor']).eq('is_active', true),
-    applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested'), 'leads'),
+    fetchAll<{ assigned_to: string | null; created_at: string }>(() => applyScope(supabase.from('leads').select('assigned_to, created_at').eq('status', 'interested').order('id'), 'leads')),
     supabase.from('departments').select('id, name, students(id, amount_paid, total_fee)'),
     // Org-wide collection card is admin/backend only, so counsellors skip the query
     isLead ? Promise.resolve({ data: [] }) : supabase.from('payments').select('amount').eq('payment_date', todayIst),

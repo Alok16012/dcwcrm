@@ -28,7 +28,7 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: n
   )
 }
 
-export function LeadsClient() {
+export function LeadsClient({ initialProfile = null }: { initialProfile?: Profile | null }) {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, newToday: 0, converted: 0, followupDue: 0 })
@@ -47,7 +47,7 @@ export function LeadsClient() {
 
   const [courses, setCourses] = useState<Course[]>([])
   const [telecallers, setTelecallers] = useState<Profile[]>([])
-  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(initialProfile)
   const { filters, setFilters } = useLeadStore()
 
   // Apply URL params as initial filters (from dashboard quick-cards)
@@ -61,10 +61,23 @@ export function LeadsClient() {
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      setCurrentProfile(profile as unknown as Profile)
+    // The server hands the profile in; only look it up here if it didn't.
+    if (!initialProfile) {
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (!user) return
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        setCurrentProfile(profile as unknown as Profile)
+      })
+    }
+
+    // Overall stats — independent of the filter/page, so fetched once,
+    // alongside the first page rather than after every fetch.
+    const today = format(new Date(), 'yyyy-MM-dd')
+    Promise.all([
+      supabase.from('leads').select('*', { count: 'exact', head: true }),
+      supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', today),
+    ]).then(([{ count: totalAll }, { count: newTodayCount }]) => {
+      setStats(prev => ({ ...prev, total: totalAll ?? 0, newToday: newTodayCount ?? 0 }))
     })
 
     Promise.all([
@@ -168,14 +181,6 @@ export function LeadsClient() {
       }
       setLeads((data as Lead[]) ?? [])
       setTotalCount(count ?? 0)
-
-      const today = format(new Date(), 'yyyy-MM-dd')
-      // Overall stats — independent of the current filter/page
-      const [{ count: totalAll }, { count: newTodayCount }] = await Promise.all([
-        supabase.from('leads').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', today),
-      ])
-      setStats(prev => ({ ...prev, total: totalAll ?? 0, newToday: newTodayCount ?? 0 }))
     } catch (err: unknown) {
       console.error('Fetch Leads Error:', err)
     } finally {

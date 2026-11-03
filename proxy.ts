@@ -11,6 +11,28 @@ export async function proxy(request: NextRequest) {
     },
   })
 
+  const { pathname } = request.nextUrl
+
+  // Routes that never use the visitor's session are let through before any
+  // Supabase call. getUser() is a network round trip to Supabase Auth, and it
+  // used to run first — so every API call, every webhook (biometric punches,
+  // the WhatsApp bot, Meta, IVR) and every public link paid for a session
+  // lookup whose answer was then ignored. API routes authenticate themselves
+  // (and can refresh their own cookies); public pages need no session.
+  const isApiRoute    = pathname.startsWith('/api')
+  // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
+  // forms (Meta ads landing pages at /f/{slug}) + Review QR pages customers
+  // reach by scanning (/r/{slug}) + walk-in registration page
+  const isPublicLink  = pathname.startsWith('/i/') || pathname.startsWith('/f/') || pathname.startsWith('/r/')
+  const isWalkinRoute = pathname === '/walkin'
+  // Public associate registration link shared on WhatsApp
+  const isJoinRoute   = pathname === '/join'
+  // PWA install assets. These were being redirected to /login, so "Add to Home
+  // Screen" never picked up the app name or icons.
+  const isPwaAsset    = pathname === '/manifest.webmanifest' || pathname === '/sw.js'
+
+  if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -36,30 +58,16 @@ export async function proxy(request: NextRequest) {
   // hit MIDDLEWARE_INVOCATION_TIMEOUT (504) on every page, login included.
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id ?? null
-  const { pathname } = request.nextUrl
 
   const isStudentRoute   = pathname.startsWith('/student/') && pathname !== '/student/login'
   const isStudentLogin   = pathname === '/student/login'
   const isAdminLogin     = pathname === '/login'
-  const isApiRoute       = pathname.startsWith('/api')
   const isAssociateRoute = pathname.startsWith('/associate')
   // Berojgar Bharat — a separate business in the same app. Its staff never see
   // the DCW side and DCW staff never see theirs; both directions are enforced
   // here rather than trusted to the UI.
   const isBbRoute        = pathname.startsWith('/bb')
-  // Public short links (invoice PDFs shared on WhatsApp) + public lead-capture
-  // forms (Meta ads landing pages at /f/{slug}) + Review QR pages customers
-  // reach by scanning (/r/{slug}) + walk-in registration page
-  const isPublicLink     = pathname.startsWith('/i/') || pathname.startsWith('/f/') || pathname.startsWith('/r/')
-  const isWalkinRoute    = pathname === '/walkin'
-  // Public associate registration link shared on WhatsApp
-  const isJoinRoute      = pathname === '/join'
-  // PWA install assets. These were being redirected to /login, so "Add to Home
-  // Screen" never picked up the app name or icons.
-  const isPwaAsset       = pathname === '/manifest.webmanifest' || pathname === '/sw.js'
-  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isBbRoute && !isAdminLogin && !isStudentLogin && !isPublicLink && !isPwaAsset && !isWalkinRoute && !isJoinRoute
-
-  if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
+  const isAdminRoute     = !isStudentRoute && !isAssociateRoute && !isBbRoute && !isAdminLogin && !isStudentLogin
 
   if (userId) {
     const { data: profile } = await supabase

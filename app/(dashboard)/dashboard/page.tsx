@@ -64,7 +64,6 @@ export default async function DashboardPage() {
     { count: totalLeads },
     { count: newToday },
     { count: convertedThisMonth },
-    { count: totalLeadsForRate },
     { data: paymentsThisMonth },
     { data: studentFees },
     { count: activeStudents },
@@ -82,7 +81,6 @@ export default async function DashboardPage() {
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd), 'leads'),
     applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'converted').gte('converted_at', monthStart).lte('converted_at', monthEnd), 'leads'),
-    applyScope(supabase.from('leads').select('*', { count: 'exact', head: true }), 'leads'),
     paymentsQuery,
     applyScope(supabase.from('students').select('total_fee, amount_paid'), 'students'),
     applyScope(supabase.from('students').select('*', { count: 'exact', head: true }), 'students'),
@@ -106,7 +104,7 @@ export default async function DashboardPage() {
   const outstandingFees = ((studentFees ?? []) as { total_fee: number | null; amount_paid: number | null }[]).reduce((s, r) => s + Math.max(0, (r.total_fee ?? 0) - (r.amount_paid ?? 0)), 0)
 
   const conversionCount = convertedThisMonth ?? 0
-  const totalCount = totalLeadsForRate || 1
+  const totalCount = totalLeads || 1
   const conversionRate = ((conversionCount / totalCount) * 100).toFixed(1) + '%'
 
   const recentLeads = ((recentLeadsRaw ?? []) as { id: string; full_name: string; status: string; created_at: string; courses: { name: string } | null }[]).map((l) => ({

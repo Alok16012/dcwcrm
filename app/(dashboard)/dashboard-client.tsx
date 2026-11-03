@@ -6,7 +6,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
 import { MobileHome } from '@/components/dashboard/MobileHome'
+import dynamic from 'next/dynamic'
 import type { UserRole } from '@/types/app.types'
+
+// Browser-only: it reads the date and localStorage to decide whether to play
+const DiwaliCelebration = dynamic(() => import('@/components/dashboard/DiwaliCelebration'), { ssr: false })
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
@@ -164,6 +168,7 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-4">
+      <DiwaliCelebration name={userName} />
       <MobileHome
         name={userName} role={role} moduleRights={moduleRights} isLead={isLead}
         newToday={newToday} followupsToday={followupsToday.length} todayAppointments={todayAppointments}

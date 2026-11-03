@@ -56,9 +56,11 @@ function Leaf({ x, y, rot }: { x: number; y: number; rot: number }) {
 
 /**
  * The garland for one corner: a swag dipping along the top edge, plus strands
- * hanging down the outer side, each ending in a small brass bell.
+ * hanging down the outer side, each ending in a small brass bell. `compact` is
+ * the phone version: one short strand, kept inside the 16px side gutter so it
+ * never hangs over the greeting.
  */
-function Toran({ side }: { side: 'left' | 'right' }) {
+function Toran({ side, compact = false }: { side: 'left' | 'right'; compact?: boolean }) {
   // Swag: a curve from the corner across the top, marigolds placed along it.
   const swag = Array.from({ length: 11 }, (_, k) => {
     const t = k / 10
@@ -68,16 +70,18 @@ function Toran({ side }: { side: 'left' | 'right' }) {
   })
   // Strands of different lengths, hanging from the outer edge.
   // Kept to the outer ~55px so they hang in the margin, clear of the content.
-  const strands = [
-    { x: 14, len: 8 },
-    { x: 36, len: 5 },
-    { x: 56, len: 3 },
-  ]
+  const strands = compact
+    ? [{ x: 12, len: 3 }]
+    : [
+        { x: 14, len: 8 },
+        { x: 36, len: 5 },
+        { x: 56, len: 3 },
+      ]
 
   return (
     <svg
-      viewBox="0 0 280 230"
-      className={`absolute top-0 ${side === 'left' ? 'left-0' : 'right-0 -scale-x-100'} w-[200px] lg:w-[280px] h-auto drop-shadow-sm`}
+      viewBox={compact ? '0 0 280 110' : '0 0 280 230'}
+      className={`absolute top-0 ${side === 'left' ? 'left-0' : 'right-0 -scale-x-100'} ${compact ? 'w-[160px]' : 'w-[200px] lg:w-[280px]'} h-auto drop-shadow-sm`}
       aria-hidden="true"
     >
       {/* string */}
@@ -119,21 +123,24 @@ function Toran({ side }: { side: 'left' | 'right' }) {
 }
 
 /** A clay diya with a flickering flame and a soft glow, plus gold swirls. */
-function Diya() {
+/** `id` keeps the gradient ids unique: two diyas render (phone + desktop) and
+ *  a url(#…) that resolves to the hidden one's gradient paints nothing. */
+function Diya({ id, className = 'w-[200px] lg:w-[240px]' }: { id: string; className?: string }) {
+  const glow = `dcw-diya-glow-${id}`, clay = `dcw-diya-clay-${id}`, flame = `dcw-diya-flame-${id}`
   return (
-    <svg viewBox="0 0 260 150" className="w-[200px] lg:w-[240px] h-auto" aria-hidden="true">
+    <svg viewBox="0 0 260 150" className={`${className} h-auto`} aria-hidden="true">
       <defs>
-        <radialGradient id="dcw-diya-glow" cx="50%" cy="50%" r="50%">
+        <radialGradient id={glow} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#fde68a" stopOpacity={0.85} />
           <stop offset="45%" stopColor="#fbbf24" stopOpacity={0.35} />
           <stop offset="100%" stopColor="#fbbf24" stopOpacity={0} />
         </radialGradient>
-        <linearGradient id="dcw-diya-clay" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={clay} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#ea580c" />
           <stop offset="55%" stopColor="#c2410c" />
           <stop offset="100%" stopColor="#7c2d12" />
         </linearGradient>
-        <linearGradient id="dcw-diya-flame" x1="0" y1="1" x2="0" y2="0">
+        <linearGradient id={flame} x1="0" y1="1" x2="0" y2="0">
           <stop offset="0%" stopColor="#f97316" />
           <stop offset="45%" stopColor="#fbbf24" />
           <stop offset="100%" stopColor="#fffbeb" />
@@ -149,18 +156,18 @@ function Diya() {
       </g>
 
       {/* glow */}
-      <ellipse className="dcw-diya-glow" cx={120} cy={62} rx={62} ry={50} fill="url(#dcw-diya-glow)" />
+      <ellipse className="dcw-diya-glow" cx={120} cy={62} rx={62} ry={50} fill={`url(#${glow})`} />
 
       {/* flame */}
       <g className="dcw-diya-flame" style={{ transformOrigin: '120px 92px' }}>
-        <path d="M 120 50 C 132 68, 134 82, 120 92 C 106 82, 108 68, 120 50 Z" fill="url(#dcw-diya-flame)" />
+        <path d="M 120 50 C 132 68, 134 82, 120 92 C 106 82, 108 68, 120 50 Z" fill={`url(#${flame})`} />
         <path d="M 120 68 C 125 76, 125 84, 120 89 C 115 84, 115 76, 120 68 Z" fill="#fffbeb" opacity={0.9} />
       </g>
       {/* wick */}
       <line x1={120} y1={92} x2={121} y2={99} stroke="#292524" strokeWidth={2} />
 
       {/* bowl */}
-      <path d="M 72 98 Q 120 92 168 98 Q 162 132 120 136 Q 78 132 72 98 Z" fill="url(#dcw-diya-clay)" />
+      <path d="M 72 98 Q 120 92 168 98 Q 162 132 120 136 Q 78 132 72 98 Z" fill={`url(#${clay})`} />
       {/* spout */}
       <path d="M 160 99 Q 178 94 182 98 Q 174 106 164 106 Z" fill="#c2410c" />
       {/* rim + oil */}
@@ -194,7 +201,7 @@ function Sparkles() {
 /** Behind the cards: the warm wash and the diya. */
 export function FestiveBackdrop() {
   return (
-    <div aria-hidden="true" className="hidden md:block pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-none">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-none">
       <div
         className="absolute inset-0"
         style={{
@@ -211,9 +218,15 @@ export function FestiveBackdrop() {
 /** Over the cards, but only along the edges: the torans and the lights. */
 export function FestiveGarlands() {
   return (
-    <div aria-hidden="true" className="hidden md:block pointer-events-none absolute inset-x-0 top-0 h-60 z-20 overflow-hidden">
-      <Toran side="left" />
-      <Toran side="right" />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 md:h-60 z-20 overflow-hidden">
+      <div className="md:hidden">
+        <Toran side="left" compact />
+        <Toran side="right" compact />
+      </div>
+      <div className="hidden md:block">
+        <Toran side="left" />
+        <Toran side="right" />
+      </div>
       <Sparkles />
     </div>
   )
@@ -223,12 +236,19 @@ export function FestiveGarlands() {
  * The diya, bottom-left of the dashboard, behind the cards — it shows in the
  * empty space under them and never covers a number. The festive wrapper is at
  * least a screen tall, so on a short dashboard this is the bottom of the view.
+ * On a phone the page is a long scroll, so it sits top-right instead, in the
+ * space beside the greeting where it is seen straight away.
  */
 export function FestiveDiya() {
   return (
-    <div aria-hidden="true" className="hidden md:block pointer-events-none absolute bottom-0 left-2 -z-10">
-      <Diya />
-    </div>
+    <>
+      <div aria-hidden="true" className="md:hidden pointer-events-none absolute top-11 right-2 -z-10">
+        <Diya id="m" className="w-[110px]" />
+      </div>
+      <div aria-hidden="true" className="hidden md:block pointer-events-none absolute bottom-0 left-2 -z-10">
+        <Diya id="d" />
+      </div>
+    </>
   )
 }
 

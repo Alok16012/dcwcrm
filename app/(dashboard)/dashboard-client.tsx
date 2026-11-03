@@ -175,7 +175,7 @@ export default function DashboardClient({
     // corners, and pads back in so the cards stay clear of the strands.
     // min-h fills the visible content area (less the top bar and footer), so the
     // wash reaches the bottom and the diya has empty space to sit in.
-    <div className={`space-y-4 ${festive ? 'relative isolate md:-mx-6 md:-mt-6 md:px-12 lg:px-16 md:pt-14 lg:pt-16 md:pb-2 md:min-h-[calc(100vh-7rem)]' : ''}`}>
+    <div className={`space-y-4 ${festive ? 'relative isolate -mx-4 -mt-1 px-4 pt-11 pb-2 md:-mx-6 md:-mt-6 md:px-12 lg:px-16 md:pt-14 lg:pt-16 md:pb-2 md:min-h-[calc(100vh-7rem)]' : ''}`}>
       {festive && (
         <>
           <FestiveStyles />

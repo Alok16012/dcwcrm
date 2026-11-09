@@ -251,64 +251,113 @@ export function ChhathBandStyles() {
   )
 }
 
+const CHM_COLORS = ['#f97316', '#fbbf24', '#ea580c', '#f59e0b']
+const CHM_SWAG = Array.from({ length: 11 }, (_, k) => ({ x: 8 + k * 15, y: 9 + Math.sin((k / 10) * Math.PI) * 12 }))
+
+/** A phone-sized corner garland: a swag along the top, strands down the side. */
+function MobileCorner({ flip }: { flip?: boolean }) {
+  const C = CHM_COLORS, swag = CHM_SWAG
+  return (
+    <div className={`chm-float absolute top-0 ${flip ? 'right-0 -scale-x-100' : 'left-0'}`} style={flip ? { animationDelay: '-2.5s' } : undefined}>
+      <svg viewBox="0 0 170 120" className="w-[150px] h-auto">
+        <path d={`M ${swag.map(p => `${p.x} ${p.y}`).join(' L ')}`} stroke="#92400e" strokeWidth="1" fill="none" opacity="0.4" />
+        {swag.slice(0, -1).map((p, k) => (
+          <path key={`l${k}`} d={`M${p.x + 7} ${p.y + 4} q ${k % 2 ? 4 : -4} 8 0 16 q ${k % 2 ? -3 : 3} -8 0 -16`} fill={k % 2 ? '#15803d' : '#166534'} />
+        ))}
+        {swag.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r="7" fill={C[k % 4]} />)}
+        {[{ x: 7, n: 7 }, { x: 22, n: 4 }].map(({ x, n }) => (
+          <g key={x}>
+            {Array.from({ length: n }, (_, k) => <circle key={k} cx={x} cy={22 + k * 12} r="6" fill={C[(k + x) % 4]} />)}
+            <path d={`M ${x - 4} ${22 + n * 12} q 4 -8 8 0 l 1 4 h -10 z`} fill="#d4a017" />
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
 /**
- * The phone version of the band: the same sunrise, garlands, river, the
- * woman with the soop and the greeting, drawn light — one circle per
- * marigold, and every animation a transform or opacity on an HTML layer, so
- * the GPU moves it and the phone never redraws the picture.
+ * The phone version of the band: the same sunrise, draping garlands, birds,
+ * river, the woman with the soop, devotees and the script greeting — drawn
+ * light (one circle per marigold) and moved only by transform/opacity on
+ * HTML layers, so the GPU animates it and slow phones stay smooth.
  */
 export function ChhathBandMobile() {
-  const flowers = (n: number) => Array.from({ length: n }, (_, k) => (
-    <circle key={k} cx={8 + k * 15} cy={8 + Math.sin((k / (n - 1)) * Math.PI) * 9} r="6.5" fill={['#f97316', '#fbbf24', '#ea580c', '#f59e0b'][k % 4]} />
-  ))
   return (
-    <div aria-hidden className="chm-in pointer-events-none select-none relative h-[150px] overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #fff7ed 0%, #fed7aa 58%, #fdba74 74%)' }}>
-      {/* sun */}
-      <div className="chm-rise absolute left-[42%] top-[52px] -ml-[34px] h-[68px] w-[68px] rounded-full"
-        style={{ background: 'radial-gradient(circle at 45% 40%, #fffbeb 0%, #fde68a 50%, #fb923c 100%)', boxShadow: '0 0 40px 18px rgba(254,243,199,0.8)' }} />
+    <div aria-hidden className="chm-in pointer-events-none select-none relative h-[190px] overflow-hidden"
+      style={{ background: 'linear-gradient(180deg, #fff7ed 0%, #fed7aa 60%, #fdba74 76%)' }}>
+      {/* sun with turning rays (the wrapper rotates, on the GPU) */}
+      <div className="chm-rise absolute left-[40%] top-[78px] -ml-[55px] h-[110px] w-[110px]">
+        <div className="chm-spin absolute inset-0">
+          <svg viewBox="0 0 110 110" className="h-full w-full">
+            {Array.from({ length: 14 }, (_, i) => (
+              <rect key={i} x="53" y="2" width="4" height="16" rx="2" fill="#f59e0b" opacity="0.45" transform={`rotate(${i * (360 / 14)} 55 55)`} />
+            ))}
+          </svg>
+        </div>
+        <div className="absolute inset-[24px] rounded-full"
+          style={{ background: 'radial-gradient(circle at 45% 40%, #fffbeb 0%, #fde68a 50%, #fb923c 100%)', boxShadow: '0 0 36px 14px rgba(254,243,199,0.85)' }} />
+      </div>
       {/* birds */}
-      <span className="chm-bird absolute top-[22px] left-0 text-[13px] text-stone-600">︶︶</span>
-      <span className="chm-bird absolute top-[38px] left-0 text-[10px] text-stone-500" style={{ animationDelay: '-9s', animationDuration: '26s' }}>︶</span>
-      {/* river */}
-      <div className="absolute inset-x-0 bottom-0 h-[40px]" style={{ background: 'linear-gradient(180deg, #fcd9b6 0%, #bae6fd 40%, #7dd3fc 100%)' }} />
-      <div className="chm-wave absolute bottom-[8px] left-0 h-[14px] w-[200%]">
-        <svg viewBox="0 0 800 14" preserveAspectRatio="none" className="h-full w-full">
-          <path d="M0 7 Q 25 0 50 7 T 100 7 T 150 7 T 200 7 T 250 7 T 300 7 T 350 7 T 400 7 T 450 7 T 500 7 T 550 7 T 600 7 T 650 7 T 700 7 T 750 7 T 800 7 V 14 H 0 Z" fill="#ffffff" opacity="0.45" />
+      {[{ t: 30, d: 0, w: 18 }, { t: 46, d: -8, w: 13 }, { t: 24, d: -15, w: 15 }].map((b, i) => (
+        <svg key={i} viewBox="0 0 40 16" className="chm-bird absolute left-0" style={{ top: b.t, width: b.w, animationDelay: `${b.d}s`, animationDuration: `${24 + i * 4}s` }}>
+          <path d="M2 6 Q 11 0 20 10 Q 29 0 38 6" stroke="#44403c" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+        </svg>
+      ))}
+      {/* far bank and river */}
+      <div className="absolute inset-x-0 bottom-[46px] h-[8px] bg-[#d6a78a]/50" style={{ borderRadius: '50% 50% 0 0 / 100% 100% 0 0' }} />
+      <div className="absolute inset-x-0 bottom-0 h-[48px]" style={{ background: 'linear-gradient(180deg, #fcd9b6 0%, #bae6fd 40%, #7dd3fc 100%)' }} />
+      <div className="chm-wave absolute bottom-[10px] left-0 h-[16px] w-[200%]">
+        <svg viewBox="0 0 800 16" preserveAspectRatio="none" className="h-full w-full">
+          <path d="M0 8 Q 25 0 50 8 T 100 8 T 150 8 T 200 8 T 250 8 T 300 8 T 350 8 T 400 8 T 450 8 T 500 8 T 550 8 T 600 8 T 650 8 T 700 8 T 750 8 T 800 8 V 16 H 0 Z" fill="#ffffff" opacity="0.45" />
         </svg>
       </div>
-      <div className="absolute left-1/2 bottom-[18px] -ml-[30px] h-[3px] w-[60px] rounded-full bg-amber-100/90 chm-glint" />
-      {/* woman with the soop */}
-      <WomanSoop className="absolute bottom-0 left-[3%] w-[86px] h-auto -scale-x-100" />
+      {[0, 1, 2].map(i => (
+        <div key={i} className="chm-glint absolute left-[40%] h-[3px] rounded-full bg-amber-100" style={{ bottom: 30 - i * 8, width: 56 - i * 14, marginLeft: -(56 - i * 14) / 2, animationDelay: `${i * 0.3}s` }} />
+      ))}
+      {/* the woman with the soop, devotees, diyas */}
+      <WomanSoop className="absolute bottom-0 left-[1%] w-[96px] h-auto -scale-x-100" />
+      <Devotees className="absolute bottom-[26px] right-[6%] w-[30px] h-auto opacity-80" />
+      {[52, 70].map((left, i) => (
+        <span key={left} className="chm-bob absolute text-sm" style={{ left: `${left}%`, bottom: 8 + i * 6, animationDelay: `${i * 0.9}s`, textShadow: '0 0 8px rgba(253,186,116,0.95)' }}>🪔</span>
+      ))}
       {/* greeting */}
-      <div className="absolute right-[5%] top-[44px] text-center">
-        <p className="font-serif italic font-bold text-[22px] leading-none text-[#1e3a8a]">Happy</p>
-        <p className="font-serif italic font-extrabold text-[28px] leading-tight text-[#b91c1c] drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">Chhath Puja</p>
+      <div className="absolute right-[4%] top-[50px] text-center">
+        <svg viewBox="0 0 80 30" className="mx-auto w-[38px] h-auto">
+          {Array.from({ length: 9 }, (_, k) => (
+            <path key={k} d="M40 30 L 38 10 L 42 10 Z" fill="#dc2626" transform={`rotate(${-80 + k * 20} 40 30)`} />
+          ))}
+          <circle cx="40" cy="30" r="10" fill="#ea580c" />
+        </svg>
+        <p className="font-serif italic font-bold text-[21px] leading-none text-[#1e3a8a] drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">Happy</p>
+        <p className="font-serif italic font-extrabold text-[26px] leading-tight text-[#b91c1c] drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">Chhath Puja</p>
+        <svg viewBox="0 0 200 12" className="mx-auto w-[110px] h-auto">
+          <path d="M 0 6 H 88 M 112 6 H 200" stroke="#b91c1c" strokeWidth="2" />
+          <path d="M 100 0 L 106 6 L 100 12 L 94 6 Z" fill="#b91c1c" />
+        </svg>
       </div>
-      {/* garlands in the corners */}
-      <svg viewBox="0 0 110 26" className="chm-float absolute left-0 top-0 w-[130px] h-auto">{flowers(8)}</svg>
-      <svg viewBox="0 0 110 26" className="chm-float absolute right-0 top-0 w-[130px] h-auto -scale-x-100" style={{ animationDelay: '-2s' }}>{flowers(8)}</svg>
-      <svg viewBox="0 0 14 80" className="absolute left-[2px] top-[10px] w-[12px] h-auto">
-        {[0, 1, 2, 3, 4].map(k => <circle key={k} cx="7" cy={8 + k * 15} r="6" fill={['#fbbf24', '#f97316'][k % 2]} />)}
-      </svg>
-      <svg viewBox="0 0 14 80" className="absolute right-[2px] top-[10px] w-[12px] h-auto">
-        {[0, 1, 2, 3, 4].map(k => <circle key={k} cx="7" cy={8 + k * 15} r="6" fill={['#f97316', '#fbbf24'][k % 2]} />)}
-      </svg>
+      <MobileCorner />
+      <MobileCorner flip />
       <style>{`
         .chm-in { animation: chm-in 1s ease-out both; }
         @keyframes chm-in { from { opacity: 0; } to { opacity: 1; } }
         .chm-rise { animation: chm-rise 5s cubic-bezier(0.2, 0.7, 0.3, 1) both; will-change: transform; }
-        @keyframes chm-rise { from { transform: translateY(46px); } to { transform: none; } }
+        @keyframes chm-rise { from { transform: translateY(50px); } to { transform: translateY(-34px); } }
+        .chm-spin { animation: chm-spin 40s linear infinite; will-change: transform; }
+        @keyframes chm-spin { to { transform: rotate(360deg); } }
         .chm-wave { animation: chm-wave 10s linear infinite; will-change: transform; }
         @keyframes chm-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .chm-bird { animation: chm-fly 22s linear infinite; will-change: transform; }
+        .chm-bird { animation: chm-fly 24s linear infinite; will-change: transform; }
         @keyframes chm-fly { from { transform: translateX(-30px); } to { transform: translateX(110vw); } }
         .chm-float { animation: chm-float 5s ease-in-out infinite; will-change: transform; }
         @keyframes chm-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 2px; } }
+        .chm-bob { animation: chm-bob 3.2s ease-in-out infinite; will-change: transform; }
+        @keyframes chm-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-4px) rotate(3deg); } }
         .chm-glint { animation: chm-glint 2.6s ease-in-out infinite; }
-        @keyframes chm-glint { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @keyframes chm-glint { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) {
-          .chm-in, .chm-rise, .chm-wave, .chm-bird, .chm-float, .chm-glint { animation: none; }
+          .chm-in, .chm-rise, .chm-spin, .chm-wave, .chm-bird, .chm-float, .chm-bob, .chm-glint { animation: none; }
+          .chm-rise { transform: translateY(-34px); }
         }
       `}</style>
     </div>

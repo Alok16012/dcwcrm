@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, PartyPopper } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ChhathScene } from './ChhathScene'
 
 /**
  * A festival greeting (migration 124) on a dashboard: the admin's image with
@@ -18,6 +19,25 @@ interface Banner {
   message: string | null
   image_url: string
   effect: 'petals' | 'sparkles' | 'none'
+  /** Built-in greetings draw their own picture instead of an uploaded image. */
+  Scene?: () => React.JSX.Element
+}
+
+/**
+ * Greetings that ship with the app, so a festival gets a banner even before
+ * anyone uploads one. An uploaded banner for the same days wins.
+ */
+const BUILTIN_GREETINGS: (Banner & { from: string; to: string; audiences: GreetingAudience[] })[] = [
+  {
+    // Chhath Puja 2026, from the end of Diwali through Usha Arghya
+    id: 'builtin-chhath-2026', title: 'Chhath Puja', image_url: '', effect: 'petals', Scene: ChhathScene,
+    message: 'Surya Dev aur Chhathi Maiya aapko sehat, urja aur samriddhi dein — Team Distance Courses Wala',
+    from: '2026-11-09', to: '2026-11-16', audiences: ['staff', 'student', 'associate'],
+  },
+]
+
+function builtinFor(audience: GreetingAudience, today: string): Banner | null {
+  return BUILTIN_GREETINGS.find(g => g.audiences.includes(audience) && g.from <= today && today <= g.to) ?? null
 }
 
 const todayIST = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
@@ -44,11 +64,14 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
       .gte('ends_on', today)
       .order('starts_on', { ascending: false })
       .limit(1)
-      .then(({ data }: { data: Banner[] | null }) => {
-        if (cancelled || !data?.[0]) return
-        setBanner(data[0])
-        setHidden(readHidden(data[0].id, today))
-      }, () => { /* no table yet / offline: show nothing */ })
+      .then(({ data }: { data: Banner[] | null }) => show(data?.[0] ?? builtinFor(audience, today)),
+        // No table yet (migration 124 not run) or offline: the built-in one still shows
+        () => show(builtinFor(audience, today)))
+    function show(b: Banner | null) {
+      if (cancelled || !b) return
+      setBanner(b)
+      setHidden(readHidden(b.id, today))
+    }
     return () => { cancelled = true }
   }, [audience, today])
 
@@ -75,6 +98,9 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
     )
   }
 
+  // A drawn scene is ready at once; an uploaded image once it has loaded.
+  const ready = loaded || !!banner.Scene
+
   function hide() {
     try { localStorage.setItem(hiddenKey(banner!.id), today) } catch { /* ignore */ }
     setHidden(true)
@@ -82,20 +108,24 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
 
   return (
     <div className={`greeting-in relative mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-lg shadow-orange-200/50 ring-1 ring-amber-200/70 ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded image of any size */}
-      <img
-        src={banner.image_url}
-        alt={banner.title}
-        onLoad={() => setLoaded(true)}
-        className={`block w-full h-auto transition-opacity duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-      />
-      {!loaded && <div className="aspect-[16/7] w-full animate-pulse bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50" />}
+      {banner.Scene ? <banner.Scene /> : (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded image of any size */}
+          <img
+            src={banner.image_url}
+            alt={banner.title}
+            onLoad={() => setLoaded(true)}
+            className={`block w-full h-auto transition-opacity duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+          {!loaded && <div className="aspect-[16/7] w-full animate-pulse bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50" />}
+        </>
+      )}
 
       {/* One shine across the image after it lands */}
-      {loaded && <div className="greeting-shine pointer-events-none absolute inset-0" />}
+      {ready && <div className="greeting-shine pointer-events-none absolute inset-0" />}
 
       {/* Falling petals / twinkling sparkles */}
-      {loaded && banner.effect !== 'none' && (
+      {ready && banner.effect !== 'none' && (
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {particles.map((p, i) => banner.effect === 'petals' ? (
             <span

@@ -10,12 +10,15 @@
  * window (./festival).
  */
 
+import { ChhathCelebration } from './ChhathCelebration'
+import { ChhathBand, ChhathBandStyles, ChhathGhat } from './ChhathBand'
+
 const MARIGOLD = ['#f97316', '#fb923c', '#f59e0b', '#fbbf24', '#ea580c']
 const SKIN = '#c98b5e'
 const SKIN_SHADE = '#b07148'
 
 /** One puffy marigold. */
-function Marigold({ cx, cy, r, i }: { cx: number; cy: number; r: number; i: number }) {
+export function Marigold({ cx, cy, r, i }: { cx: number; cy: number; r: number; i: number }) {
   const c = MARIGOLD[i % MARIGOLD.length]
   return (
     <g>
@@ -46,7 +49,7 @@ function Swag({ i }: { i: number }) {
 }
 
 /** A strand of marigolds hanging down a side. */
-function Strand({ count, className }: { count: number; className: string }) {
+export function Strand({ count, className }: { count: number; className: string }) {
   return (
     <svg viewBox={`0 0 24 ${count * 18 + 20}`} className={className} aria-hidden>
       <line x1="12" y1="0" x2="12" y2={count * 18} stroke="#92400e" strokeWidth="1" opacity="0.5" />
@@ -57,28 +60,28 @@ function Strand({ count, className }: { count: number; className: string }) {
 }
 
 /** The rising sun, rays turning slowly. */
-function Sun({ className }: { className: string }) {
+function Sun({ id, className }: { id: string; className: string }) {
   return (
     <svg viewBox="0 0 300 300" className={className} aria-hidden>
       <defs>
-        <radialGradient id="ch-halo" cx="50%" cy="50%" r="50%">
+        <radialGradient id={`ch-halo-${id}`} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#fde68a" stopOpacity="0.95" />
           <stop offset="60%" stopColor="#fdba74" stopOpacity="0.3" />
           <stop offset="100%" stopColor="#fdba74" stopOpacity="0" />
         </radialGradient>
-        <radialGradient id="ch-disc" cx="45%" cy="40%" r="60%">
+        <radialGradient id={`ch-disc-${id}`} cx="45%" cy="40%" r="60%">
           <stop offset="0%" stopColor="#fffbeb" />
           <stop offset="45%" stopColor="#fcd34d" />
           <stop offset="100%" stopColor="#f97316" />
         </radialGradient>
       </defs>
-      <circle cx="150" cy="150" r="150" fill="url(#ch-halo)" />
+      <circle cx="150" cy="150" r="150" fill={`url(#ch-halo-${id})`} />
       <g className="ch-rays" style={{ transformOrigin: '150px 150px' }}>
         {Array.from({ length: 18 }, (_, i) => (
           <rect key={i} x="146" y="20" width="8" height="40" rx="4" fill="#f59e0b" opacity="0.4" transform={`rotate(${i * 20} 150 150)`} />
         ))}
       </g>
-      <circle cx="150" cy="150" r="64" fill="url(#ch-disc)" />
+      <circle cx="150" cy="150" r="64" fill={`url(#ch-disc-${id})`} />
     </svg>
   )
 }
@@ -110,7 +113,7 @@ function Head({ x, y, dir, saree, border }: { x: number; y: number; dir: 1 | -1;
 }
 
 /** The woman offering arghya: lota tipped, water streaming into the river. */
-function WomanArghya({ className }: { className: string }) {
+export function WomanArghya({ className }: { className: string }) {
   const saree = '#9f1239', border = '#facc15'
   return (
     <svg viewBox="0 0 220 300" className={className} aria-hidden>
@@ -143,7 +146,7 @@ function WomanArghya({ className }: { className: string }) {
 }
 
 /** The woman holding the soop of fruits up to the sun. */
-function WomanSoop({ className }: { className: string }) {
+export function WomanSoop({ className }: { className: string }) {
   const saree = '#dc2626', border = '#facc15'
   return (
     <svg viewBox="0 0 220 300" className={className} aria-hidden>
@@ -187,7 +190,7 @@ function WomanSoop({ className }: { className: string }) {
 }
 
 /** River band with moving waves; drawn in front of the women's skirts. */
-function River({ className }: { className: string }) {
+function River({ id, className }: { id: string; className: string }) {
   const wave = (y: number) => {
     let d = `M0 ${y}`
     for (let x = 0; x <= 2400; x += 100) d += ` Q ${x + 50} ${y - 12} ${x + 100} ${y}`
@@ -196,12 +199,12 @@ function River({ className }: { className: string }) {
   return (
     <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className={className} aria-hidden>
       <defs>
-        <linearGradient id="ch-water" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`ch-water-${id}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#7dd3fc" />
           <stop offset="100%" stopColor="#0284c7" />
         </linearGradient>
       </defs>
-      <g className="ch-wave"><path d={wave(24)} fill="url(#ch-water)" /></g>
+      <g className="ch-wave"><path d={wave(24)} fill={`url(#ch-water-${id})`} /></g>
       <g className="ch-wave ch-wave-slow"><path d={wave(52)} fill="#0ea5e9" opacity="0.55" /></g>
       <rect y="100" width="1200" height="20" fill="#d97706" opacity="0.9" />
       <path d="M0 104 H1200" stroke="#fde68a" strokeWidth="3" strokeDasharray="10 8" />
@@ -213,7 +216,7 @@ function River({ className }: { className: string }) {
  * The festival scene across the top of the page — toran, sun, greeting, the
  * two women in the river — sized to bleed to the page edges.
  */
-export function ChhathHero({ name }: { name?: string }) {
+export function ChhathHero({ name, id = 'page', subtitle = true }: { name?: string; id?: string; subtitle?: boolean }) {
   const first = (name ?? '').trim().split(/\s+/)[0]
   return (
     <div aria-label="Happy Chhath Puja" className="relative h-[250px] md:h-[330px] overflow-hidden pointer-events-none select-none">
@@ -227,16 +230,16 @@ export function ChhathHero({ name }: { name?: string }) {
 
       {/* sun rising behind the greeting */}
       <div className="ch-rise absolute left-1/2 top-2 md:top-0">
-        <Sun className="w-[220px] md:w-[300px] h-auto" />
+        <Sun id={id} className="w-[220px] md:w-[300px] h-auto" />
       </div>
 
       {/* greeting */}
       <div className="ch-in absolute inset-x-0 top-[62px] md:top-[78px] z-10 flex flex-col items-center px-24 md:px-56 text-center">
         <p className="font-serif italic text-2xl md:text-4xl font-bold text-orange-600 drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">Happy</p>
         <p className="-mt-1 text-4xl md:text-6xl font-extrabold text-rose-900 drop-shadow-[0_2px_0_rgba(255,255,255,0.7)]">छठ पूजा</p>
-        <p className="mt-1 hidden sm:block max-w-md text-xs md:text-sm font-medium text-rose-900/80">
+        {subtitle && <p className="mt-1 hidden sm:block max-w-md text-xs md:text-sm font-medium text-rose-900/80">
           {first ? `${first}, ` : ''}Surya Dev aapko sehat, urja aur samriddhi dein 🙏
-        </p>
+        </p>}
       </div>
 
       {/* the two women, standing in the river */}
@@ -244,7 +247,7 @@ export function ChhathHero({ name }: { name?: string }) {
       <WomanSoop className="ch-woman absolute bottom-6 right-[4%] md:right-[7%] w-[110px] md:w-[220px] h-auto z-10" />
 
       {/* river in front of them */}
-      <River className="absolute inset-x-0 bottom-0 z-10 h-[64px] md:h-[84px] w-full" />
+      <River id={id} className="absolute inset-x-0 bottom-0 z-10 h-[64px] md:h-[84px] w-full" />
       {[20, 38, 60, 78].map((left, i) => (
         <span key={left} className="ch-diya absolute z-10 text-lg md:text-2xl" style={{ left: `${left}%`, bottom: `${18 + (i % 2) * 12}px`, animationDelay: `${i * 0.8}s` }}>🪔</span>
       ))}
@@ -264,9 +267,9 @@ export function ChhathBackdrop() {
 }
 
 /** Petals drifting down the page, never catching a click. */
-export function ChhathPetals() {
+export function ChhathPetals({ className = '' }: { className?: string }) {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-30 overflow-hidden">
+    <div aria-hidden className={`pointer-events-none fixed inset-0 z-30 overflow-hidden ${className}`}>
       {Array.from({ length: 14 }, (_, i) => (
         <span key={i} className="ch-petal absolute -top-6 rounded-[60%_0_60%_0]" style={{
           left: `${(i * 41 + 7) % 100}%`,
@@ -321,11 +324,16 @@ export function ChhathPage({ name, className = '', heroClassName = '', children 
   name?: string; className?: string; heroClassName?: string; children: React.ReactNode
 }) {
   return (
-    <div className={`relative isolate ${className}`}>
+    <div className={`relative isolate md:pb-40 ${className}`}>
       <ChhathStyles />
       <ChhathBackdrop />
-      <ChhathPetals />
-      <div className={`mb-5 ${heroClassName}`}><ChhathHero name={name} /></div>
+      {/* On a phone the wish plays as a moment and leaves (ChhathCelebration);
+          bigger screens keep the scene on the page. */}
+      <ChhathPetals className="hidden md:block" />
+      <ChhathBandStyles />
+      <div className={`mb-5 hidden md:block ${heroClassName}`}><ChhathBand id="portal" /></div>
+      <div className="hidden md:block"><ChhathGhat /></div>
+      <ChhathCelebration name={name} />
       {children}
     </div>
   )

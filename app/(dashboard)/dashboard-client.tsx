@@ -9,7 +9,9 @@ import { MobileHome } from '@/components/dashboard/MobileHome'
 import type { UserRole } from '@/types/app.types'
 
 // Browser-only: it reads the date and localStorage to decide whether to play
-import { ChhathBackdrop, ChhathHero, ChhathPetals, ChhathStyles } from '@/components/dashboard/ChhathTheme'
+import { ChhathBackdrop, ChhathPetals, ChhathStyles } from '@/components/dashboard/ChhathTheme'
+import { ChhathBand, ChhathBandStyles, ChhathGhat } from '@/components/dashboard/ChhathBand'
+import { ChhathCelebration } from '@/components/dashboard/ChhathCelebration'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
@@ -176,13 +178,15 @@ export default function DashboardClient({
     // wash reaches the bottom and the diya has empty space to sit in.
     // During Chhath the wrapper undoes the layout's padding so the festival
     // scene runs edge to edge, then pads the cards back in.
-    <div className={`space-y-4 ${festive ? 'relative isolate -mx-4 -mt-1 px-4 pb-6 md:-mx-6 md:-mt-6 md:px-6 md:min-h-[calc(100vh-7rem)]' : ''}`}>
+    <div className={`space-y-4 ${festive ? 'relative isolate -mx-4 -mt-1 px-4 pb-6 md:-mx-6 md:-mt-6 md:px-6 md:pt-28 md:pb-40 md:min-h-[calc(100vh-7rem)]' : ''}`}>
       {festive && (
         <>
           <ChhathStyles />
           <ChhathBackdrop />
-          <ChhathPetals />
-          <div className="-mx-4 md:-mx-6"><ChhathHero name={userName} /></div>
+          <ChhathPetals className="hidden md:block" />
+          {/* Desktop: the sunrise band under the heading and tabs, the ghat at the foot */}
+          <div className="hidden md:block"><ChhathBandStyles /><ChhathBand behind id="staff" /><ChhathGhat /></div>
+          <ChhathCelebration name={userName} />
         </>
       )}
       <GreetingBanner audience="staff" />

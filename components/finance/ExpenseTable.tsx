@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { format } from 'date-fns'
-import { Plus, CheckCircle, XCircle, Trash2 } from 'lucide-react'
+import { Plus, CheckCircle, XCircle, Trash2, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -15,11 +16,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { DateRangeFilter, NO_DATE_RANGE, inDateRange, rangeBounds, type DateRangeValue } from '@/components/shared/DateRangeFilter'
 import { expenseSchema, type ExpenseFormData } from '@/lib/validations/expense.schema'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { ExpenseCategory } from '@/types/app.types'
+import { EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from '@/types/app.types'
 
 interface ExpenseRow {
   id: string
@@ -42,7 +44,9 @@ interface ExpenseTableProps {
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
-const CATEGORIES: ExpenseCategory[] = ['rent', 'utilities', 'marketing', 'travel', 'salary', 'vendor', 'misc', 'other']
+const CATEGORIES: ExpenseCategory[] = ['rent', 'utilities', 'marketing', 'travel', 'salary', 'board', 'university', 'event', 'misc', 'other']
+// Rows saved before migration 125 can still say 'vendor'.
+const categoryLabel = (c: string) => EXPENSE_CATEGORY_LABELS[c as ExpenseCategory] ?? (c === 'vendor' ? 'Vendor' : c)
 
 export default function ExpenseTable({ data: initialData, currentUserId, currentUserRole }: ExpenseTableProps) {
   const [data, setData] = useState(initialData)
@@ -50,8 +54,10 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
   const [billUrl, setBillUrl] = useState('')
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'approved' | 'rejected' | 'delete' } | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [range, setRange] = useState<DateRangeValue>(NO_DATE_RANGE)
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<ExpenseFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: { category: 'misc', amount: 0 },
   })
@@ -79,7 +85,10 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
         reset()
         setBillUrl('')
       } catch (e) {
-        toast.error('Failed to submit expense')
+        // 23514: the database doesn't know this category yet (migration 125 not run)
+        toast.error((e as { code?: string })?.code === '23514'
+          ? 'This category needs migration 125_expense_categories.sql — run it in Supabase'
+          : 'Failed to submit expense')
       }
     })
   }
@@ -127,7 +136,7 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
       accessorKey: 'category',
       header: 'Category',
       cell: ({ getValue }) => (
-        <Badge variant="outline" className="capitalize">{getValue() as string}</Badge>
+        <Badge variant="outline">{categoryLabel(getValue() as string)}</Badge>
       ),
     },
     { accessorKey: 'description', header: 'Description' },
@@ -198,6 +207,34 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
   const thisMonthTotal = thisMonthExpenses.reduce((s, e) => s + e.amount, 0)
   const pendingCount = data.filter((e) => e.status === 'pending').length
 
+  const filtered = useMemo(() => data.filter((e) =>
+    inDateRange(e.expense_date, range) && (!categoryFilter || e.category === categoryFilter)
+  ), [data, range, categoryFilter])
+  const filteredTotal = filtered.filter((e) => e.status !== 'rejected').reduce((s, e) => s + Number(e.amount || 0), 0)
+  const filtering = Boolean(range.preset || categoryFilter)
+
+  function exportExcel() {
+    if (filtered.length === 0) { toast.error('No expenses to export'); return }
+    const rows = filtered.map((e) => ({
+      Date: format(new Date(e.expense_date), 'dd-MM-yyyy'),
+      Category: categoryLabel(e.category),
+      Description: e.description,
+      'Amount (₹)': Number(e.amount || 0),
+      'Payment Mode': e.payment_mode ?? '',
+      Status: e.status.charAt(0).toUpperCase() + e.status.slice(1),
+      'Bill / Receipt': e.bill_url ?? '',
+    }))
+    rows.push({ Date: '', Category: '', Description: 'Total (excluding rejected)', 'Amount (₹)': filteredTotal, 'Payment Mode': '', Status: '', 'Bill / Receipt': '' })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Expenses')
+    const { from, to } = rangeBounds(range)
+    const span = from || to ? `_${from ?? 'start'}_to_${to ?? 'today'}` : ''
+    const cat = categoryFilter ? `_${categoryLabel(categoryFilter).replace(/\W+/g, '-')}` : ''
+    XLSX.writeFile(wb, `Expenses${cat}${span}.xlsx`)
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
@@ -215,13 +252,37 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Expense
-        </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <DateRangeFilter label="Date" value={range} onChange={setRange} />
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className={`h-9 rounded-lg border px-2 text-sm bg-white min-w-40 ${categoryFilter ? 'border-blue-300 bg-blue-50 text-blue-700' : 'text-gray-600'}`}
+        >
+          <option value="">Category: All</option>
+          {CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+        </select>
+        {filtering && (
+          <>
+            <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5">
+              {filtered.length} record{filtered.length === 1 ? '' : 's'} · {fmt(filteredTotal)}
+            </span>
+            <button onClick={() => { setRange(NO_DATE_RANGE); setCategoryFilter('') }} className="text-xs text-red-500 hover:underline">
+              Clear
+            </button>
+          </>
+        )}
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" onClick={exportExcel}>
+            <Download className="mr-2 h-4 w-4" /> Download Excel
+          </Button>
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Expense
+          </Button>
+        </div>
       </div>
 
-      <DataTable data={data} columns={columns} />
+      <DataTable data={filtered} columns={columns} />
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-lg">
@@ -232,11 +293,11 @@ export default function ExpenseTable({ data: initialData, currentUserId, current
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Category</Label>
-                <Select onValueChange={(v) => setValue('category', v as ExpenseCategory)} defaultValue="misc">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select onValueChange={(v) => setValue('category', v as ExpenseCategory)} value={watch('category')}>
+                  <SelectTrigger><span className="text-sm">{categoryLabel(watch('category'))}</span></SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

@@ -9,12 +9,14 @@ import { endOfMonth, endOfYear, format, startOfMonth, startOfYear, subMonths, su
  */
 
 export type DateRangeValue = { preset: DatePreset; from?: string; to?: string }
-export type DatePreset = '' | 'this_month' | 'last_month' | 'last_3' | 'last_6' | 'this_year' | 'last_year' | 'custom'
+export type DatePreset = '' | 'this_month' | 'last_month' | 'last_1' | 'last_2' | 'last_3' | 'last_6' | 'this_year' | 'last_year' | 'custom'
 
 const PRESETS: [DatePreset, string][] = [
   ['', 'Any date'],
   ['this_month', 'This month'],
   ['last_month', 'Last month'],
+  ['last_1', 'Last 1 month'],
+  ['last_2', 'Last 2 months'],
   ['last_3', 'Last 3 months'],
   ['last_6', 'Last 6 months'],
   ['this_year', 'This year'],
@@ -34,6 +36,8 @@ export function rangeBounds(v: DateRangeValue | undefined, today = new Date()): 
       const m = subMonths(today, 1)
       return { from: day(startOfMonth(m)), to: day(endOfMonth(m)) }
     }
+    case 'last_1': return { from: day(subMonths(today, 1)), to: day(today) }
+    case 'last_2': return { from: day(subMonths(today, 2)), to: day(today) }
     case 'last_3': return { from: day(subMonths(today, 3)), to: day(today) }
     case 'last_6': return { from: day(subMonths(today, 6)), to: day(today) }
     case 'this_year': return { from: day(startOfYear(today)), to: day(today) }

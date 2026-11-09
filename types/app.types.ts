@@ -48,7 +48,7 @@ export type AttendanceStatus =
   | 'cl' | 'sl' | 'lwp'
 
 export type ExpenseCategory =
-  | 'rent' | 'utilities' | 'marketing' | 'travel' | 'salary' | 'vendor' | 'misc' | 'other'
+  | 'rent' | 'utilities' | 'marketing' | 'travel' | 'salary' | 'board' | 'university' | 'event' | 'misc' | 'other'
 
 export const LEAD_COLUMNS = [
   { key: 'full_name', label: 'Student name', default: true },
@@ -425,7 +425,9 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   marketing: 'Marketing',
   travel: 'Travel',
   salary: 'Salary',
-  vendor: 'Vendor',
+  board: 'Board',
+  university: 'University',
+  event: 'Event',
   misc: 'Miscellaneous',
   other: 'Other',
 }

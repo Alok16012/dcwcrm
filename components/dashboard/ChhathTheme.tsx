@@ -11,7 +11,7 @@
  */
 
 import { ChhathCelebration } from './ChhathCelebration'
-import { ChhathBand, ChhathBandStyles, ChhathGhat } from './ChhathBand'
+import { ChhathBand, ChhathBandMobile, ChhathBandStyles, ChhathGhat } from './ChhathBand'
 
 const MARIGOLD = ['#f97316', '#fb923c', '#f59e0b', '#fbbf24', '#ea580c']
 const SKIN = '#c98b5e'
@@ -335,6 +335,7 @@ export function ChhathPage({ name, className = '', heroClassName = '', children 
       <ChhathPetals className="hidden md:block" />
       <ChhathBandStyles />
       <div className={`mb-5 hidden md:block ${heroClassName}`}><ChhathBand id="portal" /></div>
+      <div className={`mb-4 md:hidden ${heroClassName}`}><ChhathBandMobile /></div>
       <div className="hidden md:block"><ChhathGhat /></div>
       <ChhathCelebration name={name} />
       {children}

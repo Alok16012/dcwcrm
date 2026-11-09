@@ -10,7 +10,7 @@ import type { UserRole } from '@/types/app.types'
 
 // Browser-only: it reads the date and localStorage to decide whether to play
 import { ChhathBackdrop, ChhathPetals, ChhathStyles } from '@/components/dashboard/ChhathTheme'
-import { ChhathBand, ChhathBandStyles, ChhathGhat } from '@/components/dashboard/ChhathBand'
+import { ChhathBand, ChhathBandMobile, ChhathBandStyles, ChhathGhat } from '@/components/dashboard/ChhathBand'
 import { ChhathCelebration } from '@/components/dashboard/ChhathCelebration'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -186,6 +186,8 @@ export default function DashboardClient({
           <ChhathPetals className="hidden md:block" />
           {/* Desktop: the sunrise band under the heading and tabs, the ghat at the foot */}
           <div className="hidden md:block"><ChhathBandStyles /><ChhathBand behind id="staff" /><ChhathGhat /></div>
+          {/* Phone: a light version of the band above the greeting */}
+          <div className="md:hidden -mx-4"><ChhathBandMobile /></div>
           <ChhathCelebration name={userName} />
         </>
       )}

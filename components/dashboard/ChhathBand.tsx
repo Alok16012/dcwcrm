@@ -250,3 +250,67 @@ export function ChhathBandStyles() {
     `}</style>
   )
 }
+
+/**
+ * The phone version of the band: the same sunrise, garlands, river, the
+ * woman with the soop and the greeting, drawn light — one circle per
+ * marigold, and every animation a transform or opacity on an HTML layer, so
+ * the GPU moves it and the phone never redraws the picture.
+ */
+export function ChhathBandMobile() {
+  const flowers = (n: number) => Array.from({ length: n }, (_, k) => (
+    <circle key={k} cx={8 + k * 15} cy={8 + Math.sin((k / (n - 1)) * Math.PI) * 9} r="6.5" fill={['#f97316', '#fbbf24', '#ea580c', '#f59e0b'][k % 4]} />
+  ))
+  return (
+    <div aria-hidden className="chm-in pointer-events-none select-none relative h-[150px] overflow-hidden"
+      style={{ background: 'linear-gradient(180deg, #fff7ed 0%, #fed7aa 58%, #fdba74 74%)' }}>
+      {/* sun */}
+      <div className="chm-rise absolute left-[42%] top-[52px] -ml-[34px] h-[68px] w-[68px] rounded-full"
+        style={{ background: 'radial-gradient(circle at 45% 40%, #fffbeb 0%, #fde68a 50%, #fb923c 100%)', boxShadow: '0 0 40px 18px rgba(254,243,199,0.8)' }} />
+      {/* birds */}
+      <span className="chm-bird absolute top-[22px] left-0 text-[13px] text-stone-600">︶︶</span>
+      <span className="chm-bird absolute top-[38px] left-0 text-[10px] text-stone-500" style={{ animationDelay: '-9s', animationDuration: '26s' }}>︶</span>
+      {/* river */}
+      <div className="absolute inset-x-0 bottom-0 h-[40px]" style={{ background: 'linear-gradient(180deg, #fcd9b6 0%, #bae6fd 40%, #7dd3fc 100%)' }} />
+      <div className="chm-wave absolute bottom-[8px] left-0 h-[14px] w-[200%]">
+        <svg viewBox="0 0 800 14" preserveAspectRatio="none" className="h-full w-full">
+          <path d="M0 7 Q 25 0 50 7 T 100 7 T 150 7 T 200 7 T 250 7 T 300 7 T 350 7 T 400 7 T 450 7 T 500 7 T 550 7 T 600 7 T 650 7 T 700 7 T 750 7 T 800 7 V 14 H 0 Z" fill="#ffffff" opacity="0.45" />
+        </svg>
+      </div>
+      <div className="absolute left-1/2 bottom-[18px] -ml-[30px] h-[3px] w-[60px] rounded-full bg-amber-100/90 chm-glint" />
+      {/* woman with the soop */}
+      <WomanSoop className="absolute bottom-0 left-[3%] w-[86px] h-auto -scale-x-100" />
+      {/* greeting */}
+      <div className="absolute right-[5%] top-[44px] text-center">
+        <p className="font-serif italic font-bold text-[22px] leading-none text-[#1e3a8a]">Happy</p>
+        <p className="font-serif italic font-extrabold text-[28px] leading-tight text-[#b91c1c] drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">Chhath Puja</p>
+      </div>
+      {/* garlands in the corners */}
+      <svg viewBox="0 0 110 26" className="chm-float absolute left-0 top-0 w-[130px] h-auto">{flowers(8)}</svg>
+      <svg viewBox="0 0 110 26" className="chm-float absolute right-0 top-0 w-[130px] h-auto -scale-x-100" style={{ animationDelay: '-2s' }}>{flowers(8)}</svg>
+      <svg viewBox="0 0 14 80" className="absolute left-[2px] top-[10px] w-[12px] h-auto">
+        {[0, 1, 2, 3, 4].map(k => <circle key={k} cx="7" cy={8 + k * 15} r="6" fill={['#fbbf24', '#f97316'][k % 2]} />)}
+      </svg>
+      <svg viewBox="0 0 14 80" className="absolute right-[2px] top-[10px] w-[12px] h-auto">
+        {[0, 1, 2, 3, 4].map(k => <circle key={k} cx="7" cy={8 + k * 15} r="6" fill={['#f97316', '#fbbf24'][k % 2]} />)}
+      </svg>
+      <style>{`
+        .chm-in { animation: chm-in 1s ease-out both; }
+        @keyframes chm-in { from { opacity: 0; } to { opacity: 1; } }
+        .chm-rise { animation: chm-rise 5s cubic-bezier(0.2, 0.7, 0.3, 1) both; will-change: transform; }
+        @keyframes chm-rise { from { transform: translateY(46px); } to { transform: none; } }
+        .chm-wave { animation: chm-wave 10s linear infinite; will-change: transform; }
+        @keyframes chm-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .chm-bird { animation: chm-fly 22s linear infinite; will-change: transform; }
+        @keyframes chm-fly { from { transform: translateX(-30px); } to { transform: translateX(110vw); } }
+        .chm-float { animation: chm-float 5s ease-in-out infinite; will-change: transform; }
+        @keyframes chm-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 2px; } }
+        .chm-glint { animation: chm-glint 2.6s ease-in-out infinite; }
+        @keyframes chm-glint { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+          .chm-in, .chm-rise, .chm-wave, .chm-bird, .chm-float, .chm-glint { animation: none; }
+        }
+      `}</style>
+    </div>
+  )
+}

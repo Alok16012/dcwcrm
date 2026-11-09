@@ -13,6 +13,7 @@ import {
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
+import { GreetingBanner } from '@/components/shared/GreetingBanner'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -181,6 +182,7 @@ export default function AssociateClient() {
 
   return (
     <div className="space-y-5 max-w-5xl">
+      <GreetingBanner audience="associate" />
 
       {/* Welcome Banner */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-indigo-900 rounded-2xl p-6 text-white overflow-hidden">

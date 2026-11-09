@@ -9,6 +9,7 @@ import {
   CircleDot, Circle,
 } from 'lucide-react'
 import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
+import { GreetingBanner } from '@/components/shared/GreetingBanner'
 
 const VER: Record<string, { label: string; color: string; bg: string; border: string; done: boolean; active: boolean }> = {
   pending:   { label: 'Pending',   color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200', done: false, active: true },
@@ -164,6 +165,7 @@ export default async function StudentDashboardPage() {
 
   return (
     <div className="space-y-5 max-w-4xl">
+      <GreetingBanner audience="student" />
 
       {/* Welcome Banner */}
       <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white overflow-hidden">

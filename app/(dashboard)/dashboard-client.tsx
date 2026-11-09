@@ -18,6 +18,7 @@ import {
   ClipboardList, Clock, AlertTriangle, Zap, CheckCircle2, ChevronRight,
   Phone, MessageCircle, FileText, ArrowRight, Calendar, Building2, Video,
 } from 'lucide-react'
+import { GreetingBanner } from '@/components/shared/GreetingBanner'
 
 interface FollowupLead {
   id: string
@@ -184,6 +185,7 @@ export default function DashboardClient({
         </>
       )}
       <DiwaliCelebration name={userName} />
+      <GreetingBanner audience="staff" />
       <MobileHome
         name={userName} role={role} moduleRights={moduleRights} isLead={isLead}
         newToday={newToday} followupsToday={followupsToday.length} todayAppointments={todayAppointments}

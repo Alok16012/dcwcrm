@@ -14,6 +14,8 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 import { GreetingBanner } from '@/components/shared/GreetingBanner'
+import { ChhathWrap } from '@/components/dashboard/ChhathTheme'
+import { isChhath } from '@/components/dashboard/festival'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -181,6 +183,7 @@ export default function AssociateClient() {
   ).sort((a, b) => b[1] - a[1])
 
   return (
+    <ChhathWrap on={isChhath()} name={associate?.name} className="-mx-4 -mt-1 px-4 md:-mx-6 md:-mt-6 md:px-6" heroClassName="-mx-4 md:-mx-6">
     <div className="space-y-5 max-w-5xl">
       <GreetingBanner audience="associate" />
 
@@ -491,6 +494,7 @@ export default function AssociateClient() {
         </div>
       )}
     </div>
+    </ChhathWrap>
   )
 }
 

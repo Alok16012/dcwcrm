@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, PartyPopper } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { ChhathScene } from './ChhathScene'
 
 /**
  * A festival greeting (migration 124) on a dashboard: the admin's image with
@@ -28,12 +27,7 @@ interface Banner {
  * anyone uploads one. An uploaded banner for the same days wins.
  */
 const BUILTIN_GREETINGS: (Banner & { from: string; to: string; audiences: GreetingAudience[] })[] = [
-  {
-    // Chhath Puja 2026, from the end of Diwali through Usha Arghya
-    id: 'builtin-chhath-2026', title: 'Chhath Puja', image_url: '', effect: 'petals', Scene: ChhathScene,
-    message: 'Surya Dev aur Chhathi Maiya aapko sehat, urja aur samriddhi dein — Team Distance Courses Wala',
-    from: '2026-11-09', to: '2026-11-16', audiences: ['staff', 'student', 'associate'],
-  },
+  // Chhath Puja 2026 is a whole-page theme instead (components/dashboard/ChhathTheme).
 ]
 
 function builtinFor(audience: GreetingAudience, today: string): Banner | null {

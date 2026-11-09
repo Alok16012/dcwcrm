@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import { StudentLifecycle, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 import { GreetingBanner } from '@/components/shared/GreetingBanner'
+import { ChhathWrap } from '@/components/dashboard/ChhathTheme'
+import { isChhath } from '@/components/dashboard/festival'
 
 const VER: Record<string, { label: string; color: string; bg: string; border: string; done: boolean; active: boolean }> = {
   pending:   { label: 'Pending',   color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200', done: false, active: true },
@@ -164,6 +166,7 @@ export default async function StudentDashboardPage() {
   const firstName = s.full_name.split(' ')[0]
 
   return (
+    <ChhathWrap on={isChhath()} name={s.full_name} className="-mx-4 -mt-4 px-4 md:-mx-6 md:-mt-6 md:px-6" heroClassName="-mx-4 md:-mx-6">
     <div className="space-y-5 max-w-4xl">
       <GreetingBanner audience="student" />
 
@@ -418,5 +421,6 @@ export default async function StudentDashboardPage() {
         </div>
       )}
     </div>
+    </ChhathWrap>
   )
 }

@@ -6,12 +6,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
 import { MobileHome } from '@/components/dashboard/MobileHome'
-import dynamic from 'next/dynamic'
 import type { UserRole } from '@/types/app.types'
 
 // Browser-only: it reads the date and localStorage to decide whether to play
-const DiwaliCelebration = dynamic(() => import('@/components/dashboard/DiwaliCelebration'), { ssr: false })
-import { FestiveBackdrop, FestiveGarlands, FestiveDiya, FestiveStyles } from '@/components/dashboard/FestiveDecor'
+import { ChhathBackdrop, ChhathHero, ChhathPetals, ChhathStyles } from '@/components/dashboard/ChhathTheme'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Users, UserCheck, IndianRupee, Bell, TrendingUp, Star,
@@ -176,15 +174,17 @@ export default function DashboardClient({
     // corners, and pads back in so the cards stay clear of the strands.
     // min-h fills the visible content area (less the top bar and footer), so the
     // wash reaches the bottom and the diya has empty space to sit in.
-    <div className={`space-y-4 ${festive ? 'relative isolate -mx-4 -mt-1 px-4 pt-11 pb-2 md:-mx-6 md:-mt-6 md:px-12 lg:px-16 md:pt-14 lg:pt-16 md:pb-2 md:min-h-[calc(100vh-7rem)]' : ''}`}>
+    // During Chhath the wrapper undoes the layout's padding so the festival
+    // scene runs edge to edge, then pads the cards back in.
+    <div className={`space-y-4 ${festive ? 'relative isolate -mx-4 -mt-1 px-4 pb-6 md:-mx-6 md:-mt-6 md:px-6 md:min-h-[calc(100vh-7rem)]' : ''}`}>
       {festive && (
         <>
-          <FestiveStyles />
-          <FestiveBackdrop />
-          <FestiveGarlands />
+          <ChhathStyles />
+          <ChhathBackdrop />
+          <ChhathPetals />
+          <div className="-mx-4 md:-mx-6"><ChhathHero name={userName} /></div>
         </>
       )}
-      <DiwaliCelebration name={userName} />
       <GreetingBanner audience="staff" />
       <MobileHome
         name={userName} role={role} moduleRights={moduleRights} isLead={isLead}
@@ -630,7 +630,6 @@ export default function DashboardClient({
           </div>
         </div>
       )}
-      {festive && <FestiveDiya />}
     </div>
   )
 }

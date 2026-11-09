@@ -40,7 +40,11 @@ export function ChhathCelebration({ name }: { name?: string }) {
   useEffect(() => {
     if (!isChhath(today) || readSeen() === today) return
     if (!window.matchMedia('(max-width: 767px)').matches) return
-    void Promise.resolve().then(() => { setWish(Math.floor(Math.random() * WISHES.length)); setPlaying(true) })
+    // Let the dashboard finish loading first: right after login the phone is
+    // busy fetching and drawing the page, and the wish competing with it made
+    // the whole CRM crawl.
+    const t = setTimeout(() => { setWish(Math.floor(Math.random() * WISHES.length)); setPlaying(true) }, 2500)
+    return () => clearTimeout(t)
   }, [today])
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export function ChhathCelebration({ name }: { name?: string }) {
       <ChhathStyles />
       {playing && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-3" onClick={stop}>
-          <div className={`${manual ? 'chc-sky-in' : 'chc-sky'} absolute inset-0 bg-gradient-to-b from-orange-200/95 via-amber-100/95 to-sky-200/95 backdrop-blur-sm`} />
+          <div className={`${manual ? 'chc-sky-in' : 'chc-sky'} absolute inset-0 bg-gradient-to-b from-orange-200/95 via-amber-100/95 to-sky-200/95`} />
           <ChhathPetals />
           <div className={`${manual ? 'chc-card-in' : 'chc-card'} relative w-full max-w-3xl overflow-hidden rounded-3xl bg-gradient-to-b from-orange-50 to-amber-50 shadow-2xl shadow-orange-500/30 ring-1 ring-amber-200`}
             onClick={e => e.stopPropagation()}>
@@ -88,7 +92,8 @@ export function ChhathCelebration({ name }: { name?: string }) {
       {/* The sun: tap to see the wish again */}
       {!playing && (
         <button onClick={openFromSun} title="Aapke liye Chhath Puja ki shubhkamna ☀️" aria-label="Show your Chhath Puja wish"
-          className="chc-sun fixed bottom-24 right-4 md:bottom-6 md:right-6 z-40 h-16 w-16 rounded-full bg-white/70 backdrop-blur transition-transform hover:scale-110 active:scale-95">
+          className="chc-sun isolate fixed bottom-24 right-4 md:bottom-6 md:right-6 z-40 h-16 w-16 rounded-full bg-white/80 transition-transform hover:scale-110 active:scale-95">
+          <span aria-hidden className="chc-halo absolute -inset-2 rounded-full bg-orange-300/50 blur-md" />
           <svg viewBox="0 0 100 100" className="h-full w-full drop-shadow-[0_0_12px_rgba(251,146,60,0.75)]" aria-hidden>
             <defs>
               <radialGradient id="chc-disc" cx="45%" cy="40%" r="60%">
@@ -132,10 +137,10 @@ export function ChhathCelebration({ name }: { name?: string }) {
         .chc-ripple { animation: chc-ripple 2s ease-in-out infinite; }
         @keyframes chc-ripple { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
         @keyframes chc-spin { to { transform: rotate(360deg); } }
-        .chc-sun { animation: chc-glow 2.6s ease-in-out infinite; border-radius: 9999px; }
-        @keyframes chc-glow { 0%, 100% { box-shadow: 0 0 12px 3px rgba(251,146,60,0.35); } 50% { box-shadow: 0 0 26px 8px rgba(251,191,36,0.6); } }
+        .chc-halo { z-index: -1; animation: chc-glow 2.6s ease-in-out infinite; will-change: opacity; }
+        @keyframes chc-glow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
         @media (prefers-reduced-motion: reduce) {
-          .chc-sky, .chc-sky-in, .chc-card, .chc-card-in, .chc-wish-text, .chc-rays, .chc-sun, .chc-ripple { animation: none; }
+          .chc-sky, .chc-sky-in, .chc-card, .chc-card-in, .chc-wish-text, .chc-rays, .chc-halo, .chc-ripple { animation: none; }
         }
       `}</style>
     </>

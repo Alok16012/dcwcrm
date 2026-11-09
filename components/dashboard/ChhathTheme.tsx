@@ -22,8 +22,8 @@ export function Marigold({ cx, cy, r, i }: { cx: number; cy: number; r: number; 
   const c = MARIGOLD[i % MARIGOLD.length]
   return (
     <g>
-      {[0, 1, 2, 3, 4, 5, 6, 7].map(k => {
-        const a = (k / 8) * Math.PI * 2 + i
+      {[0, 1, 2, 3, 4, 5].map(k => {
+        const a = (k / 6) * Math.PI * 2 + i
         return <circle key={k} cx={Math.round((cx + Math.cos(a) * r * 0.5) * 10) / 10} cy={Math.round((cy + Math.sin(a) * r * 0.5) * 10) / 10} r={r * 0.55} fill={c} />
       })}
       <circle cx={cx} cy={cy} r={r * 0.32} fill="#c2410c" opacity="0.5" />
@@ -222,7 +222,7 @@ export function ChhathHero({ name, id = 'page', subtitle = true }: { name?: stri
     <div aria-label="Happy Chhath Puja" className="relative h-[250px] md:h-[330px] overflow-hidden pointer-events-none select-none">
       {/* toran across the top */}
       <div className="absolute inset-x-0 top-0 z-20 flex -space-x-1">
-        {Array.from({ length: 14 }, (_, i) => <Swag key={i} i={i} />)}
+        {Array.from({ length: 11 }, (_, i) => <Swag key={i} i={i} />)}
       </div>
       {/* strands down both sides */}
       <Strand count={11} className="absolute left-1 top-4 z-20 h-[230px] md:h-[300px] w-auto" />
@@ -299,7 +299,7 @@ export function ChhathStyles() {
       @keyframes ch-flicker { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15, 0.9); } }
       .ch-woman { animation: ch-woman 1.2s cubic-bezier(0.2, 1, 0.4, 1) both; }
       @keyframes ch-woman { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
-      .ch-diya { animation: ch-bob 3.2s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(253,186,116,0.95)); }
+      .ch-diya { animation: ch-bob 3.2s ease-in-out infinite; will-change: transform; text-shadow: 0 0 10px rgba(253,186,116,0.95); }
       @keyframes ch-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
       .ch-petal { opacity: 0; animation-name: ch-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
       @keyframes ch-fall {
@@ -310,6 +310,9 @@ export function ChhathStyles() {
       }
       .ch-in { animation: ch-in 0.9s 0.3s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
       @keyframes ch-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @media (max-width: 767px) {
+        .ch-rays, .ch-pour, .ch-flame { animation: none; }
+      }
       @media (prefers-reduced-motion: reduce) {
         .ch-rise, .ch-rays, .ch-wave, .ch-pour, .ch-flame, .ch-woman, .ch-diya, .ch-in { animation: none; }
         .ch-rise { transform: translateX(-50%); }

@@ -861,6 +861,22 @@ export function LeadTable({ leads, totalCount, isLoading, page, pageSize, sortDi
         />
       )}
 
+      {/* "Converted" in the status menu opens this: the lead becomes a student (fee, mode, board) */}
+      {statusLead && (
+        <ConvertLeadModal
+          open
+          lead={statusLead}
+          redirectOnSuccess={false}
+          onClose={() => setStatusLead(null)}
+          onSuccess={() => {
+            const id = statusLead.id
+            setStatusLead(null)
+            if (onLeadUpdate) onLeadUpdate(id, { status: 'converted' })
+            else onRefresh()
+          }}
+        />
+      )}
+
       <Dialog open={!!editLead} onOpenChange={(open) => !open && setEditLead(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

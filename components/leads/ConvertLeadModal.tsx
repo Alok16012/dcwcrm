@@ -16,9 +16,11 @@ interface ConvertLeadModalProps {
   onClose: () => void
   lead: Lead
   onSuccess: () => void
+  /** Go to Students after converting (the lead page). The leads table stays put. */
+  redirectOnSuccess?: boolean
 }
 
-export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLeadModalProps) {
+export function ConvertLeadModal({ open, onClose, lead, onSuccess, redirectOnSuccess = true }: ConvertLeadModalProps) {
   const [loading, setLoading] = useState(false)
   const [totalFee, setTotalFee] = useState(lead.total_fee?.toString() ?? '')
   const [amountPaid, setAmountPaid] = useState(lead.amount_paid?.toString() ?? '0')
@@ -72,7 +74,7 @@ export function ConvertLeadModal({ open, onClose, lead, onSuccess }: ConvertLead
 
       toast.success('Lead converted! Awaiting admin approval in New Students.')
       onSuccess()
-      router.push('/backend')
+      if (redirectOnSuccess) router.push('/backend')
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to convert lead')
     } finally {

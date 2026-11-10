@@ -12,11 +12,13 @@
 import { leadFields } from './lead.mjs'
 import { FLOWS } from './flows/index.mjs'
 
-export async function backfillLeads({ db, crm, log, apply = true }) {
-  const { data: rows, error } = await db
+export async function backfillLeads({ db, crm, log, apply = true, accountId }) {
+  let q = db
     .from('wa_conversations')
     .select('id, chat_jid, phone, push_name, state')
     .is('lead_id', null)
+  if (accountId) q = q.eq('account_id', accountId)
+  const { data: rows, error } = await q
     .order('created_at')
   if (error) throw new Error(error.message)
 

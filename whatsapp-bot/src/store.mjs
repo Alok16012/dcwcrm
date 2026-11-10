@@ -9,9 +9,11 @@
 
 import { newConversation } from './engine.mjs'
 
-export function makeStore(db) {
+/** `accountId`: which of our WhatsApp numbers this store belongs to (migration 126). */
+export function makeStore(db, accountId) {
   async function load(jid) {
-    const { data, error } = await db.from('wa_conversations').select('*').eq('chat_jid', jid).maybeSingle()
+    const { data, error } = await db.from('wa_conversations').select('*')
+      .eq('account_id', accountId).eq('chat_jid', jid).maybeSingle()
     if (error) throw new Error(`load conversation: ${error.message}`)
     return data
   }
@@ -19,7 +21,7 @@ export function makeStore(db) {
   async function create({ jid, phone, pushName }) {
     const { data, error } = await db
       .from('wa_conversations')
-      .insert({ chat_jid: jid, phone, push_name: pushName, state: newConversation() })
+      .insert({ account_id: accountId, chat_jid: jid, phone, push_name: pushName, state: newConversation() })
       .select('*')
       .single()
     if (!error) return data

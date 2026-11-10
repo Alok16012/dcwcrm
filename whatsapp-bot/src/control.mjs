@@ -59,7 +59,8 @@ export function fillTemplate(template, name) {
     .trim()
 }
 
-export function makeControl({ db, wa, store, config, envPaused, log }) {
+/** `accountId`: this worker's number — settings, flows and outreach are per number; knowledge is shared. */
+export function makeControl({ db, wa, store, config, envPaused, log, accountId }) {
   let settings = { ...DEFAULTS }
   let nextSendAt = 0
   let busy = false
@@ -82,11 +83,11 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
 
   async function refresh() {
     const [s, k, f] = await Promise.all([
-      db.from('wa_bot_settings').select('*').maybeSingle(),
+      db.from('wa_bot_settings').select('*').eq('account_id', accountId).maybeSingle(),
       db.from('wa_knowledge').select('id, title, body, keywords, flow, is_active').eq('is_active', true),
       // '*': `kind` arrives with migration 120, and a missing column must not
       // take the other flows down with it.
-      db.from('wa_flows').select('*').eq('is_active', true).order('created_at'),
+      db.from('wa_flows').select('*').eq('account_id', accountId).eq('is_active', true).order('created_at'),
     ])
     if (s.error) log.warn(`settings load failed: ${s.error.message}`)
     else if (s.data) settings = { ...DEFAULTS, ...s.data }
@@ -107,6 +108,7 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     const since = new Date(`${istDay()}T00:00:00+05:30`).toISOString()
     const { count, error } = await db.from('wa_outreach')
       .select('id', { count: 'exact', head: true })
+      .eq('account_id', accountId)
       .in('status', ['sent', 'replied'])
       .gte('sent_at', since)
     if (error) throw new Error(`outreach count: ${error.message}`)
@@ -144,7 +146,7 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     if (templates.length === 0) return
 
     const { data: item, error } = await db.from('wa_outreach')
-      .select('*').eq('status', 'queued').order('queued_at').limit(1).maybeSingle()
+      .select('*').eq('account_id', accountId).eq('status', 'queued').order('queued_at').limit(1).maybeSingle()
     if (error) throw new Error(`outreach pick: ${error.message}`)
     if (!item) return
 
@@ -203,7 +205,7 @@ export function makeControl({ db, wa, store, config, envPaused, log }) {
     if (last10.length !== 10) return
     const { error } = await db.from('wa_outreach')
       .update({ status: 'replied', replied_at: new Date().toISOString() })
-      .eq('phone', last10).eq('status', 'sent')
+      .eq('account_id', accountId).eq('phone', last10).eq('status', 'sent')
     if (error) log.warn(`outreach reply mark failed: ${error.message}`)
   }
 

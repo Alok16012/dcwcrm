@@ -143,3 +143,29 @@ npm test
 
 24 conversation and pipeline tests — every scenario from the briefs, plus
 redelivery, takeover and CRM ordering — run with no WhatsApp and no database.
+
+## Several numbers (migration 126)
+
+`npm start` runs `src/manager.mjs`, which starts one worker (`src/index.mjs`
+with `ACCOUNT_ID`) per active row in `wa_accounts`. Add, rename, switch off or
+remove numbers from the CRM: WhatsApp Bot → the **Numbers** bar. Each number
+has its own login (`$WA_AUTH_DIR/<account id>/`), QR, chats, trigger flows,
+admission script, settings and outreach queue; AI Knowledge is shared. The
+manager re-reads `wa_accounts` every 15 s and restarts a worker that dies.
+Everything from before belongs to "Number 1"
+(`00000000-0000-0000-0000-000000000001`); a single login left straight in the
+auth folder is moved into Number 1's folder on first start.
+
+## Running on a VPS (Hostinger)
+
+1. On the server, as root: copy `deploy/setup-vps.sh` up and run it. It
+   installs Node 22 and a systemd service (`dcw-whatsapp-bot`) that starts on
+   boot and restarts on any crash.
+2. Fill in `/opt/dcw-whatsapp-bot/.env` on the server (Supabase URL + service
+   role key, `CRM_BASE_URL`, `WHATSAPP_BOT_SECRET`, optional `GEMINI_API_KEY`).
+3. From this folder on your Mac: `VPS=root@<server-ip> deploy/deploy.sh` —
+   rsyncs the code, installs, restarts, and prints `/health`.
+4. Logs: `journalctl -u dcw-whatsapp-bot -f`.
+
+Only ONE place may run the bot at a time: two copies of the same number's
+login knock each other off. Stop the Railway service before starting the VPS.

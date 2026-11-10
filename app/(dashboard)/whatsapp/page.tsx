@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { type Conversation, type BotStatus } from '@/components/whatsapp/WhatsAppClient'
-import WhatsAppPageTabs from '@/components/whatsapp/WhatsAppPageTabs'
+import WhatsAppPageTabs, { type WaAccount } from '@/components/whatsapp/WhatsAppPageTabs'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -29,18 +29,32 @@ export default async function WhatsAppPage() {
   const db = supabase as any
 
   let convQuery = db.from('wa_conversations')
-    .select(`id, chat_jid, phone, push_name, flow, status, lead_temperature, lead_id, human_until, last_inbound_at, last_outbound_at, created_at, state${isCounsellor ? ', lead:leads!inner(assigned_to)' : ''}`)
+    .select(`id, account_id, chat_jid, phone, push_name, flow, status, lead_temperature, lead_id, human_until, last_inbound_at, last_outbound_at, created_at, state${isCounsellor ? ', lead:leads!inner(assigned_to)' : ''}`)
     .order('last_inbound_at', { ascending: false, nullsFirst: false })
     .limit(300)
   if (isCounsellor) convQuery = convQuery.eq('lead.assigned_to', user.id)
 
-  const [statusRes, convRes] = await Promise.all([
+  const [statusRes, accountsRes, convRes] = await Promise.all([
     canManage ? db.from('wa_bot_status').select('*').maybeSingle() : Promise.resolve({ data: null }),
+    // Several numbers (migration 126). Errors until that migration runs — then the page
+    // falls back to the single number above.
+    canManage ? db.from('wa_accounts').select('*').order('sort_order').order('created_at') : Promise.resolve({ data: null, error: true }),
     canSeeChats ? convQuery : Promise.resolve({ data: [] }),
   ])
+  let convData = convRes.data
+  // Before migration 126 there is no account_id column, and the whole select fails.
+  if (convRes.error && canSeeChats) {
+    let q = db.from('wa_conversations')
+      .select(`id, chat_jid, phone, push_name, flow, status, lead_temperature, lead_id, human_until, last_inbound_at, last_outbound_at, created_at, state${isCounsellor ? ', lead:leads!inner(assigned_to)' : ''}`)
+      .order('last_inbound_at', { ascending: false, nullsFirst: false })
+      .limit(300)
+    if (isCounsellor) q = q.eq('lead.assigned_to', user.id)
+    convData = (await q).data
+  }
 
-  const conversations: Conversation[] = ((convRes.data ?? []) as any[]).map(c => ({
+  const conversations: (Conversation & { accountId?: string | null })[] = ((convData ?? []) as any[]).map(c => ({
     id: c.id,
+    accountId: c.account_id ?? null,
     phone: c.phone,
     name: c.push_name,
     flow: c.flow,
@@ -63,6 +77,7 @@ export default async function WhatsAppPage() {
       </div>
       <WhatsAppPageTabs
         initialStatus={(statusRes.data ?? null) as BotStatus | null}
+        initialAccounts={accountsRes.error ? null : ((accountsRes.data ?? []) as WaAccount[])}
         conversations={conversations}
         canManage={canManage}
         canSeeChats={canSeeChats}

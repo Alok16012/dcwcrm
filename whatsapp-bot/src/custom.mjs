@@ -24,8 +24,11 @@ import { normalize } from './nlu.mjs'
 import { greetingName } from './control.mjs'
 
 const KEYCAPS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
-/** A runaway chain of message nodes must not flood a student. */
-const MAX_SENDS = 8
+/**
+ * A runaway chain of message nodes (a goto looping back) must not flood a
+ * student. High enough for long flows of several messages in a row.
+ */
+const MAX_SENDS = 25
 
 /** Rows from wa_flows → what the engine walks. Broken rows are dropped. */
 export function compileFlows(rows) {

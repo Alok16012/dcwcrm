@@ -7,6 +7,7 @@ import {
   Settings2, BookOpen, Send, Plus, Trash2, Save, Pencil, X, AlertTriangle, RefreshCw, Workflow,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { byAccount, bySettings } from './scope'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -72,9 +73,12 @@ function db() {
   return createClient() as any
 }
 
+
 // ================================================================ tabs ===
 
-export default function ControlCentre({ aiProvider }: { aiProvider: string | null }) {
+/** `accountId`: the WhatsApp number being steered (migration 126). Settings, flows and
+ *  outreach are per number; AI Knowledge is shared by all numbers. */
+export default function ControlCentre({ aiProvider, accountId }: { aiProvider: string | null; accountId: string | null }) {
   const [tab, setTab] = useState<'settings' | 'flows' | 'knowledge' | 'outreach'>('settings')
   const tabs = [
     { key: 'settings', label: 'Settings', icon: Settings2 },
@@ -99,10 +103,10 @@ export default function ControlCentre({ aiProvider }: { aiProvider: string | nul
           </button>
         ))}
       </div>
-      {tab === 'settings' && <SettingsPanel aiProvider={aiProvider} />}
-      {tab === 'flows' && <FlowBuilder />}
+      {tab === 'settings' && <SettingsPanel key={accountId} aiProvider={aiProvider} accountId={accountId} />}
+      {tab === 'flows' && <FlowBuilder key={accountId} accountId={accountId} />}
       {tab === 'knowledge' && <KnowledgePanel />}
-      {tab === 'outreach' && <OutreachPanel />}
+      {tab === 'outreach' && <OutreachPanel key={accountId} accountId={accountId} />}
     </div>
   )
 }
@@ -135,17 +139,17 @@ function Toggle({ label, hint, checked, onChange }: {
 
 // ============================================================ settings ===
 
-function SettingsPanel({ aiProvider }: { aiProvider: string | null }) {
+function SettingsPanel({ aiProvider, accountId }: { aiProvider: string | null; accountId: string | null }) {
   const [s, setS] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    db().from('wa_bot_settings').select('*').maybeSingle()
+    bySettings(db().from('wa_bot_settings').select('*'), accountId).maybeSingle()
       .then(({ data, error }: any) => {
         if (error) toast.error(error.message)
         else setS(data as Settings)
       })
-  }, [])
+  }, [accountId])
 
   if (!s) return <p className="text-sm text-gray-400">Loading…</p>
 
@@ -158,12 +162,12 @@ function SettingsPanel({ aiProvider }: { aiProvider: string | null }) {
     if (s.outreach_start_hour >= s.outreach_end_hour) return toast.error('Start hour must be before end hour')
     setSaving(true)
     const { data: { user } } = await createClient().auth.getUser()
-    const { error } = await db().from('wa_bot_settings').update({
+    const { error } = await bySettings(db().from('wa_bot_settings').update({
       ...s,
       outreach_templates: templates,
       updated_at: new Date().toISOString(),
       updated_by: user?.id ?? null,
-    }).eq('id', true)
+    }), accountId)
     setSaving(false)
     if (error) return toast.error(error.message)
     set({ outreach_templates: templates })
@@ -394,7 +398,7 @@ function KnowledgePanel() {
 
 // ============================================================ outreach ===
 
-function OutreachPanel() {
+function OutreachPanel({ accountId }: { accountId: string | null }) {
   const [rows, setRows] = useState<OutreachRow[]>([])
   const [limit, setLimit] = useState<number | null>(null)
   const [statuses, setStatuses] = useState<string[]>(['dnp', 'not_reachable', 'switch_off', 'contacted', 'interested'])
@@ -407,13 +411,13 @@ function OutreachPanel() {
 
   const load = useCallback(async () => {
     const [q, s] = await Promise.all([
-      db().from('wa_outreach').select('*').order('queued_at', { ascending: false }).limit(300),
-      db().from('wa_bot_settings').select('outreach_daily_limit').maybeSingle(),
+      byAccount(db().from('wa_outreach').select('*'), accountId).order('queued_at', { ascending: false }).limit(300),
+      bySettings(db().from('wa_bot_settings').select('outreach_daily_limit'), accountId).maybeSingle(),
     ])
     if (q.error) toast.error(q.error.message)
     else setRows(q.data as OutreachRow[])
     setLimit(s.data?.outreach_daily_limit ?? null)
-  }, [])
+  }, [accountId])
   useEffect(() => { load() }, [load])
 
   const counts = useMemo(() => {
@@ -476,7 +480,7 @@ function OutreachPanel() {
     setBusy(true)
     const { data: { user } } = await createClient().auth.getUser()
     const payload = preview.map(l => ({
-      lead_id: l.id, phone: l.phone, name: l.full_name,
+      ...(accountId ? { account_id: accountId } : {}), lead_id: l.id, phone: l.phone, name: l.full_name,
       campaign: campaign.trim() || null, queued_by: user?.id ?? null,
     }))
     const { error } = await db().from('wa_outreach').insert(payload)
@@ -489,7 +493,7 @@ function OutreachPanel() {
 
   async function clearQueue() {
     if (!confirm(`Remove all ${counts.queued} queued leads? Nothing already sent is affected.`)) return
-    const { error } = await db().from('wa_outreach').delete().eq('status', 'queued')
+    const { error } = await byAccount(db().from('wa_outreach').delete(), accountId).eq('status', 'queued')
     if (error) return toast.error(error.message)
     toast.success('Queue cleared')
     load()

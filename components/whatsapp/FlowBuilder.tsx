@@ -7,6 +7,7 @@ import {
   ClipboardList, CornerDownRight, Link2, Lock, Send, ChevronDown, ChevronUp, UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { byAccount, bySettings } from './scope'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -45,7 +46,8 @@ interface Flow {
   is_active: boolean
 }
 
-const MAX_OPTIONS = 9
+// Replies past 9 are typed numbers ("10", "11"…) — the bot reads up to 99.
+const MAX_OPTIONS = 30
 const KEYCAPS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
 
 const NODE_STYLE = {
@@ -215,36 +217,36 @@ const FOLD_ABOVE = 12
 
 // =============================================================== panel ===
 
-export default function FlowBuilder() {
+/** `accountId`: the WhatsApp number these flows belong to (migration 126). */
+export default function FlowBuilder({ accountId }: { accountId: string | null }) {
   const [flows, setFlows] = useState<(Flow & { id: string })[]>([])
   const [draft, setDraft] = useState<Flow | null>(null)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
-    db().from('wa_flows').select('*').order('created_at')
+    byAccount(db().from('wa_flows').select('*'), accountId).order('created_at')
       .then(({ data, error }: any) => {
         if (error) toast.error(error.message)
         else setFlows(data ?? [])
       })
-  }, [])
+  }, [accountId])
   useEffect(() => { load() }, [load])
 
   // Same switch as Settings → "Talk to new contacts only" (migration 121).
   const [newOnly, setNewOnly] = useState<boolean | null>(null)
   useEffect(() => {
-    db().from('wa_bot_settings').select('new_contacts_only').maybeSingle()
+    bySettings(db().from('wa_bot_settings').select('new_contacts_only'), accountId).maybeSingle()
       .then(({ data, error }: any) => {
         if (error) toast.error(error.message)
         else setNewOnly(Boolean(data?.new_contacts_only))
       })
-  }, [])
+  }, [accountId])
 
   async function toggleNewOnly(v: boolean) {
     setNewOnly(v)
     const { data: { user } } = await db().auth.getUser()
-    const { error } = await db().from('wa_bot_settings')
-      .update({ new_contacts_only: v, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
-      .eq('id', true)
+    const { error } = await bySettings(db().from('wa_bot_settings')
+      .update({ new_contacts_only: v, updated_at: new Date().toISOString(), updated_by: user?.id ?? null }), accountId)
     if (error) { setNewOnly(!v); toast.error(error.message); return }
     toast.success(v
       ? 'The bot now talks to new contacts only — picked up within a minute'
@@ -253,6 +255,37 @@ export default function FlowBuilder() {
 
   const script = flows.find(isScript)
   const custom = flows.filter(f => !isScript(f))
+
+  /**
+   * A new number starts on the built-in questions. Copy another number's
+   * admission script — and, if this one has none yet, its trigger flows — so
+   * it can be edited here rather than built from nothing.
+   */
+  const [copying, setCopying] = useState(false)
+  async function copyFromAnotherNumber() {
+    setCopying(true)
+    try {
+      const { data: src, error } = await db().from('wa_flows').select('*').neq('account_id', accountId).order('created_at')
+      if (error) throw error
+      const rows = (src ?? []) as any[]
+      const fromId = rows.find(r => r.kind === 'script')?.account_id ?? rows[0]?.account_id
+      if (!fromId) { toast.error('No other number has flows to copy yet'); return }
+      const pick = rows.filter(r => r.account_id === fromId && (r.kind === 'script' ? !script : custom.length === 0))
+      if (pick.length === 0) { toast.message('Nothing new to copy'); return }
+      const { data: { user } } = await db().auth.getUser()
+      const { error: insErr } = await db().from('wa_flows').insert(pick.map(r => ({
+        account_id: accountId, kind: r.kind, name: r.name, triggers: r.triggers, match_mode: r.match_mode,
+        on_first_message: r.on_first_message, root: r.root, is_active: r.is_active, created_by: user?.id ?? null,
+      })))
+      if (insErr) throw insErr
+      toast.success(`Copied ${pick.length} flow${pick.length === 1 ? '' : 's'} — edit them for this number`)
+      load()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not copy')
+    } finally {
+      setCopying(false)
+    }
+  }
 
   // Another flow already answering the same word would make one of them dead.
   const clash = draft && !isScript(draft)
@@ -273,7 +306,7 @@ export default function FlowBuilder() {
     }
     const { data, error } = draft.id
       ? await db().from('wa_flows').update(payload).eq('id', draft.id).select().single()
-      : await db().from('wa_flows').insert({ ...payload, created_by: user?.id ?? null }).select().single()
+      : await db().from('wa_flows').insert({ ...payload, ...(accountId ? { account_id: accountId } : {}), kind: draft.kind ?? 'custom', created_by: user?.id ?? null }).select().single()
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success('Flow saved — the bot picks it up within a minute')
@@ -347,6 +380,23 @@ export default function FlowBuilder() {
               onClick={() => toggleNewOnly(!newOnly)}
             >
               {newOnly ? 'Talk to everyone' : 'Start for new contacts only'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!script && accountId && (
+        <div className="rounded-2xl border border-dashed border-violet-300 bg-violet-50/40 p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shrink-0"><Workflow className="w-5 h-5" /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900">Admission script</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                This number asks the bot&apos;s built-in admission questions. Copy another number&apos;s script{custom.length === 0 ? ' and trigger flows' : ''} to edit them for this one.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" disabled={copying} onClick={copyFromAnotherNumber}>
+              {copying ? 'Copying…' : 'Copy from another number'}
             </Button>
           </div>
         </div>

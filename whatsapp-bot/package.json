@@ -9,7 +9,8 @@
   },
   "main": "src/index.mjs",
   "scripts": {
-    "start": "node src/index.mjs",
+    "start": "node src/manager.mjs",
+    "worker": "node src/index.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

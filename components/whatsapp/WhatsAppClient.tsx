@@ -22,6 +22,8 @@ export interface BotStatus {
   ai_used_today: number | null
   last_error: string | null
   relink_requested_at?: string | null
+  /** wa_accounts only: the worker's last heartbeat (updated_at also moves on CRM edits). */
+  heartbeat_at?: string | null
   updated_at: string
 }
 
@@ -61,8 +63,12 @@ const TEMP_STYLE: Record<string, string> = {
 const FLOW_LABEL: Record<string, string> = { school: 'Open School', college: 'College' }
 
 export default function WhatsAppClient({
-  initialStatus, conversations, canManage, connectionOnly = false,
-}: { initialStatus: BotStatus | null; conversations: Conversation[]; canManage: boolean; connectionOnly?: boolean }) {
+  initialStatus, conversations, canManage, connectionOnly = false, accountId = null,
+}: {
+  initialStatus: BotStatus | null; conversations: Conversation[]; canManage: boolean; connectionOnly?: boolean
+  /** The number shown (wa_accounts, migration 126); null = the old single-number wa_bot_status. */
+  accountId?: string | null
+}) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [status, setStatus] = useState<BotStatus | null>(initialStatus)
@@ -73,7 +79,8 @@ export default function WhatsAppClient({
   const [filter, setFilter] = useState<'all' | 'hot' | 'handoff' | 'paused'>('all')
 
   const connected = status?.status === 'connected'
-  const stale = !status || Date.now() - new Date(status.updated_at).getTime() > STALE_MS
+  const beat = status ? (status.heartbeat_at ?? (accountId ? null : status.updated_at)) : null
+  const stale = !beat || Date.now() - new Date(beat).getTime() > STALE_MS
 
   // While waiting to be linked the QR rotates every ~20s, so keep it fresh.
   // Once connected, a slow poll is enough to notice a disconnect.
@@ -81,12 +88,14 @@ export default function WhatsAppClient({
     if (!canManage) return
     const supabase = createClient() as any
     const tick = async () => {
-      const { data } = await supabase.from('wa_bot_status').select('*').maybeSingle()
+      const { data } = accountId
+        ? await supabase.from('wa_accounts').select('*').eq('id', accountId).maybeSingle()
+        : await supabase.from('wa_bot_status').select('*').maybeSingle()
       if (data) setStatus(data)
     }
     const id = setInterval(tick, connected ? 30000 : 4000)
     return () => clearInterval(id)
-  }, [canManage, connected])
+  }, [canManage, connected, accountId])
 
   const loadMessages = useCallback(async (c: Conversation) => {
     setSelected(c)
@@ -149,9 +158,8 @@ export default function WhatsAppClient({
               <div>
                 <p className="font-bold text-gray-900">Bot is not running</p>
                 <p className="text-sm text-gray-600 mt-0.5">
-                  No heartbeat from the bot service
-                  {status ? ` since ${formatDistanceToNow(parseISO(status.updated_at), { addSuffix: true })}` : ''}.
-                  Check the <b>whatsapp-bot</b> service on Railway.
+                  No heartbeat from the bot service{beat ? ` since ${formatDistanceToNow(parseISO(beat), { addSuffix: true })}` : ' for this number yet'}.
+                  Check that the <b>whatsapp-bot</b> service is running on the bot server — a number added just now starts within a minute.
                 </p>
               </div>
             </div>
@@ -170,9 +178,10 @@ export default function WhatsAppClient({
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400">
-                  checked {formatDistanceToNow(parseISO(status!.updated_at), { addSuffix: true })}
+                  checked {formatDistanceToNow(parseISO(beat!), { addSuffix: true })}
                 </span>
                 <RelinkButton
+                  accountId={accountId}
                   pending={Boolean(status?.relink_requested_at)}
                   label="Unlink / link another number"
                   confirmText={`Unlink ${status?.connected_as ?? 'this number'}? The bot stops answering until a number is linked again.`}
@@ -224,6 +233,7 @@ export default function WhatsAppClient({
                 )}
                 <div className="mt-4">
                   <RelinkButton
+                    accountId={accountId}
                     pending={Boolean(status?.relink_requested_at)}
                     label="Stuck? Start a fresh link"
                     confirmText="Throw away the current link attempt and show a new QR?"
@@ -401,7 +411,8 @@ function Tag({ cls, children }: { cls: string; children: React.ReactNode }) {
  * connection or switch the bot to another number. The bot polls for this
  * every ~10s; the QR then appears in the card above.
  */
-function RelinkButton({ pending, label, confirmText, onRequested }: {
+function RelinkButton({ accountId = null, pending, label, confirmText, onRequested }: {
+  accountId?: string | null
   pending: boolean; label: string; confirmText: string; onRequested: (at: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
@@ -411,7 +422,9 @@ function RelinkButton({ pending, label, confirmText, onRequested }: {
     setBusy(true)
     const at = new Date().toISOString()
     const supabase = createClient() as any
-    const { error } = await supabase.from('wa_bot_status').update({ relink_requested_at: at }).eq('id', true)
+    const { error } = accountId
+      ? await supabase.from('wa_accounts').update({ relink_requested_at: at }).eq('id', accountId)
+      : await supabase.from('wa_bot_status').update({ relink_requested_at: at }).eq('id', true)
     setBusy(false)
     setConfirming(false)
     if (error) {

@@ -338,6 +338,7 @@ async function pollRecords() {
   for (let i = 0; i < records.length; i += 50) {
     await sendPunches(records.slice(i, i + 50), 'poll')
   }
+  log(`poll (${mode}): ${records.length} record(s) sent`)
 }
 
 // -------------------------------------------------------------- heartbeat ---

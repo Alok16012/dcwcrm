@@ -113,7 +113,7 @@ A healthy start looks like:
 
 ```
 DCW Dahua bridge v1.0.0
-device http://192.168.1.108  ->  CRM https://dcwcrm-production.up.railway.app
+device http://192.168.1.108  ->  CRM https://distancecourseswala.com/crm
 device serial: 7L03D2APAZ00123
 event stream connected
 ```
@@ -197,6 +197,7 @@ The device itself holds 100,000 records, so even a multi-day outage replays.
 | `event stream -> HTTP 401` | Wrong `DAHUA_USERNAME`/`DAHUA_PASSWORD`, or the account lacks event rights |
 | `cannot open record finder ... HTTP 501` | Old agent against 3.x firmware — update; the agent now detects which record API the firmware speaks |
 | `device ... timed out` | Agent machine is not on the same LAN/VLAN as the controller |
+| `CRM ... HTTP 404` / `Application not found` | `CRM_BASE_URL` still points at the old Railway app, which no longer exists. Set `CRM_BASE_URL=https://distancecourseswala.com/crm` and restart the agent |
 | `CRM ... HTTP 401: Bad signature` | `BIOMETRIC_WEBHOOK_SECRET` differs between `.env` and Railway |
 | `HTTP 401: Stale or invalid timestamp` | Agent machine's clock is off by >5 min — enable NTP |
 | Punches arrive but no attendance | The `User ID` is not mapped yet — HRMS → Biometric → Mapping (mapping backfills past punches) |

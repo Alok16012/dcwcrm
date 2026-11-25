@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, PartyPopper } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { GreetingEffectLayer, type GreetingEffect } from './greetingEffects'
 
 /**
  * A festival greeting (migration 124) on a dashboard: the admin's image with
- * an entrance animation, falling marigold petals or sparkles, and a shine.
+ * an entrance animation, a festival effect (greetingEffects) and a shine.
  * Shows during the banner's IST dates for its audience; ✕ hides it for the
  * rest of the day on this browser, and a small pill brings it back.
  */
@@ -17,7 +18,7 @@ interface Banner {
   title: string
   message: string | null
   image_url: string
-  effect: 'petals' | 'sparkles' | 'none'
+  effect: GreetingEffect
   /** Built-in greetings draw their own picture instead of an uploaded image. */
   Scene?: () => React.JSX.Element
 }
@@ -69,16 +70,6 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
     return () => { cancelled = true }
   }, [audience, today])
 
-  // Fixed per mount so the petals don't jump on re-render.
-  const particles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
-    left: (i * 37 + 11) % 100,
-    delay: (i * 0.53) % 6,
-    duration: 6 + ((i * 7) % 5),
-    size: 8 + ((i * 5) % 9),
-    drift: ((i % 2) ? 1 : -1) * (20 + (i * 13) % 40),
-    hue: i % 3,
-  })), [])
-
   if (!banner) return null
 
   if (hidden) {
@@ -118,32 +109,8 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
       {/* One shine across the image after it lands */}
       {ready && <div className="greeting-shine pointer-events-none absolute inset-0" />}
 
-      {/* Falling petals / twinkling sparkles */}
-      {ready && banner.effect !== 'none' && (
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          {particles.map((p, i) => banner.effect === 'petals' ? (
-            <span
-              key={i}
-              className="greeting-petal absolute -top-6 rounded-[60%_0_60%_0]"
-              style={{
-                left: `${p.left}%`, width: p.size, height: p.size * 0.7,
-                background: ['#f97316', '#fbbf24', '#f59e0b'][p.hue],
-                animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s`,
-                ['--drift' as string]: `${p.drift}px`,
-              }}
-            />
-          ) : (
-            <span
-              key={i}
-              className="greeting-spark absolute text-amber-300"
-              style={{
-                left: `${p.left}%`, top: `${(i * 23 + 7) % 90}%`, fontSize: p.size + 4,
-                animationDelay: `${p.delay * 0.6}s`, animationDuration: `${2 + (i % 3)}s`,
-              }}
-            >✦</span>
-          ))}
-        </div>
-      )}
+      {/* Festival animation (petals, diyas, fireworks, Holi colours, …) */}
+      {ready && <GreetingEffectLayer effect={banner.effect} />}
 
       {banner.message && (
         <div className="relative px-4 py-2.5 text-center text-sm font-medium text-gray-700 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 border-t border-amber-100">
@@ -169,18 +136,9 @@ export function GreetingBanner({ audience, className = '' }: { audience: Greetin
           animation: greeting-shine 1.6s 0.5s ease-out forwards;
         }
         @keyframes greeting-shine { to { transform: translateX(120%); } }
-        .greeting-petal { opacity: 0; animation-name: greeting-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
-        @keyframes greeting-fall {
-          0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
-          10% { opacity: 0.9; }
-          90% { opacity: 0.8; }
-          100% { opacity: 0; transform: translate(var(--drift), 420px) rotate(540deg); }
-        }
-        .greeting-spark { opacity: 0; animation-name: greeting-twinkle; animation-iteration-count: infinite; animation-timing-function: ease-in-out; text-shadow: 0 0 8px rgba(251,191,36,0.9); }
-        @keyframes greeting-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1.1); } }
         @media (prefers-reduced-motion: reduce) {
-          .greeting-in, .greeting-shine, .greeting-petal, .greeting-spark { animation: none; }
-          .greeting-petal, .greeting-spark, .greeting-shine { display: none; }
+          .greeting-in { animation: none; }
+          .greeting-shine { display: none; }
         }
       `}</style>
     </div>

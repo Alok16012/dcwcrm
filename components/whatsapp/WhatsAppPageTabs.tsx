@@ -21,7 +21,21 @@ export interface WaAccount extends BotStatus {
   phone: string | null
   is_active: boolean
   sort_order: number
+  /** What the number is for (migration 127); missing before that migration. */
+  purpose?: WaPurpose | null
 }
+
+export type WaPurpose = 'admissions' | 'ads' | 'broadcast' | 'support' | 'other'
+
+/** What a number can be for — shown on its chip so the team knows which is which. */
+const PURPOSES: { key: WaPurpose; label: string; hint: string; cls: string }[] = [
+  { key: 'admissions', label: 'Admissions', hint: 'Main number: answers enquiries with the admission script', cls: 'bg-blue-50 text-blue-700' },
+  { key: 'ads', label: 'Ads leads', hint: 'The number on Meta / Google ads (click-to-WhatsApp)', cls: 'bg-purple-50 text-purple-700' },
+  { key: 'broadcast', label: 'Broadcasting', hint: 'Outreach and broadcasts — keeps the main number safe from bans', cls: 'bg-amber-50 text-amber-700' },
+  { key: 'support', label: 'Student support', hint: 'Existing students: fees, exams, documents', cls: 'bg-emerald-50 text-emerald-700' },
+  { key: 'other', label: 'Other', hint: '', cls: 'bg-gray-100 text-gray-600' },
+]
+const purposeOf = (k?: string | null) => PURPOSES.find(p => p.key === k) ?? null
 
 /** "Number 1" — everything from before several numbers belongs to it. */
 const FIRST_ACCOUNT = '00000000-0000-0000-0000-000000000001'
@@ -56,7 +70,7 @@ export default function WhatsAppPageTabs({ initialStatus, initialAccounts, conve
     try { saved = localStorage.getItem(PICK_KEY) } catch { /* ignore */ }
     if (saved) void Promise.resolve().then(() => setPicked(saved))
   }, [])
-  const [editing, setEditing] = useState<{ id?: string; label: string; phone: string } | null>(null)
+  const [editing, setEditing] = useState<{ id?: string; label: string; phone: string; purpose: WaPurpose } | null>(null)
   const [removing, setRemoving] = useState<WaAccount | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -89,12 +103,18 @@ export default function WhatsAppPageTabs({ initialStatus, initialAccounts, conve
     const phone = editing.phone.replace(/\D/g, '') || null
     setSaving(true)
     const { data: { user } } = await db().auth.getUser()
-    const res = editing.id
-      ? await db().from('wa_accounts').update({ label, phone, updated_at: new Date().toISOString() }).eq('id', editing.id).select().single()
-      : await db().from('wa_accounts').insert({
-          label, phone, created_by: user?.id ?? null,
-          sort_order: (accounts ?? []).reduce((m, a) => Math.max(m, a.sort_order), 0) + 1,
-        }).select().single()
+    const write = (withPurpose: boolean) => {
+      const fields = { label, phone, ...(withPurpose ? { purpose: editing.purpose } : {}) }
+      return editing.id
+        ? db().from('wa_accounts').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editing.id).select().single()
+        : db().from('wa_accounts').insert({
+            ...fields, created_by: user?.id ?? null,
+            sort_order: (accounts ?? []).reduce((m, a) => Math.max(m, a.sort_order), 0) + 1,
+          }).select().single()
+    }
+    let res = await write(true)
+    // Before migration 127 there is no purpose column: save the rest.
+    if (res.error && /purpose/.test(res.error.message)) res = await write(false)
     setSaving(false)
     if (res.error) return toast.error(res.error.message)
     toast.success(editing.id ? 'Saved' : `${label} added — its QR appears here within a minute`)
@@ -140,16 +160,19 @@ export default function WhatsAppPageTabs({ initialStatus, initialAccounts, conve
                 } ${a.is_active ? '' : 'opacity-60'}`}>
                 <span className={`h-2 w-2 rounded-full ${dot(a)}`} />
                 {a.label}
+                {purposeOf(a.purpose) && (
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${purposeOf(a.purpose)!.cls}`}>{purposeOf(a.purpose)!.label}</span>
+                )}
                 {a.connected_as && <span className="text-[11px] font-normal text-gray-400">{a.connected_as}</span>}
               </button>
             ))}
-            <Button size="sm" variant="outline" className="h-8" onClick={() => setEditing({ label: '', phone: '' })}>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => setEditing({ label: '', phone: '', purpose: (accounts ?? []).length ? 'ads' : 'admissions' })}>
               <Plus className="w-3.5 h-3.5 mr-1" /> Add number
             </Button>
             {account && (
               <div className="ml-auto flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-8" title="Rename"
-                  onClick={() => setEditing({ id: account.id, label: account.label, phone: account.phone ?? '' })}>
+                <Button size="sm" variant="ghost" className="h-8" title="Edit name and purpose"
+                  onClick={() => setEditing({ id: account.id, label: account.label, phone: account.phone ?? '', purpose: account.purpose ?? 'admissions' })}>
                   <Pencil className="w-3.5 h-3.5" />
                 </Button>
                 <Button size="sm" variant="ghost" className="h-8" title={account.is_active ? 'Switch off' : 'Switch on'} onClick={() => toggleActive(account)}>
@@ -197,6 +220,21 @@ export default function WhatsAppPageTabs({ initialStatus, initialAccounts, conve
                 <div className="space-y-1.5">
                   <Label className="text-xs">Name *</Label>
                   <Input value={editing.label} onChange={e => setEditing({ ...editing, label: e.target.value })} placeholder="e.g. Open Schooling, Degree, Ads number" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Used for</Label>
+                  <div className="grid gap-1.5">
+                    {PURPOSES.map(p => (
+                      <label key={p.key} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${editing.purpose === p.key ? 'border-blue-400 bg-blue-50/60' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <input type="radio" name="wa-purpose" className="mt-0.5 accent-blue-600" checked={editing.purpose === p.key}
+                          onChange={() => setEditing({ ...editing, purpose: p.key })} />
+                        <span>
+                          <span className="font-medium text-gray-800">{p.label}</span>
+                          {p.hint && <span className="block text-xs text-gray-500">{p.hint}</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Phone number (optional)</Label>

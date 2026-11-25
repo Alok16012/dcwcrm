@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS greeting_banners (
   audiences   text[] NOT NULL DEFAULT '{staff,student,associate}',
   starts_on   date NOT NULL,
   ends_on     date NOT NULL,
-  -- 'petals' | 'sparkles' | 'none'
+  -- a key from components/shared/greetingEffects (petals, diyas, fireworks, colors, …)
   effect      text NOT NULL DEFAULT 'petals',
   is_active   boolean NOT NULL DEFAULT true,
   created_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,

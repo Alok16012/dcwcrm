@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { createClient } from '@/lib/supabase/client'
+import { GREETING_EFFECTS, GreetingEffectLayer, type GreetingEffect } from '@/components/shared/greetingEffects'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -18,7 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 // components/shared/GreetingBanner doing the animation.
 
 type Audience = 'staff' | 'student' | 'associate'
-type Effect = 'petals' | 'sparkles' | 'none'
+type Effect = GreetingEffect
 
 interface Greeting {
   id: string
@@ -37,11 +38,6 @@ const AUDIENCES: { key: Audience; label: string }[] = [
   { key: 'staff', label: 'Staff' },
   { key: 'student', label: 'Students' },
   { key: 'associate', label: 'Associates' },
-]
-const EFFECTS: { key: Effect; label: string }[] = [
-  { key: 'petals', label: 'Falling petals' },
-  { key: 'sparkles', label: 'Sparkles' },
-  { key: 'none', label: 'No effect' },
 ]
 
 const BUCKET = 'student-documents'
@@ -208,6 +204,8 @@ export function GreetingsClient() {
                     <div className="relative rounded-xl overflow-hidden border border-gray-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={draft.image_url} alt="" className="w-full max-h-64 object-cover" />
+                      {/* Live preview of the chosen animation */}
+                      <GreetingEffectLayer effect={draft.effect} />
                       <Button size="sm" variant="outline" className="absolute right-2 bottom-2 bg-white/90" disabled={uploading} onClick={() => fileRef.current?.click()}>
                         {uploading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1" />} Replace
                       </Button>
@@ -231,7 +229,7 @@ export function GreetingsClient() {
                     <Label className="text-xs">Animation</Label>
                     <select value={draft.effect} onChange={e => setDraft({ ...draft, effect: e.target.value as Effect })}
                       className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm">
-                      {EFFECTS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                      {GREETING_EFFECTS.map(f => <option key={f.key} value={f.key}>{f.label}{f.hint ? ` — ${f.hint}` : ''}</option>)}
                     </select>
                   </div>
                 </div>

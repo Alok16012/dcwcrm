@@ -1,6 +1,6 @@
 'use client'
 import { withBase } from '@/lib/base-path'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { usePathname } from 'next/navigation'
 import {
   Users, BookOpen, GraduationCap, DollarSign,

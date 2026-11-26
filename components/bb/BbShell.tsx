@@ -2,7 +2,7 @@
 import { withBase } from '@/lib/base-path'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'

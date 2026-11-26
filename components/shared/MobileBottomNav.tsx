@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { usePathname } from 'next/navigation'
 import {
   Home, Users, GraduationCap, Award, Wallet, Truck,

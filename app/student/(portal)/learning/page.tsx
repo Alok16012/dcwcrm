@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { MonitorPlay, CalendarClock, Megaphone, ExternalLink, BookOpen, ChevronRight, PlayCircle } from 'lucide-react'
 import { requireStudent } from '@/lib/lms/server'
 import { fmtDateTime, pct, type LmsAnnouncement, type LmsCourse, type LmsLiveClass } from '@/lib/lms/shared'

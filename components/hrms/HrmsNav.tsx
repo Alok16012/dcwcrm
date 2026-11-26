@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { usePathname } from 'next/navigation'
 import { Users, CalendarCheck, CalendarDays, ClipboardCheck, Banknote, Wallet, Fingerprint, Settings, LayoutDashboard, BarChart3 } from 'lucide-react'
 

@@ -1,7 +1,7 @@
 import { withBase } from '@/lib/base-path'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import {
   GraduationCap, Wallet, BookOpen, HelpCircle, Bell,
   ChevronRight, CheckCircle2, Clock, AlertCircle, User,

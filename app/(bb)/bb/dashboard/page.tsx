@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { createServerClient } from '@/lib/supabase/server'
 import { asLoose } from '@/lib/bb/db'
 import { inr, inrShort, STAGE_STYLE, APPLICATION_STAGES, CANDIDATE_STATUS_STYLE } from '@/lib/bb/constants'

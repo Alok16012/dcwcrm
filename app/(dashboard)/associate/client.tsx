@@ -10,7 +10,7 @@ import {
   UserCheck, BarChart2, ChevronRight, Package, Phone, PhoneCall,
   School, UserCog, FileText,
 } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { toast } from 'sonner'
 import { STUDENT_LIFECYCLE, getLifecycleStage, lifecycleProgress } from '@/components/shared/StudentLifecycle'
 import { GreetingBanner } from '@/components/shared/GreetingBanner'

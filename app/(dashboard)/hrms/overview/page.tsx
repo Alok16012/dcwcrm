@@ -1,6 +1,6 @@
 import { withBase } from '@/lib/base-path'
 import { DCW_STAFF_ROLES } from '@/lib/dcw-roles'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { loadHrmsSettings } from '@/lib/hrms/attendance-rules'

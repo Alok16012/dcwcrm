@@ -1,7 +1,7 @@
 import { type Student } from '@/types/app.types'
 import { format } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { ExternalLink } from 'lucide-react'
 
 interface StudentRecordProps {

@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import FinanceSummary from '@/components/finance/FinanceSummary'
 import { MonthlyFinanceSummary } from '@/components/finance/MonthlyFinanceSummary'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 
 export default async function FinancePage() {
   const supabase = await createServerClient()

@@ -2,7 +2,7 @@
 import { Bell, Menu } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { usePathname } from 'next/navigation'
 import { useUIStore } from '@/store/useUIStore'
 

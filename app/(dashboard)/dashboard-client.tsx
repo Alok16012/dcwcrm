@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { createClient } from '@/lib/supabase/client'
 import { StatCard } from '@/components/shared/StatCard'
 import { MobileHome } from '@/components/dashboard/MobileHome'

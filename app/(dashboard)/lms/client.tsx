@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { Plus, Search, BookOpen, Layers, Users, CalendarClock, ClipboardCheck, MonitorPlay, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'

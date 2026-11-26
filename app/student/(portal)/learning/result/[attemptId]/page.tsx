@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
 import { requireStudent } from '@/lib/lms/server'

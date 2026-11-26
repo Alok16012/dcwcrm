@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {

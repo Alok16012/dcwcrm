@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { toast } from 'sonner'
 import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown, Users, FileText, Radio, Star, Loader2,

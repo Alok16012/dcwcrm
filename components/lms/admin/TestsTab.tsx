@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/AppLink'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, ClipboardCheck, ChevronRight, Clock } from 'lucide-react'

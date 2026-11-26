@@ -2,10 +2,12 @@ import { cache } from 'react'
 import { createServerClient as _createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database.types'
+import { verifySessionLocally } from './local-auth'
 
 export async function createServerClient() {
   const cookieStore = await cookies()
-  return _createServerClient<Database>(
+  // getUser() on this client verifies the session locally: see local-auth.ts.
+  return verifySessionLocally(_createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -22,7 +24,7 @@ export async function createServerClient() {
         },
       },
     }
-  )
+  ))
 }
 
 /**

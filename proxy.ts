@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { isBbRole } from '@/lib/bb/constants'
 import { withBase } from '@/lib/base-path'
+import { verifySessionLocally } from '@/lib/supabase/local-auth'
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
@@ -33,7 +34,8 @@ export async function proxy(request: NextRequest) {
 
   if (isApiRoute || isPublicLink || isPwaAsset || isWalkinRoute || isJoinRoute) return response
 
-  const supabase = createServerClient(
+  // getUser() on this client verifies the session locally (lib/supabase/local-auth.ts).
+  const supabase = verifySessionLocally(createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -52,10 +54,13 @@ export async function proxy(request: NextRequest) {
         },
       },
     }
-  )
+  ))
 
-  // getUser(), not getClaims(): on Vercel getClaims() hung until the proxy
-  // hit MIDDLEWARE_INVOCATION_TIMEOUT (504) on every page, login included.
+  // An earlier switch to getClaims() here hung until MIDDLEWARE_INVOCATION_TIMEOUT
+  // (504). In Nov 2026 Supabase Auth itself turned out to be the thing that was
+  // hanging (health checks timing out after 90 s), and getUser() hung with it.
+  // getClaims() only needs Auth to fetch the public key, which is then cached
+  // for 10 minutes, so it is now much less exposed to Auth being slow.
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id ?? null
 
